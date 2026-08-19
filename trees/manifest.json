@@ -1,0 +1,74 @@
+{
+  "variants": [
+    {
+      "name": "pine_large",
+      "role": "canopy",
+      "file": "pine_large.json",
+      "srcHeight": 68.38,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.5
+    },
+    {
+      "name": "pine_bush",
+      "role": "canopy",
+      "file": "pine_bush.json",
+      "srcHeight": 40.93,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.4
+    },
+    {
+      "name": "aspen",
+      "role": "grove",
+      "file": "aspen.json",
+      "srcHeight": 74.33,
+      "tex": {
+        "barkColor": "tex/birch_color.jpg",
+        "barkNormal": "tex/birch_normal.jpg",
+        "barkRough": "tex/birch_rough.jpg",
+        "barkAO": "tex/birch_ao.jpg",
+        "leaf": "tex/oak_leaf.png"
+      },
+      "alphaTest": 0.3
+    },
+    {
+      "name": "pine_mid",
+      "role": "mid",
+      "file": "pine_mid.json",
+      "srcHeight": 67.78,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.32
+    },
+    {
+      "name": "pine_far",
+      "role": "far",
+      "file": "pine_far.json",
+      "srcHeight": 70.15,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.3
+    }
+  ]
+}

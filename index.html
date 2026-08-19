@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Terrain — Paradise Valley</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d1117;overflow:hidden;font-family:system-ui,sans-serif;color:#e6edf3}
+  #c{display:block;width:100%;height:100%}
+  .card{position:fixed;z-index:10;background:rgba(13,17,23,.75);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5}
+  #hud{top:10px;left:10px}
+  #hud b{color:#7ee787}
+  #panel{bottom:10px;left:10px;max-height:78vh;overflow:auto}
+  #fab{position:fixed;bottom:10px;left:10px;z-index:12;width:42px;height:42px;border-radius:50%;font-size:22px;line-height:1;display:none;cursor:pointer;color:#7ee787}
+  #min{padding:0 9px;font-size:15px;line-height:1.2}
+  #stats{bottom:10px;right:10px;font:11px/1.5 monospace;color:#7ee787}
+  #panel .sec{margin-top:7px;padding-top:6px;border-top:1px solid #2a3038;color:#9aa4af;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+  #panel label{display:flex;align-items:center;gap:8px;margin-top:4px}
+  input[type=range]{width:120px}
+  select,button{cursor:pointer;background:#21262d;color:#e6edf3;border:1px solid #444;border-radius:6px;padding:4px 8px}
+  #info{top:10px;right:10px;max-width:210px;color:#ffd479}
+  #compass{position:fixed;z-index:10;top:120px;right:10px;width:52px;height:52px;background:rgba(13,17,23,.75);border-radius:50%;font-size:11px}
+  #compass span{position:absolute;left:50%;transform:translateX(-50%);top:4px;color:#ff7b72;font-weight:bold}
+  #ov{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;opacity:.5;pointer-events:none;display:none;z-index:5}
+  #err{position:fixed;bottom:0;left:0;right:0;background:#7d1d1d;color:#fff;font:12px monospace;padding:6px;white-space:pre-wrap;display:none;z-index:99}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<img id="ov">
+<div id="hud" class="card">loading…</div>
+<div id="info" class="card">tap the terrain to read coordinates</div>
+<div id="compass"><span>N</span></div>
+<div id="panel" class="card">
+  <label style="justify-content:space-between;margin:0 0 2px"><b style="color:#7ee787">Tools</b> <button id="min">–</button></label>
+  <label>vertical scale <input id="vex" type="range" min="0.5" max="3" step="0.1" value="1"><span id="vexv">1.0×</span></label>
+  <label><button id="mode">show elevation colors</button></label>
+
+  <div class="sec">structures</div>
+  <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
+
+  <div class="sec">selected — tap a building, drag to move</div>
+  <label>heading <input id="head" type="range" min="0" max="360" step="1" value="0"><span id="headv">0°</span></label>
+  <label>size <input id="size" type="range" min="0.4" max="2" step="0.02" value="1"><span id="sizev">1.00×</span></label>
+  <label>nudge 1m <button id="nw">W</button><button id="ne">E</button><button id="nn">N</button><button id="ns">S</button></label>
+  <div id="selinfo" style="font-size:11px;color:#9aa4af;margin-top:3px">none selected</div>
+
+  <div class="sec">layout data</div>
+  <label><button id="copy">copy layout</button> <button id="topview">top view</button></label>
+  <textarea id="dump" rows="5" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333;margin-top:3px" readonly></textarea>
+
+  <div class="sec">trees (from LiDAR)</div>
+  <label>style <select id="treeStyle"><option value="spiky">spiky (textured)</option><option value="lowpoly">low-poly</option><option value="cross2">billboards ×2</option><option value="cross3">billboards ×3</option></select></label>
+  <label>show <input id="treeN" type="range" min="0" max="45000" step="500" value="18000"><span id="treeNv">18000</span></label>
+  <label>billboard size <input id="bbSize" type="range" min="0.5" max="1.8" step="0.02" value="1"><span id="bbSizev">1.00</span></label>
+  <label>billboard y <input id="bbY" type="range" min="-0.4" max="0.3" step="0.01" value="0"><span id="bbYv">0.00</span></label>
+  <label><button id="reseed">rebuild</button></label>
+  <label><button id="rmtree">remove tree</button> <button id="cptree">copy removed</button></label>
+
+  <div class="sec">vehicle</div>
+  <label><button id="drive">drive the RAV4</button></label>
+  <label>drive <button id="dU">▲</button><button id="dD">▼</button><button id="dL">◀</button><button id="dR">▶</button></label>
+  <div style="font-size:10px;color:#9aa4af">arrows / WASD, or hold buttons · chase-cam lines up behind it</div>
+
+  <div class="sec">route / sim</div>
+  <label><button id="radd">add waypoints</button> <button id="rclear">clear</button></label>
+  <label><button id="rdrive">drive route</button> <button id="rintro">▶ play intro</button></label>
+  <label><button id="rcopy">copy route</button></label>
+  <textarea id="rdump" rows="2" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333" readonly></textarea>
+
+  <div class="sec">photo match</div>
+  <label>photo <input id="photo" type="file" accept="image/*" style="width:150px"></label>
+  <label>fade <input id="ovop" type="range" min="0" max="1" step="0.05" value="0.5"> <button id="ovtog">hide</button></label>
+  <label>lens FOV <input id="fov" type="range" min="35" max="95" step="1" value="55"><span id="fovv">55°</span></label>
+  <label><button id="stand">stand at marker</button> <button id="dropcam">drop camera</button></label>
+</div>
+<button id="fab" class="card">＋</button>
+<div id="stats" class="card">–</div>
+<div id="err"></div>
+<script>window.onerror=(m,s,l)=>{const e=document.getElementById('err');e.style.display='block';e.textContent+=m+' @'+l+'\n';};</script>
+<script type="importmap">
+{ "imports": {
+  "three": "./node_modules/three/build/three.module.js",
+  "three/addons/": "./node_modules/three/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeBufferGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { buildHouse } from './house-model.js';
+
+const M = await (await fetch('./manifest.json')).json();
+let houseSchema=null; try{ houseSchema=await (await fetch('./montana-home.json')).json(); }catch(e){}   // redesigned house
+const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
+const loadBin = async u => new Float32Array(await (await fetch(u)).arrayBuffer());
+const [cData, fData] = await Promise.all([loadBin('./'+M.coarse.bin), loadBin('./'+M.fine.bin)]);
+
+const cHalf = (M.coarse.W-1)*M.coarse.px/2;   // ~750 m
+const fHalf = (M.fine.W-1)*M.fine.px/2;       // ~250 m
+
+const renderer = new THREE.WebGLRenderer({canvas:c, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fb8d0);
+const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1.5, 120000);
+cam.position.set(420, relief*1.4+320, 620);
+const controls = new OrbitControls(cam, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xbcd4ff,0x2a2420,0.6));
+const sun = new THREE.DirectionalLight(0xfff2d8,1.4); sun.position.set(-1,1.3,-0.6); scene.add(sun);
+
+// ---- gradient sky dome + atmospheric haze ----
+const HAZE=new THREE.Color(0xc2d4e2);
+scene.background=HAZE.clone();
+scene.fog=new THREE.Fog(HAZE, 5000, 30000);          // only distant (>5km) fades; near scene stays clear
+const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide, depthWrite:false, depthTest:false, fog:false,
+  uniforms:{zen:{value:new THREE.Color(0x2f6fbf)}, mid:{value:new THREE.Color(0x8fbfe6)}, hor:{value:HAZE.clone()}},
+  vertexShader:'varying vec3 vp; void main(){vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'varying vec3 vp; uniform vec3 zen,mid,hor; void main(){float h=clamp(normalize(vp).y,0.0,1.0); vec3 c=mix(hor,mid,smoothstep(0.0,0.28,h)); c=mix(c,zen,smoothstep(0.22,0.8,h)); gl_FragColor=vec4(c,1.0);}'});
+const skyDome=new THREE.Mesh(new THREE.SphereGeometry(60000,24,14),skyMat); skyDome.renderOrder=-1000; scene.add(skyDome);
+
+// shared aerial texture
+const tex = new THREE.TextureLoader().load('./'+M.coarse.aerial);
+tex.encoding = THREE.sRGBEncoding;
+tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+function ramp(t){
+  const s=[[0,0x2d4a1e],[0.35,0x5a6b33],[0.6,0x8a7a4e],[0.82,0x8f8175],[1,0xd9d2c4]];
+  for(let i=0;i<s.length-1;i++){const[a,ca]=s[i],[b,cb]=s[i+1];
+    if(t<=b){const u=(t-a)/(b-a);return[((ca>>16&255)+((cb>>16&255)-(ca>>16&255))*u)/255,
+      ((ca>>8&255)+((cb>>8&255)-(ca>>8&255))*u)/255,((ca&255)+((cb&255)-(ca&255))*u)/255];}}
+  return[1,1,1];
+}
+
+// ---- terrain tiles ------------------------------------------------------
+const mats=[]; const tiles=[];
+function buildTile(data,W,H,px,uvRect,pushBack){
+  const half=(W-1)*px/2;
+  const geo=new THREE.PlaneGeometry(2*half,2*half,W-1,H-1);
+  geo.rotateX(-Math.PI/2);
+  const pos=geo.attributes.position, uv=geo.attributes.uv, col=new Float32Array(pos.count*3);
+  const baseY=new Float32Array(pos.count);
+  const [u0,v0,u1,v1]=uvRect;
+  for(let i=0;i<pos.count;i++){
+    const e=data[i]; baseY[i]=e-gmin;
+    const t=relief>0?(e-gmin)/relief:0; const [r,g,b]=ramp(t);
+    col[i*3]=r;col[i*3+1]=g;col[i*3+2]=b;
+    uv.setXY(i, u0+uv.getX(i)*(u1-u0), v0+uv.getY(i)*(v1-v0));
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const mat=new THREE.MeshStandardMaterial({map:tex,roughness:1,metalness:0});
+  if(pushBack){mat.polygonOffset=true;mat.polygonOffsetFactor=1;mat.polygonOffsetUnits=1;}
+  const mesh=new THREE.Mesh(geo,mat);
+  scene.add(mesh); mats.push(mat);
+  const t={mesh,pos,baseY,W,H,px,half,data};
+  tiles.push(t); return t;
+}
+const fu=fHalf/cHalf, uv0=0.5-fu*0.5, uv1=0.5+fu*0.5;
+const coarse=buildTile(cData,M.coarse.W,M.coarse.H,M.coarse.px,[0,0,1,1],true);
+const fine  =buildTile(fData,M.fine.W,  M.fine.H,  M.fine.px,[uv0,uv0,uv1,uv1],false);
+// boost saturation of the draped aerial (in-shader, GPU side)
+for(const m of mats){ m.onBeforeCompile=sh=>{ sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',
+  '#include <map_fragment>\n{float l=dot(diffuseColor.rgb,vec3(0.299,0.587,0.114));diffuseColor.rgb=clamp(mix(vec3(l),diffuseColor.rgb,1.5),0.0,1.0);}'); }; m.needsUpdate=true; }
+
+// ---- height sampling ----------------------------------------------------
+let VEX=1;
+function sampleBase(x,z,t){
+  const i=(x+t.half)/t.px, j=(z+t.half)/t.px;
+  if(i<0||j<0||i>t.W-1||j>t.H-1) return null;
+  const i0=Math.floor(i),j0=Math.floor(j),fx=i-i0,fy=j-j0;
+  const i1=Math.min(i0+1,t.W-1),j1=Math.min(j0+1,t.H-1);
+  const a=t.baseY[j0*t.W+i0],b=t.baseY[j0*t.W+i1],cc=t.baseY[j1*t.W+i0],d=t.baseY[j1*t.W+i1];
+  return (a*(1-fx)+b*fx)*(1-fy)+(cc*(1-fx)+d*fx)*fy;
+}
+function heightAt(x,z){
+  let v=(Math.abs(x)<=fine.half&&Math.abs(z)<=fine.half)?sampleBase(x,z,fine):null;
+  if(v==null) v=sampleBase(x,z,coarse);
+  return (v==null?0:v)*VEX;
+}
+
+// ---- building models ----------------------------------------------------
+const placed=[];
+const MAT=(c,r=.9,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,flatShading:true});
+const COL={side:0x352a20, trim:0xece9e0, roof:0x2e3033, glass:0x28323b,
+           wood:0xba8a4e, stone:0x6b6560, garage:0xbcac91, tank:0xd6d2c6};
+function box(p,w,h,d,x,y,z,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);p.add(m);return m;}
+// gable roof, ridge along Z, gable ends face +Z / -Z. baseY = eave height.
+function gableRoof(p,w,d,rh,baseY,eave,mat){
+  const s=new THREE.Shape();s.moveTo(-w/2-eave,0);s.lineTo(w/2+eave,0);s.lineTo(0,rh);s.lineTo(-w/2-eave,0);
+  const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:d+2*eave,bevelEnabled:false}),mat);
+  r.position.set(0,baseY,-(d/2+eave));p.add(r);return r;
+}
+// gable roof with ridge along X (E–W); slopes face ±Z, gable ends (siding) face ±X
+function gableRoofX(g,w,d,rh,baseY,eave,roofMat,gableMat){
+  const D=d/2+eave, ang=Math.atan2(rh,D), sl=Math.hypot(D,rh), W=w+2*eave;
+  box(g,W,0.12,sl,0,baseY+rh/2, D/2,roofMat).rotation.x= ang;
+  box(g,W,0.12,sl,0,baseY+rh/2,-D/2,roofMat).rotation.x=-ang;
+  for(const sx of [-1,1]){const s=new THREE.Shape();s.moveTo(-d/2,0);s.lineTo(d/2,0);s.lineTo(0,rh);s.lineTo(-d/2,0);
+    const t=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.12,bevelEnabled:false}),gableMat);
+    t.rotation.y=Math.PI/2; t.position.set(sx*w/2,baseY,0); g.add(t);}
+}
+// small gabled dormer sitting on the front (+Z) slope, window facing +Z
+function dormer(g,cx,zc,yc,side,roof,glass,trim){
+  const dw=1.9,dh=1.6,dd=1.6,drh=0.9;
+  box(g,dw,dh,dd,cx,yc+dh/2,zc,side);
+  const s=new THREE.Shape();s.moveTo(-dw/2-0.15,0);s.lineTo(dw/2+0.15,0);s.lineTo(0,drh);s.lineTo(-dw/2-0.15,0);
+  const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:dd+0.3,bevelEnabled:false}),roof);
+  r.position.set(cx,yc+dh,zc-(dd/2+0.15)); g.add(r);
+  box(g,1.1,1.0,0.1,cx,yc+dh*0.52,zc+dd/2+0.05,glass);
+  box(g,1.35,1.25,0.05,cx,yc+dh*0.52,zc+dd/2+0.02,trim);
+}
+
+// build a Three.js group from the box-part schema (auto-material: walls / roof / deck)
+function buildFromParts(schema){
+  const g=new THREE.Group(), S=0.5;                          // scale designer units → ~metres
+  const sideMat=MAT(0x3a2f24), roofMat=MAT(0x33363a,.5,.35), deckMat=MAT(0x795c3a), trimMat=MAT(0xd8d4c8);
+  const wdim=p=>[p.params.w*(p.scale?p.scale[0]||1:1), p.params.d*(p.scale?p.scale[2]||1:1)];
+  for(const p of schema.parts){
+    if(p.kind!=='box') continue;
+    const P=p.params, y=p.pos[1]||0, tilted=p.rot&&((p.rot[2]||0)!==0);
+    let mat=sideMat;
+    if(tilted || (P.h<=0.4 && y>2)) mat=roofMat;             // tilted board / high thin slab = roof
+    else if(P.h<=0.4) mat=deckMat;                           // low thin slab = deck/floor
+    else if(Math.min(P.w,P.d)<=0.25 && P.h<=6) mat=trimMat;  // short thin panel = window/rail trim
+    const m=new THREE.Mesh(new THREE.BoxGeometry(P.w*S,P.h*S,P.d*S),mat);
+    m.position.set((p.pos[0]||0)*S, y*S, (p.pos[2]||0)*S);
+    if(p.rot)   m.rotation.set(p.rot[0]||0,p.rot[1]||0,p.rot[2]||0);
+    if(p.scale) m.scale.set(p.scale[0]||1,p.scale[1]||1,p.scale[2]||1);
+    g.add(m);
+  }
+  // ---- auto roof over the open-topped shell ----
+  let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,eastTop=0,westTop=0;
+  for(const p of schema.parts){if(p.params.h<3)continue; const[w,d]=wdim(p),x=p.pos[0]||0,z=p.pos[2]||0;
+    minX=Math.min(minX,x-w/2);maxX=Math.max(maxX,x+w/2);minZ=Math.min(minZ,z-d/2);maxZ=Math.max(maxZ,z+d/2);}
+  for(const p of schema.parts){if(p.params.h<3)continue; const x=p.pos[0]||0,t=(p.pos[1]||0)+p.params.h/2;
+    if(x>maxX-4)eastTop=Math.max(eastTop,t); if(x<minX+4)westTop=Math.max(westTop,t);}
+  const midX=(minX+maxX)/2, ov=3, zc=(minZ+maxZ)/2, zd=(maxZ-minZ+ov*2);
+  const slab=(x1,y1,x2,y2)=>{const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)+ov,ang=Math.atan2(dy,dx);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(len*S,0.5*S,zd*S),roofMat);
+    m.position.set((x1+x2)/2*S,(y1+y2)/2*S,zc*S); m.rotation.z=ang; g.add(m);};
+  const ridge=eastTop+4, eMid=(midX+maxX)/2;
+  slab(midX,eastTop, eMid,ridge); slab(eMid,ridge, maxX+1,eastTop-1);   // gable over the tall east block
+  slab(minX-1,westTop+1.5, midX,westTop+2.5);                          // low shed over the west wing
+  if(eastTop-westTop>2){const sw=new THREE.Mesh(new THREE.BoxGeometry(0.4*S,(eastTop-westTop+4)*S,(maxZ-minZ)*S),sideMat);
+    sw.position.set(midX*S,(westTop+eastTop)/2*S,zc*S); g.add(sw);}   // step wall between wing and block
+  return g;
+}
+function makeHouse(){
+  const saved=localStorage.getItem('montanaHouse');                  // design from the Home Designer
+  if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return h; }catch(e){} }
+  const g=new THREE.Group(), w=15,d=9,wh=6.2,rh=4.6,eave=0.7,fh=0.6;
+  const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
+        stone=MAT(COL.stone),tank=MAT(COL.tank,.5,.2),wood=MAT(COL.wood),pipe=MAT(0x242424,.5,.4);
+  box(g,w+0.6,fh,d+0.6,0,fh/2,0,stone);
+  box(g,w,wh,d,0,fh+wh/2,0,side);
+  gableRoofX(g,w,d,rh,fh+wh,eave,roof,side);
+  const wt=fh+wh, sang=Math.atan2(rh,d/2+eave);
+  dormer(g,-4.2,2.3,wt+1.3,side,roof,glass,trim);                  // left gabled dormer
+  dormer(g, 4.2,2.3,wt+1.3,side,roof,glass,trim);                  // right gabled dormer
+  for(const x of [-1.5,1.5]) box(g,1.5,0.12,1.4,x,wt+rh*0.6,1.1,glass).rotation.x=sang;   // two skylights
+  {const p=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,2.6,10),pipe);p.position.set(-5.6,wt+rh*0.55+1.0,-0.6);g.add(p);}  // stovepipe
+  const zf=d/2+0.05;
+  for(const x of [-5.0,-2.6,3.4,5.6]){box(g,1.5,1.7,0.14,x,fh+2.1,zf,glass);box(g,1.8,2.0,0.07,x,fh+2.1,zf-0.03,trim);}  // ground windows
+  box(g,3.0,2.0,1.2,0,fh+1.6,d/2+0.6,side);                        // center bay projection
+  box(g,2.6,1.4,0.14,0,fh+1.7,d/2+1.25,glass);                     // bay window
+  {const s=new THREE.Shape();s.moveTo(-1.8,0);s.lineTo(1.8,0);s.lineTo(0,0.9);s.lineTo(-1.8,0);
+   const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:1.7,bevelEnabled:false}),roof);
+   r.position.set(0,fh+2.6,d/2-0.7); g.add(r);}                    // bay gablet
+  box(g,1.4,2.6,0.14,2.0,fh+1.3,zf,MAT(COL.trim));                 // front door
+  box(g,4.6,0.2,3.2,-4.6,fh+3.1,d/2+1.4,roof);                     // left forward porch roof
+  for(const x of [-6.6,-2.6]) box(g,0.24,3.1,0.24,x,fh+1.55,d/2+2.7,wood);
+  box(g,3.2,0.2,2.6,6.2,fh+3.1,d/2+1.0,roof);                      // right covered porch roof
+  for(const x of [4.9,7.5]) box(g,0.22,3.1,0.22,x,fh+1.55,d/2+2.0,MAT(0x241e18));
+  {const t=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.4,12),tank);t.rotation.z=Math.PI/2;t.position.set(w/2+3.2,fh+0.9,-1);g.add(t);}  // propane
+  return g;
+}
+
+function makeGarageApt(){                    // tall garage w/ apartment above, steep gable
+  const g=new THREE.Group(), w=8,d=9,wh=6.2,rh=5.4,eave=0.6,fh=0.5;
+  const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
+        stone=MAT(COL.stone),wood=MAT(COL.wood),gdoor=MAT(COL.garage,.7);
+  box(g,w+0.5,fh,d+0.5,0,fh/2,0,stone);
+  box(g,w,wh,d,0,fh+wh/2,0,side);
+  gableRoof(g,w,d,rh,fh+wh,eave,roof);
+  const ang=Math.atan2(rh,w/2+eave);
+  {const s=box(g,1.3,0.14,1.6,w/4,fh+wh+rh*0.5,0,glass);s.rotation.z=-ang;}     // skylight
+  const zf=d/2+0.05;
+  box(g,w*0.60,3.0,0.14,-0.7,fh+1.5,zf,gdoor);                    // garage door
+  box(g,1.3,2.6,0.14,w/2-1.2,fh+1.3,zf,MAT(COL.trim));           // man door
+  for(const x of [-2,2]){box(g,1.3,1.7,0.14,x,fh+4.7,zf,glass);box(g,1.6,2.0,0.07,x,fh+4.7,zf-0.03,trim);}  // apt windows
+  box(g,1.1,1.1,0.14,0,fh+wh+rh*0.42,zf,glass);                  // gable peak window
+  for(const z of [-2.6,2.6]) box(g,0.14,1.6,1.2,w/2+0.05,fh+4.5,z,glass);
+  // natural-wood pergola over the entry (front, +Z)
+  const pz=d/2+2.3;
+  for(const c of [[-w/2+0.5,d/2+0.3],[-w/2+0.5,pz],[w/2-0.5,d/2+0.3],[w/2-0.5,pz]]) box(g,0.22,3.4,0.22,c[0],fh+1.7,c[1],wood);
+  box(g,w+0.2,0.2,0.22,0,fh+3.3,d/2+0.3,wood); box(g,w+0.2,0.2,0.22,0,fh+3.3,pz,wood);
+  for(let i=-3;i<=3;i++) box(g,0.14,0.14,pz-(d/2+0.3),i*1.15,fh+3.4,(d/2+0.3+pz)/2,wood);
+  // 2nd-floor balcony + railing above the entry
+  box(g,w+0.2,0.22,2.0,0,fh+3.5,d/2+1.0,side);
+  box(g,w+0.2,0.1,0.1,0,fh+4.6,d/2+2.0,trim);
+  for(let i=-3;i<=3;i++) box(g,0.07,1.1,0.07,i*1.15,fh+4.05,d/2+2.0,trim);
+  return g;
+}
+
+// railing segment with full balusters between two deck points
+function railSeg(g,mat,x1,z1,x2,z2,y,h){
+  const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz); if(len<0.05)return;
+  const ux=dx/len,uz=dz/len,ang=Math.atan2(-uz,ux);
+  box(g,len,0.07,0.07,(x1+x2)/2,y+h,(z1+z2)/2,mat).rotation.y=ang;      // top rail
+  box(g,len,0.05,0.05,(x1+x2)/2,y+0.12,(z1+z2)/2,mat).rotation.y=ang;   // bottom rail
+  const n=Math.max(2,Math.round(len/0.16));
+  for(let i=0;i<=n;i++){const t=i/n; box(g,0.04,h,0.04,x1+dx*t,y+h/2,z1+dz*t,mat);}  // balusters
+  box(g,0.09,h+0.1,0.09,x1,y+(h+0.1)/2,z1,mat); box(g,0.09,h+0.1,0.09,x2,y+(h+0.1)/2,z2,mat); // corner posts
+}
+// stair flight running along +X, descending, with railings + balusters both sides + concrete pad
+function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps){
+  const rise=0.18;
+  for(let i=0;i<steps;i++){const cx=x0+run*(i+0.5),cy=topY-rise*(i+0.5);
+    box(g,run*1.02,0.06,width,cx,cy,z0,treadM); box(g,0.05,rise,width,cx+run/2,cy-rise/2,z0,treadM);}
+  const endX=x0+run*steps,endY=topY-rise*steps;
+  for(const side of [-1,1]){const cz=z0+side*width/2;
+    for(let i=0;i<=steps;i++){box(g,0.05,0.85,0.05,x0+run*i,topY-rise*i+0.42,cz,railM);}
+    const rl=Math.hypot(run*steps,rise*steps);
+    box(g,rl,0.06,0.06,(x0+endX)/2,(topY+endY)/2+0.85,cz,railM).rotation.z=Math.atan2(endY-topY,endX-x0);
+  }
+  box(g,1.6,0.12,1.8,endX+0.9,endY-0.06,z0,concM);
+}
+function makeCabin(){
+  const g=new THREE.Group();
+  const w=6.5,d=7,wh=3.4,rh=3.0,eave=0.7,DY=1.3,P=2.6;   // DY = deck/floor height above grade, P = porch depth
+  const side=MAT(0xc9a86a),shake=MAT(0xbe9b66),accent=MAT(0x6b4a35),roof=MAT(0x2e3033,.45,.35),
+        glass=MAT(0x28323b,.3),door=MAT(0x3a352f),logM=MAT(0x9c7b4f,.8),deckM=MAT(0xa88b63),
+        railM=MAT(0x9c8358),pier=MAT(0x4a4038),conc=MAT(0xb8b4ab,.95);
+  for(const px of [-w/2+0.4,w/2-0.4]) for(const pz of [-d/2+0.4,d/2-0.4]) box(g,0.3,DY,0.3,px,DY/2,pz,pier);
+  box(g,w,wh,d,0,DY+wh/2,0,side);
+  box(g,w+0.06,1.0,d+0.06,0,DY+wh-0.5,0,shake);                        // shake band under eaves
+  {const s=new THREE.Shape();s.moveTo(-w/2-eave,0);s.lineTo(w/2+eave,0);s.lineTo(0,rh);s.lineTo(-w/2-eave,0);
+   const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:d+2*eave+P,bevelEnabled:false}),roof);
+   r.position.set(0,DY+wh,-(d/2+eave)); g.add(r);}                     // gable roof, extended over porch
+  {const s=new THREE.Shape();s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(0,rh);s.lineTo(-w/2,0);
+   const tri=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.1,bevelEnabled:false}),shake);
+   tri.position.set(0,DY+wh,d/2); g.add(tri);}                        // front gable infill
+  const zf=d/2+0.06;
+  box(g,1.8,1.3,0.14,-0.6,DY+1.7,zf,glass); box(g,2.1,1.6,0.07,-0.6,DY+1.7,zf-0.02,accent);  // window + accent frame
+  box(g,1.0,2.1,0.12,1.9,DY+1.05,zf,door);                            // door
+  const dExt=P+1.0, leftExt=2.6;
+  box(g,w+leftExt,0.18,dExt,-leftExt/2,DY-0.09,d/2+dExt/2,deckM);      // front deck
+  box(g,leftExt,0.18,d,-w/2-leftExt/2,DY-0.09,0,deckM);               // left wrap deck
+  for(const c of [[-w/2-leftExt+0.4,d/2+dExt-0.4],[w/2-0.4,d/2+dExt-0.4],[-w/2-leftExt+0.4,-d/2+0.4]])
+    box(g,0.25,DY,0.25,c[0],DY/2,c[1],pier);                          // deck piers
+  const feZ=d/2+eave+P-0.3, feY=DY+wh;
+  for(const lx of [-w/2,-w/6,w/6,w/2]){const p=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,feY-DY,7),logM);
+    p.position.set(lx,DY+(feY-DY)/2,feZ); g.add(p);}                  // peeled-log porch posts
+  {const b=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,w+0.4,7),logM);b.rotation.z=Math.PI/2;b.position.set(0,feY-0.15,feZ);g.add(b);}  // log header
+  railSeg(g,railM,-w/2-leftExt,d/2+dExt, w/2-0.2,d/2+dExt, DY,1.0);   // front rail
+  railSeg(g,railM,-w/2-leftExt,-d/2, -w/2-leftExt,d/2+dExt, DY,1.0);  // left rail
+  railSeg(g,railM,-w/2-leftExt,-d/2, -w/2,-d/2, DY,1.0);              // left return rail
+  stairFlight(g,deckM,railM,conc, w/2-0.2, d/2+dExt-0.6, DY, 0.9, 0.35, 11); // stairs down to pad
+  return g;
+}
+
+const BUILD={house:makeHouse, garage:makeGarageApt, cabin:makeCabin};
+// collapse a building's ~100s of little box meshes into one merged mesh per material → far fewer draw calls
+function matKey(m){return (m.map?'t':'')+m.color.getHexString()+'_'+m.roughness+'_'+m.metalness+(m.flatShading?'f':'');}
+function optimizeGroup(g){
+  const groups=new Map();
+  for(const o of [...g.children]){
+    if(!o.isMesh || !o.geometry.attributes.uv) continue;
+    o.updateMatrix(); const geo=o.geometry.clone().applyMatrix4(o.matrix);
+    const k=matKey(o.material);
+    if(!groups.has(k)) groups.set(k,{mat:o.material,geos:[]});
+    groups.get(k).geos.push(geo); g.remove(o);
+  }
+  for(const {mat,geos} of groups.values()){
+    const merged=mergeBufferGeometries(geos,false);
+    if(merged) g.add(new THREE.Mesh(merged,mat)); else geos.forEach(ge=>g.add(new THREE.Mesh(ge,mat)));
+  }
+}
+let sel=null;   // last-placed structure, driven live by heading/size sliders
+function placeStructure(type,x,z,heading,scale){
+  const g=BUILD[type](); optimizeGroup(g); g.position.set(x,heightAt(x,z),z);
+  const rot=heading!==undefined?heading:+document.getElementById('head').value;
+  const sc =scale  !==undefined?scale  :+document.getElementById('size').value;
+  g.rotation.y=THREE.MathUtils.degToRad(rot); g.scale.setScalar(sc);
+  scene.add(g); const rec={group:g,x,z,type}; placed.push(rec); sel=rec; return rec;
+}
+// real placements from your layout (E,N,heading,scale); z = -N
+placeStructure('house',   8,   -8, 7, 1);
+placeStructure('garage',-29.1,-9.8,65, 1);
+placeStructure('cabin', -41,   31,94, 1);
+
+// ---- trees (instanced conifers) ----------------------------------------
+const paint=(geo,c)=>{const n=geo.attributes.position.count,arr=new Float32Array(n*3),col=new THREE.Color(c);
+  for(let i=0;i<n;i++){arr[i*3]=col.r;arr[i*3+1]=col.g;arr[i*3+2]=col.b;} geo.setAttribute('color',new THREE.BufferAttribute(arr,3));return geo;};
+const treeGeo=(()=>{
+  const t=paint(new THREE.CylinderGeometry(0.22,0.34,1.8,5),0x5b4632).translate(0,0.9,0);
+  const c1=paint(new THREE.ConeGeometry(2.4,3.4,7),0x2f5233).translate(0,2.6,0);
+  const c2=paint(new THREE.ConeGeometry(1.8,2.9,7),0x356139).translate(0,4.1,0);
+  const c3=paint(new THREE.ConeGeometry(1.1,2.3,7),0x3a6b3d).translate(0,5.5,0);
+  return mergeBufferGeometries([t,c1,c2,c3]);
+})();
+const treeMat=new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1});
+// ---- tree render styles: low-poly geometry vs crossed textured billboards ----
+function makeTreeTexture(){
+  const c=document.createElement('canvas');c.width=128;c.height=256;const g=c.getContext('2d');
+  g.fillStyle='#4a3826';g.fillRect(59,205,10,48);                          // trunk
+  const cols=['#26482a','#2c5230','#335c37'];
+  for(let i=0;i<6;i++){const f=i/5, cy=210-f*180, hw=58*(1-f*0.72);        // stacked conifer tiers
+    g.beginPath();g.moveTo(64,cy-46);g.lineTo(64-hw,cy);g.lineTo(64+hw,cy);g.closePath();g.fillStyle=cols[i%3];g.fill();}
+  const id=g.getImageData(0,0,128,256), px=id.data;                        // speckle for needle texture
+  for(let k=0;k<2400;k++){const i=(Math.random()*128|0)+(Math.random()*256|0)*128;
+    if(px[i*4+3]>20){const dark=Math.random()<0.5; px[i*4]+=dark?-18:26; px[i*4+1]+=dark?-14:22; px[i*4+2]+=dark?-12:14;}}
+  g.putImageData(id,0,0);
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+const treeTex=makeTreeTexture();
+const billMat=new THREE.MeshStandardMaterial({map:treeTex,alphaTest:0.5,roughness:1,metalness:0,side:THREE.DoubleSide});
+function crossGeo(n){const ps=[];for(let k=0;k<n;k++){const p=new THREE.PlaneGeometry(6.4,7.0);p.translate(0,3.5,0);p.rotateY(k*Math.PI/n);ps.push(p);}return mergeBufferGeometries(ps);}
+// spiky low-poly conifer: cones with base rings jittered into drooping spikes + needle texture
+function needleTex(){
+  const c=document.createElement('canvas');c.width=64;c.height=64;const g=c.getContext('2d');
+  g.fillStyle='#3a6330';g.fillRect(0,0,64,64);
+  const cols=['#264a1e','#2f5626','#5c8a44','#20401a'];
+  for(let k=0;k<1100;k++){const x=Math.random()*64,y=Math.random()*64,l=2+Math.random()*4;
+    g.strokeStyle=cols[k&3];g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.lineTo(x+(Math.random()-0.5)*2,y+l);g.stroke();}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);t.encoding=THREE.sRGBEncoding;return t;
+}
+function spikeCone(r,h,y,segs){
+  const g=new THREE.ConeGeometry(r,h,segs,1,true);          // open-ended: lower poly, spikes hang free
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){const vy=pos.getY(i);
+    if(vy<-h/2+0.01){const vx=pos.getX(i),vz=pos.getZ(i),rad=Math.hypot(vx,vz);
+      if(rad>0.001){const f=1.2+Math.random()*0.55; pos.setX(i,vx*f); pos.setZ(i,vz*f); pos.setY(i,vy-(0.25+Math.random()*0.7)*h);}}}
+  g.computeVertexNormals(); g.translate(0,y,0); return g;
+}
+const treeGeoSpiky=mergeBufferGeometries([
+  new THREE.CylinderGeometry(0.16,0.28,1.6,6).translate(0,0.8,0),
+  spikeCone(1.9,3.2,2.3,8), spikeCone(1.5,2.9,3.7,8), spikeCone(1.05,2.5,5.0,7), spikeCone(0.62,2.1,6.2,7)
+]);
+const treeMatSpiky=new THREE.MeshStandardMaterial({map:needleTex(),flatShading:true,roughness:1,metalness:0});
+const STYLES={spiky:{geo:treeGeoSpiky,mat:treeMatSpiky},lowpoly:{geo:treeGeo,mat:treeMat},cross2:{geo:crossGeo(2),mat:billMat},cross3:{geo:crossGeo(3),mat:billMat}};
+let treeStyle='spiky';
+function setTreeStyle(s){treeStyle=s;buildTreeMesh();}
+let trees=[], treeMeshes=[];
+const removedTrees=new Set(); let selTree=null;   // tree editing: click to get id, remove ones inside the house
+const _o=new THREE.Object3D(), _c=new THREE.Color();
+// ---- high-detail pine (used near buildings): drooping branch-card billboards ----
+function branchTex(){
+  const c=document.createElement('canvas');c.width=160;c.height=96;const g=c.getContext('2d');
+  const greens=['#22451d','#294f22','#33612a','#1a3815']; const bx=8,tx=152,my=48;
+  for(let i=0;i<80;i++){const t=i/79, x=bx+(tx-bx)*t, spread=(1-t)*40+3;
+    for(const side of [-1,1]) for(let j=0;j<2;j++){ g.strokeStyle=greens[(i+j)&3]; g.lineWidth=2;
+      g.beginPath(); g.moveTo(x,my); g.lineTo(x+(1-t)*8+2, my+side*spread*(0.6+0.4*Math.random())); g.stroke(); }
+    g.strokeStyle=greens[(i+1)&3]; g.lineWidth=3; g.beginPath(); g.moveTo(x,my-spread*0.35); g.lineTo(x,my+spread*0.35); g.stroke();
+  }
+  const tex=new THREE.CanvasTexture(c); tex.encoding=THREE.sRGBEncoding; return tex;
+}
+const pineTrunkGeo=new THREE.CylinderGeometry(0.12,0.34,7.4,6).translate(0,3.7,0);
+const pineTrunkMat=new THREE.MeshStandardMaterial({color:0x5a4632,flatShading:true,roughness:1});
+// one branch = a ribbon that curves outward (+X) then droops down, width tapering to the tip
+function curvedBranch(L,W,segs,droop0,curve){
+  const cx=[],cy=[]; let x=0,y=0,ang=droop0;
+  for(let i=0;i<=segs;i++){cx.push(x);cy.push(y); const sl=L/segs; x+=Math.cos(ang)*sl; y-=Math.sin(ang)*sl; ang+=curve;}
+  const pos=[],uv=[],idx=[];
+  for(let i=0;i<=segs;i++){const w=W*(1-i/segs*0.8)*0.5, u=i/segs; pos.push(cx[i],cy[i],w, cx[i],cy[i],-w); uv.push(u,1, u,0);}
+  for(let i=0;i<segs;i++){const a=i*2; idx.push(a,a+2,a+1, a+1,a+2,a+3);}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+const pineFoliageGeo=(()=>{
+  const cards=[]; // [y, count, L, W, droop0, curvePerSeg]
+  const tiers=[[1.5,11,3.4,2.2,0.32,0.30],[2.4,11,3.1,2.0,0.35,0.30],[3.2,10,2.7,1.8,0.38,0.32],[4.0,9,2.3,1.6,0.40,0.32],
+               [4.7,8,2.0,1.4,0.42,0.34],[5.4,7,1.7,1.15,0.44,0.34],[6.0,6,1.4,0.95,0.46,0.34],[6.6,5,1.1,0.8,0.46,0.34],[7.1,4,0.9,0.65,0.46,0.34]];
+  for(const [ty,n,L,W,dr,cv] of tiers) for(let i=0;i<n;i++){
+    const b=curvedBranch(L*(0.8+Math.random()*0.55),W,3,dr,cv);      // vary length so some reach further
+    b.rotateY((i/n)*Math.PI*2 + ty*2.1 + Math.random()*0.35); b.translate(0,ty,0);
+    cards.push(b);
+  }
+  return mergeBufferGeometries(cards);
+})();
+const pineFoliageMat=new THREE.MeshStandardMaterial({map:branchTex(),alphaTest:0.42,side:THREE.DoubleSide,roughness:1,metalness:0});
+function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65*65) return true; } return false; }
+// ---- photoreal ez-pines (baked from ez-tree → trees/*.json). Near = detailed (alpha-fade); far = billboard impostor ----
+let ezPines=null;      // [{name, bark:Geo, leaf:Geo, barkMat, leafMat}]; null until loaded
+let ezImpostor=null;   // {mat} — camera-facing billboard using a baked image of the pine (cheap far LOD)
+let impCamU=null, impHU=null, impYU=null;   // impostor shader uniforms: camera pos (per-frame facing) + size + y-offset (sliders)
+// LOD cross-fade band (m from camera): detailed dissolves OUT and billboard dissolves IN across F0→F1
+const _F0=150.0, _F1=180.0;
+const _IGN='float _ign(vec2 p){return fract(52.9829189*fract(dot(p,vec2(0.06711056,0.00583715))));}';   // stable per-pixel dither threshold
+const _BAND=(_F1-_F0).toFixed(1);
+function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissolves to nothing by F1
+  mat.onBeforeCompile=(sh)=>{
+    sh.vertexShader='varying float vDist;\n'+sh.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n  vDist=length(mvPosition.xyz);');
+    sh.fragmentShader='varying float vDist;\n'+_IGN+'\n'+sh.fragmentShader.replace('void main() {',
+      'void main() {\n  float _fd=clamp(('+_F1.toFixed(1)+'-vDist)/'+_BAND+',0.0,1.0); if(_ign(gl_FragCoord.xy)>_fd) discard;');
+  };
+}
+(async()=>{
+  try{
+    const man=await (await fetch('./trees/manifest.json?v=7')).json();
+    const tl=new THREE.TextureLoader(), texCache={};
+    const T=(u,srgb,noMip)=>{ const key=u+(noMip?'#nm':''); if(texCache[key]) return texCache[key];
+      const t=tl.load('./trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding;
+      if(noMip){ t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; }          // alpha-fade fix: no mip alpha shrink
+      t.anisotropy=8; texCache[key]=t; return t; };
+    const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
+    const f32=(s)=>new Float32Array(dec(s)), u32=(s)=>new Uint32Array(dec(s));
+    const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
+      g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));
+      g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));
+      const uv=f32(p.uv); g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));
+      if(p.index) g.setIndex(new THREE.BufferAttribute(u32(p.index),1)); return g;};
+    const loaded=[];
+    for(const v of man.variants){ if(v.role==='mid'||v.role==='far') continue;      // skip the geo-LOD experiments; we use impostors for far
+      const d=await (await fetch('./trees/'+v.file+'?v=7')).json(); const x=v.tex;
+      const barkMat=new THREE.MeshStandardMaterial({map:T(x.barkColor,true),normalMap:T(x.barkNormal),roughnessMap:T(x.barkRough),aoMap:T(x.barkAO),roughness:1,metalness:0});
+      const leafMat=new THREE.MeshStandardMaterial({map:T(x.leaf,true),alphaTest:v.alphaTest??0.4,side:THREE.DoubleSide,roughness:1,metalness:0});
+      leafMat.alphaToCoverage=true;   // MSAA-smoothed cutout: keeps needles from harshly vanishing, no mip-off shimmer
+      addDitherFadeOut(barkMat); addDitherFadeOut(leafMat);   // dissolve out as they approach the LOD hand-off
+      loaded.push({name:v.name, bark:mkGeo(d.branches), leaf:mkGeo(d.leaves), barkMat, leafMat}); }
+    ezPines=loaded;
+    // billboard impostor material (Y-axis camera-facing GPU billboard; dissolves IN as its detailed twin dissolves out)
+    const impTex=T('tex/impostor_pine_large.png?v=2',true); impTex.anisotropy=8;
+    const impMat=new THREE.MeshBasicMaterial({map:impTex,alphaTest:0.3,side:THREE.DoubleSide,fog:true});
+    impMat.color.setScalar(0.72);   // impostor is unlit/full-bright → darken it to match the shaded detailed pines
+    impMat.onBeforeCompile=(sh)=>{
+      sh.uniforms.uCam={value:new THREE.Vector3()}; impCamU=sh.uniforms.uCam;   // MeshBasicMaterial doesn't auto-refresh cameraPosition → feed it ourselves each frame
+      sh.uniforms.uHScale={value:1.0}; sh.uniforms.uYOff={value:0.0}; impHU=sh.uniforms.uHScale; impYU=sh.uniforms.uYOff;   // live billboard size + vertical offset (sliders)
+      sh.vertexShader=('attribute float aDetail;\nuniform vec3 uCam;\nuniform float uHScale;\nuniform float uYOff;\nvarying float vDist;\nvarying float vDet;\n'+sh.vertexShader).replace('#include <project_vertex>', `
+        vec3 iC=(modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0)).xyz;
+        float sX=length(instanceMatrix[0].xyz), sY=length(instanceMatrix[1].xyz);
+        vec3 dir=uCam-iC; dir.y=0.0; dir=normalize(dir);
+        vec3 rgt=normalize(cross(vec3(0.0,1.0,0.0),dir));
+        vec3 wp=iC + rgt*(position.x*sX*uHScale) + vec3(0.0,1.0,0.0)*(position.y*sY*uHScale + uYOff*sY);
+        vec4 mvPosition=viewMatrix*vec4(wp,1.0);
+        gl_Position=projectionMatrix*mvPosition; vDist=length(uCam-iC); vDet=aDetail;`);
+      sh.fragmentShader=('varying float vDist;\nvarying float vDet;\n'+_IGN+'\n'+sh.fragmentShader).replace('void main() {',
+        'void main() {\n  if(vDet>0.5){ float _fd=clamp(('+_F1.toFixed(1)+'-vDist)/'+_BAND+',0.0,1.0); if(_ign(gl_FragCoord.xy)<=_fd) discard; }');   // complement of the detailed dissolve
+    };
+    ezImpostor={ mat:impMat };
+    if(trees.length) buildTreeMesh();                 // rebuild now that the photoreal pines are ready
+  }catch(e){ console.warn('ez-pines load failed, using fallback pine',e); }
+})();
+const _impGeo=new THREE.PlaneGeometry(1,1).translate(0,0.5,0);   // unit billboard: x∈[-.5,.5], y∈[0,1]
+const IMP_ASPECT=0.261;  // impostor image width/height (tightly cropped 73/280) → quad width = height*aspect
+const _UP=new THREE.Vector3(0,1,0), _XAX=new THREE.Vector3(1,0,0), _q=new THREE.Quaternion();
+const _zeroMat=new THREE.Matrix4().makeScale(0,0,0);            // collapse a hidden impostor instance
+function impMatrix(t){ const h=(t.h||10); _o.position.set(t.x,t.gy,t.z); _o.quaternion.identity(); _o.scale.set(h*IMP_ASPECT,h,1); _o.updateMatrix(); return _o.matrix; }  // tight crop → base at ground, height = real tree height
+// build one detailed InstancedMesh (bark or leaf) over a list; returns {im,list} (does NOT track in treeMeshes)
+function mkInstEz(geo,mat,list){
+  const im=new THREE.InstancedMesh(geo,mat,list.length);
+  for(let i=0;i<list.length;i++){const t=list[i];
+    _o.position.set(t.x,t.gy!=null?t.gy:heightAt(t.x,t.z),t.z);
+    _o.quaternion.setFromAxisAngle(_UP,t.r);                              // trunk spin
+    if(t.lean){ _q.setFromAxisAngle(_XAX,t.lean); _o.quaternion.premultiply(_q); }  // world-space lean (aspens lean north, -z)
+    _o.scale.setScalar(t.h||t.s*6.4);_o.updateMatrix();                  // ez geo is unit-height → scale = real LiDAR height (m)
+    im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
+  scene.add(im); return {im,list};
+}
+// pick a pine variant by real height: tall→pine_large, short→bushy (aspens are placed as groves, not here)
+function ezVariantFor(t){
+  const n=ezPines.map(v=>v.name), iL=n.indexOf('pine_large'), iB=n.indexOf('pine_bush');
+  const r=((t.id*2654435761)>>>0)/4294967296, h=t.h||10;
+  const idx = (h<=9) ? iB : (h>=16 ? iL : (r<0.5 ? iB : iL));
+  return (idx>=0 && idx<ezPines.length) ? idx : (t.id % ezPines.length);
+}
+// aspen groves (small, north-leaning, green) at the two spots he marked — scene coords x=E, z=-N
+const ASPEN_GROVES=[[-39.8, 10.8],[-6.1, 43.8]];
+// distance from a point to the driveway polyline (routePts), for zoning trees along the drive
+function _pSeg(px,pz,ax,az,bx,bz){ const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1; let u=((px-ax)*dx+(pz-az)*dz)/l2; u=u<0?0:u>1?1:u; const cx=ax+u*dx,cz=az+u*dz; return Math.hypot(px-cx,pz-cz); }
+function distDriveway(x,z){ let m=1e9; for(let i=0;i<routePts.length-1;i++){ const a=routePts[i],b=routePts[i+1]; const d=_pSeg(x,z,a.x,a.z,b.x,b.z); if(d<m)m=d; } return m; }
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+// real tree positions from LiDAR (trees.bin = Float32 x,z,height triples)
+let realXZ=new Float32Array(0);
+const TREE_SHIFT_N=3;        // nudge all trees north to line up with the aerial (z = -N, so subtract)
+function inBuilding(x,z){                                          // LiDAR read building roofs as canopy — reject those
+  for(const o of placed){ const r=o.type==='house'?11:o.type==='cabin'?9:8;
+    if((x-o.x)**2+(z-o.z)**2 < r*r) return true; }
+  return false;
+}
+function buildTreesFrom(n){
+  const total=realXZ.length/3; n=Math.min(n,total);
+  const stride=n>0?total/n:1, R=rng(12345); trees=[];
+  for(let k=0;k<n;k++){const idx=Math.floor(k*stride);
+    if(removedTrees.has(idx)) continue;                             // skip trees you've deleted
+    const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
+    if(inBuilding(rx,rz)) continue;                                 // strip trees sitting on the buildings
+    const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
+    trees.push({id:idx,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+R()*0.2),r:R()*Math.PI*2,tint:0.8+R()*0.35});}
+  buildTreeMesh();
+}
+function addInst(geo,mat,list){
+  if(!list.length) return;
+  const im=new THREE.InstancedMesh(geo,mat,list.length);
+  for(let i=0;i<list.length;i++){const t=list[i];
+    _o.position.set(t.x,heightAt(t.x,t.z),t.z);_o.rotation.set(0,t.r,0);_o.scale.setScalar(t.s);_o.updateMatrix();
+    im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
+  scene.add(im); treeMeshes.push({im,list});
+}
+const DRIVE_W=20;          // driveway corridor half-width (m) → bushy pines line the drive
+// ---- dynamic camera-distance LOD: detailed pines swap to billboard impostors past LOD_DIST from the camera ----
+const LOD_DIST=180;        // trees within this many m (3D) of the camera get detailed geometry
+const MAX_DETAIL=340;      // hard cap on detailed trees (perf) — keep the nearest ones
+let impMesh=null, impDetailAttr=null;   // persistent impostor InstancedMesh over ALL trees (instance i ↔ trees[i]) + per-instance "has detailed twin" flag
+let detMeshes=[], groveMeshes=[];   // detailed pines (rebuilt on camera move) + aspen groves (always detailed)
+let detailSet=new Set();   // impostor instance indices currently cross-fading with a detailed twin
+const _lodPrev=new THREE.Vector3(1e9,0,1e9);
+function assignVariants(){   // decide each tree's detailed pine type once (driveway→bushy, near-build mix, else by height)
+  const iL=ezPines.findIndex(v=>v.name==='pine_large'), iB=ezPines.findIndex(v=>v.name==='pine_bush');
+  for(const t of trees){ const nb=isNearBuild(t.x,t.z), h=t.h||0;
+    t.variant = (!nb && distDriveway(t.x,t.z)<DRIVE_W) ? (iB>=0?iB:0)
+              : nb ? ezVariantFor(t)
+              : (h<=9 ? (iB>=0?iB:0) : (iL>=0?iL:0));
+    t.lean=0; }
+}
+function buildGroves(){      // aspen groves — small, north-leaning, green; always detailed (few trees, fixed spots)
+  const iA=ezPines.findIndex(v=>v.name==='aspen'); if(iA<0) return;
+  const list=[], g=rng(9001);
+  for(const [cx,cz] of ASPEN_GROVES){ const nA=6+((g()*4)|0);
+    for(let k=0;k<nA;k++){ const a=g()*6.283, rad=g()*6.2, x=cx+Math.cos(a)*rad, z=cz+Math.sin(a)*rad;
+      list.push({x,z,gy:heightAt(x,z),h:4.2+g()*3.4,r:g()*6.283,tint:0.85+g()*0.22,lean:-(0.18+g()*0.12)}); } }
+  const v=ezPines[iA];
+  groveMeshes.push(mkInstEz(v.bark,v.barkMat,list), mkInstEz(v.leaf,v.leafMat,list));
+}
+function buildTreeMesh(){
+  for(const {im} of treeMeshes){scene.remove(im); im.dispose();} treeMeshes=[];
+  for(const m of detMeshes){scene.remove(m.im); m.im.dispose();} detMeshes=[];
+  for(const m of groveMeshes){scene.remove(m.im); m.im.dispose();} groveMeshes=[];
+  if(impMesh){ scene.remove(impMesh); impMesh.dispose(); impMesh=null; } detailSet=new Set();
+  const S=STYLES[treeStyle];
+  if(!(ezPines && ezPines.length && ezImpostor)){                   // fallback: old near/far split with the hand-made pine
+    const near=[], far=[];
+    for(const t of trees) (isNearBuild(t.x,t.z)?near:far).push(t);
+    addInst(S.geo,S.mat,far); addInst(treeGeoSpiky,treeMatSpiky,near); addInst(pineFoliageGeo,pineFoliageMat,near);
+    return;
+  }
+  assignVariants();
+  impMesh=new THREE.InstancedMesh(_impGeo, ezImpostor.mat, trees.length);   // one billboard per tree, always present
+  impMesh.frustumCulled=false;
+  impDetailAttr=new THREE.InstancedBufferAttribute(new Float32Array(trees.length),1);   // 1 = has a detailed twin right now (billboard cross-fades)
+  impMesh.geometry.setAttribute('aDetail',impDetailAttr);
+  for(let i=0;i<trees.length;i++){ const t=trees[i]; impMesh.setMatrixAt(i,impMatrix(t)); impMesh.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint)); }
+  impMesh.instanceMatrix.needsUpdate=true; if(impMesh.instanceColor) impMesh.instanceColor.needsUpdate=true;
+  scene.add(impMesh);
+  buildGroves();
+  _lodPrev.set(1e9,0,1e9); updateTreeLOD(true);
+}
+// swap nearby trees to detailed & hide their billboards; throttled to when the camera actually moves
+function updateTreeLOD(force){
+  if(!impMesh || !ezPines) return;
+  const dx=cam.position.x-_lodPrev.x, dy=cam.position.y-_lodPrev.y, dz=cam.position.z-_lodPrev.z;
+  if(!force && dx*dx+dy*dy+dz*dz < 14*14) return;                   // only re-evaluate every ~14 m of camera travel
+  _lodPrev.copy(cam.position);
+  const cx=cam.position.x, cy=cam.position.y, cz=cam.position.z, R2=LOD_DIST*LOD_DIST;
+  let near=[];
+  for(let i=0;i<trees.length;i++){ const t=trees[i]; const a=t.x-cx,b=(t.gy+ (t.h||10)*0.5)-cy,c=t.z-cz; if(a*a+b*b+c*c<R2) near.push(i); }
+  if(near.length>MAX_DETAIL){ near.sort((p,q)=>{ const A=trees[p],B=trees[q]; return ((A.x-cx)**2+(A.z-cz)**2)-((B.x-cx)**2+(B.z-cz)**2); }); near.length=MAX_DETAIL; }
+  const newSet=new Set(near); let changed=false; const a=impDetailAttr.array;
+  for(const i of detailSet){ if(!newSet.has(i)){ a[i]=0; changed=true; } }   // left the band → billboard shows fully again
+  for(const i of newSet){ if(!detailSet.has(i)){ a[i]=1; changed=true; } }   // gained a detailed twin → billboard cross-fades
+  if(changed) impDetailAttr.needsUpdate=true;
+  detailSet=newSet;
+  for(const m of detMeshes){ scene.remove(m.im); m.im.dispose(); } detMeshes=[];
+  const buckets=ezPines.map(()=>[]);
+  for(const i of near){ const t=trees[i]; buckets[t.variant].push(t); }
+  ezPines.forEach((v,idx)=>{ if(buckets[idx].length){ detMeshes.push(mkInstEz(v.bark,v.barkMat,buckets[idx])); detMeshes.push(mkInstEz(v.leaf,v.leafMat,buckets[idx])); } });
+}
+(async()=>{
+  try{ realXZ=new Float32Array(await (await fetch('./trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
+  const total=realXZ.length/3, sl=document.getElementById('treeN');
+  sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
+  buildTreesFrom(+sl.value);
+})();
+
+// ---- distant low-poly mountains (60 km regional DEM, hole for the detailed scene) ----
+(async()=>{
+  const dj=await (await fetch('./distant.json')).json();
+  const dz=new Float32Array(await (await fetch('./distant.bin')).arrayBuffer());
+  const {W,H,span}=dj, hole=450;
+  function ramp(e){
+    const s=[[1500,0x3f5a2f],[1900,0x50632f],[2300,0x6b6a45],[2650,0x776a55],[2900,0x8a8378],[3100,0xb9b4ab],[3350,0xf4f4f4]];
+    for(let i=0;i<s.length-1;i++){const[a,ca]=s[i],[b,cb]=s[i+1];
+      if(e<=b){const u=Math.max(0,(e-a)/(b-a));
+        return[((ca>>16&255)+((cb>>16&255)-(ca>>16&255))*u)/255,((ca>>8&255)+((cb>>8&255)-(ca>>8&255))*u)/255,((ca&255)+((cb&255)-(ca&255))*u)/255];}}
+    return[0.96,0.96,0.96];
+  }
+  const verts=new Float32Array(W*H*3), cols=new Float32Array(W*H*3), idx=[];
+  for(let j=0;j<H;j++)for(let i=0;i<W;i++){
+    const x=(i/(W-1)-0.5)*span, z=-((0.5-j/(H-1))*span), e=dz[j*W+i], k=(j*W+i)*3;
+    verts[k]=x; verts[k+1]=(e-gmin)-3; verts[k+2]=z;      // -3 so it tucks just under the detailed terrain
+    const c=ramp(e); cols[k]=c[0]; cols[k+1]=c[1]; cols[k+2]=c[2];
+  }
+  for(let j=0;j<H-1;j++)for(let i=0;i<W-1;i++){
+    const cx=((i+0.5)/(W-1)-0.5)*span, cz=-((0.5-(j+0.5)/(H-1))*span);
+    if(Math.abs(cx)<hole && Math.abs(cz)<hole) continue;   // leave a hole for the real scene
+    const a=j*W+i,b=a+1,c=a+W,d=c+1; idx.push(a,c,b, b,c,d);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(verts,3));
+  g.setAttribute('color',new THREE.BufferAttribute(cols,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1,metalness:0}));
+  mesh.renderOrder=-1; scene.add(mesh);
+})();
+
+// ---- ground detail: boulders, sage, green grass, birches (near the scene) ----
+let groundMeshes=[];
+function addGround(geo,mat,list){
+  if(!list.length) return;
+  const im=new THREE.InstancedMesh(geo,mat,list.length);
+  for(let i=0;i<list.length;i++){const t=list[i];
+    _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();
+    im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
+  scene.add(im); groundMeshes.push({im,list});
+}
+const rockGeo=(()=>{const g=new THREE.DodecahedronGeometry(1,0),p=g.attributes.position;
+  for(let i=0;i<p.count;i++)p.setXYZ(i,p.getX(i)*(0.75+Math.random()*0.5),p.getY(i)*(0.55+Math.random()*0.4),p.getZ(i)*(0.75+Math.random()*0.5));
+  g.computeVertexNormals();return g;})();
+const rockMat=new THREE.MeshStandardMaterial({color:0x77746d,flatShading:true,roughness:1});
+const blob=(specs,scaleY)=>mergeBufferGeometries(specs.map(([ox,oy,oz,r])=>new THREE.IcosahedronGeometry(r,0).scale(1,scaleY,1).translate(ox,oy,oz)));
+const bushGeo=blob([[0,0.5,0,1],[0.6,0.35,0.2,0.7],[-0.5,0.4,-0.3,0.75],[0.1,0.72,-0.35,0.6]],0.7);
+const bushMat=new THREE.MeshStandardMaterial({color:0x6f8a45,flatShading:true,roughness:1});
+function grassTex(){const c=document.createElement('canvas');c.width=64;c.height=64;const g=c.getContext('2d');
+  const greens=['#4a7a2a','#5c9033','#72a83d','#3f6a24'];
+  for(let b=0;b<28;b++){const x=4+Math.random()*56,h=22+Math.random()*40,sw=(Math.random()-0.5)*12;
+    g.strokeStyle=greens[b&3];g.lineWidth=1+Math.random()*1.6;g.beginPath();g.moveTo(x,64);g.quadraticCurveTo(x+sw*0.5,64-h*0.5,x+sw,64-h);g.stroke();}
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;}
+const grassGeo=(()=>{const ps=[];for(let k=0;k<3;k++){const p=new THREE.PlaneGeometry(1,0.8);p.translate(0,0.4,0);p.rotateY(k*Math.PI/3);ps.push(p);}return mergeBufferGeometries(ps);})();
+const grassMat=new THREE.MeshStandardMaterial({map:grassTex(),alphaTest:0.4,side:THREE.DoubleSide,roughness:1});
+const birchTrunkGeo=new THREE.CylinderGeometry(0.12,0.22,9,6).translate(0,4.5,0);
+const birchTrunkMat=new THREE.MeshStandardMaterial({color:0xe9e7dd,flatShading:true,roughness:1});
+const birchCanopyGeo=blob([[0,9.5,0,2.2],[1.3,8.6,0.4,1.6],[-1.2,8.8,-0.5,1.7],[0.3,10.6,-0.3,1.5]],1.15);
+const birchCanopyMat=new THREE.MeshStandardMaterial({color:0x9cc24e,flatShading:true,roughness:1});
+(function scatterGround(){
+  const R=rng(20260813), Z=115, rocks=[],bushes=[],grass=[],birch=[];
+  const near=(x,z,d)=>{for(const o of placed){const dx=x-o.x,dz=z-o.z;if(dx*dx+dz*dz<d*d)return true;}return false;};
+  const pt=s=>{const a=R()*6.283,rad=Math.sqrt(R())*s;return [Math.cos(a)*rad,Math.sin(a)*rad];};
+  for(let i=0;i<170;i++){const[x,z]=pt(Z);if(near(x,z,10))continue;const big=R()<0.12,s=big?1.4+R()*1.2:0.3+R()*0.8;rocks.push({x,z,s,sy:0.55+R()*0.35,r:R()*6.283,rx:(R()-0.5)*0.3,dy:-s*0.3,tint:0.8+R()*0.4});}
+  for(let i=0;i<230;i++){const[x,z]=pt(Z);if(near(x,z,10))continue;bushes.push({x,z,s:0.5+R()*0.9,r:R()*6.283,tint:0.82+R()*0.36});}
+  for(let i=0;i<4500;i++){const[x,z]=pt(Z);if(near(x,z,9))continue;grass.push({x,z,s:0.35+R()*0.5,sy:0.8+R()*0.7,r:R()*6.283,tint:0.78+R()*0.4});}
+  addGround(rockGeo,rockMat,rocks); addGround(bushGeo,bushMat,bushes); addGround(grassGeo,grassMat,grass);
+})();
+
+// ---- vertical exaggeration ---------------------------------------------
+function applyVex(v){
+  VEX=v;
+  for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();}
+  for(const o of placed) o.group.position.y=heightAt(o.x,o.z);
+  for(const {im,list} of treeMeshes){for(let i=0;i<list.length;i++){const t=list[i];
+    _o.position.set(t.x,heightAt(t.x,t.z),t.z);_o.rotation.set(0,t.r,0);_o.scale.setScalar(t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
+    im.instanceMatrix.needsUpdate=true;}
+  for(const {im,list} of groundMeshes){for(let i=0;i<list.length;i++){const t=list[i];
+    _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
+    im.instanceMatrix.needsUpdate=true;}
+  if(marker) marker.position.y=heightAt(marker.position.x,marker.position.z)+2;
+}
+
+// ---- tap to inspect + move marker --------------------------------------
+const marker=new THREE.Mesh(new THREE.ConeGeometry(3,10,8),new THREE.MeshStandardMaterial({color:0xff5555,flatShading:true}));
+marker.rotation.x=Math.PI; scene.add(marker); marker.position.set(0,heightAt(0,0)+2,0);
+const info=document.getElementById('info');
+const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
+let dragging=null;
+function evNdc(ev){const r=renderer.domElement.getBoundingClientRect();
+  const cx=(ev.touches?ev.touches[0].clientX:ev.clientX), cy=(ev.touches?ev.touches[0].clientY:ev.clientY);
+  ndc.x=((cx-r.left)/r.width)*2-1; ndc.y=-((cy-r.top)/r.height)*2+1; ray.setFromCamera(ndc,cam);}
+function updateSelInfo(){ if(!sel)return; const g=sel.group, deg=Math.round(((THREE.MathUtils.radToDeg(g.rotation.y))%360+360)%360);
+  document.getElementById('selinfo').innerHTML=`<b>${sel.type}</b> · E ${sel.x.toFixed(1)} N ${(-sel.z).toFixed(1)} · ${deg}° · ${g.scale.x.toFixed(2)}×`; }
+function selectRec(rec){ sel=rec; const g=rec.group, deg=Math.round(((THREE.MathUtils.radToDeg(g.rotation.y))%360+360)%360);
+  document.getElementById('head').value=deg; document.getElementById('headv').textContent=deg+'°';
+  document.getElementById('size').value=+g.scale.x.toFixed(2); document.getElementById('sizev').textContent=g.scale.x.toFixed(2)+'×';
+  updateSelInfo(); }
+function nudge(de,dn){ if(!sel)return; sel.x+=de; sel.z-=dn; sel.group.position.set(sel.x,heightAt(sel.x,sel.z),sel.z); updateSelInfo(); }
+function dumpLayout(){ return placed.map(o=>({type:o.type, E:+o.x.toFixed(1), N:+(-o.z).toFixed(1),
+  heading:Math.round(((THREE.MathUtils.radToDeg(o.group.rotation.y))%360+360)%360), scale:+o.group.scale.x.toFixed(2)})); }
+
+renderer.domElement.addEventListener('pointerdown',ev=>{
+  evNdc(ev);
+  if(routeAdd){const h=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(h) addWaypoint(h.point.x,h.point.z); return;}
+  if(driveMode) return;                                            // no building editing while driving
+  const sh=ray.intersectObjects(placed.map(o=>o.group),true)[0];   // grab a building → select + start drag
+  if(sh){let g=sh.object; while(g.parent&&!placed.some(o=>o.group===g)) g=g.parent;
+    const rec=placed.find(o=>o.group===g);
+    if(rec){selectRec(rec); dragging=rec; controls.enabled=false; return;}}
+  const th=ray.intersectObjects(treeMeshes.map(m=>m.im))[0];       // click a tree → get its id
+  if(th && th.instanceId!=null){
+    const entry=treeMeshes.find(m=>m.im===th.object), t=entry&&entry.list[th.instanceId];
+    if(t){ selTree=t; info.innerHTML=`🌲 tree #${t.id}<br>E ${t.x.toFixed(1)} · N ${(-t.z).toFixed(1)}<br>use "remove tree" to delete it`; return; }
+  }
+  const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
+  const p=hit.point; marker.position.set(p.x,p.y+2,p.z);
+  const east=p.x, north=-p.z, elev=gmin+p.y/VEX;
+  const lat=M.center.lat+north/111132, lon=M.center.lon+east/(111320*Math.cos(M.center.lat*Math.PI/180));
+  info.innerHTML=`marker<br>E ${east.toFixed(1)} m · N ${north.toFixed(1)} m<br>elev ${elev.toFixed(0)} m (${(elev*3.28084).toFixed(0)} ft)<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+});
+renderer.domElement.addEventListener('pointermove',ev=>{
+  if(!dragging) return;
+  evNdc(ev);
+  const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
+  dragging.x=hit.point.x; dragging.z=hit.point.z;
+  dragging.group.position.set(dragging.x,heightAt(dragging.x,dragging.z),dragging.z); updateSelInfo();
+});
+addEventListener('pointerup',()=>{ if(dragging){dragging=null; controls.enabled=true;} });
+
+// ---- driveable Toyota RAV4 (third-person camera orbits it) --------------
+const wheels=[];
+function wheel(){
+  const g=new THREE.CylinderGeometry(0.36,0.36,0.28,14); g.rotateZ(Math.PI/2);
+  const m=new THREE.Mesh(g,MAT(0x141414,.7));
+  const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.30,8),MAT(0x888888,.5,.4)); hub.rotation.z=Math.PI/2; m.add(hub);
+  return m;
+}
+function makeRav4(){
+  const g=new THREE.Group();
+  const body=MAT(0xededed,.5,.1), clad=MAT(0x20242b,.5), glass=MAT(0x2a3038,.2,.3), blk=MAT(0x1a1a1a,.6),
+        red=MAT(0x8a1a1a,.4), lamp=MAT(0xf7f4e0,.3);
+  box(g,1.85,0.7,4.3,0,0.75,0,body);                 // main body
+  box(g,1.9,0.34,4.35,0,0.5,0,clad);                 // lower cladding
+  box(g,1.72,0.72,2.5,0,1.36,-0.1,body);             // cabin
+  box(g,1.75,0.5,2.32,0,1.34,-0.1,glass);            // window band
+  box(g,1.6,0.12,2.4,0,1.74,-0.1,body);              // roof
+  for(const sx of [-0.7,0.7]) box(g,0.06,0.09,2.2,sx,1.82,-0.1,blk);   // roof rails
+  for(const sx of [-0.62,0.62]){box(g,0.46,0.22,0.06,sx,0.9,2.16,lamp); box(g,0.46,0.22,0.06,sx,1.0,-2.16,red);}
+  box(g,1.86,0.3,0.22,0,0.55,2.18,clad); box(g,1.86,0.3,0.22,0,0.55,-2.18,clad);  // bumpers
+  const wx=0.98,wz=1.45;
+  for(const [sx,sz] of [[-wx,wz],[wx,wz],[-wx,-wz],[wx,-wz]]){const w=wheel();w.position.set(sx,0.36,sz);g.add(w);wheels.push(w);}
+  return g;
+}
+const car={x:16,z:-14,heading:Math.PI,speed:0,group:makeRav4()};
+scene.add(car.group);
+car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading;
+
+let driveMode=false, carMode='idle';        // carMode: idle | manual | route
+const KEY={};
+addEventListener('keydown',e=>{const k=e.key.toLowerCase(); KEY[k]=true; if(driveMode&&k.startsWith('arrow'))e.preventDefault();});
+addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;});
+
+// ---- route waypoints ----
+let routePts=[[26.6,422.4],[15.2,381.4],[18.7,366.1],[28.7,355],[41.2,347.1],[49.8,340.4],[56.8,331.2],[65.3,314.4],[71.9,289.9],[75.6,269.2],[76.5,249.1],[74.3,219.6],[69.8,190],[71.2,163.8],[76.7,139.6],[86,118.1],[98,101],[110.7,85.6],[120.2,76.3],[123.1,72.2],[125.1,65.4],[126.9,52.3],[126.1,43.1],[119.5,37],[108.1,33.9],[96.5,29.7],[85,22.5],[77.6,16.7],[67.2,9.6],[56,6.1],[46.4,4],[35.1,2.3],[26.5,1.2],[10.7,-2.3],[-4.1,-1.4],[-22.9,6.4]].map(([E,N])=>({x:E,z:-N})), routeIdx=0, routeAdd=false, routeObj=null;
+function drawRoute(){
+  if(routeObj) scene.remove(routeObj);
+  routeObj=new THREE.Group();
+  if(routePts.length){
+    const pts=routePts.map(p=>new THREE.Vector3(p.x,heightAt(p.x,p.z)+1.2,p.z));
+    if(pts.length>1) routeObj.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xffcc33})));
+    for(const p of pts){const m=new THREE.Mesh(new THREE.ConeGeometry(0.8,2.4,6),MAT(0xffcc33,.5));m.position.copy(p);m.rotation.x=Math.PI;routeObj.add(m);}
+  }
+  scene.add(routeObj);
+}
+function addWaypoint(x,z){ routePts.push({x,z}); drawRoute(); }
+function clearRoute(){ routePts=[]; routeIdx=0; drawRoute(); }
+drawRoute();   // show the baked default route
+
+// ---- chase camera (lines up behind the car) ----
+const _fwd=new THREE.Vector3(),_des=new THREE.Vector3(),_look=new THREE.Vector3();
+let chaseDist=12, chaseHi=5;
+function chaseCam(blend){
+  _fwd.set(Math.sin(car.heading),0,Math.cos(car.heading));
+  const y=heightAt(car.x,car.z);
+  _des.set(car.x-_fwd.x*chaseDist, y+chaseHi, car.z-_fwd.z*chaseDist);
+  _look.set(car.x+_fwd.x*3, y+1.3, car.z+_fwd.z*3);
+  cam.position.lerp(_des,blend); cam.lookAt(_look); controls.target.copy(_look);
+}
+renderer.domElement.addEventListener('wheel',e=>{ if(driveMode){e.preventDefault(); chaseDist=Math.max(5,Math.min(45,chaseDist+e.deltaY*0.02));}},{passive:false});
+
+// ---- drive + intro cinematic ----
+let introT=0, introActive=false; const introDur=4.5;
+function beginDrive(mode){
+  driveMode=true; carMode=mode; controls.enabled=false; introActive=false;
+  document.getElementById('drive').textContent='exit drive';
+  if(mode==='route'&&routePts.length){ car.x=routePts[0].x; car.z=routePts[0].z; routeIdx=1;
+    if(routePts[1]) car.heading=Math.atan2(routePts[1].x-car.x,routePts[1].z-car.z); car.speed=5; }
+  if(mode==='manual') chaseCam(1);
+}
+function endDrive(){ driveMode=false; carMode='idle'; introActive=false; controls.enabled=true;
+  controls.target.set(0,heightAt(0,0),0); controls.update();
+  document.getElementById('drive').textContent='drive the RAV4'; }
+function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypoints first';return;}
+  beginDrive('route'); const y=heightAt(car.x,car.z); cam.position.set(car.x+35,y+55,car.z+35); introActive=true; introT=0; }
+
+function updateCar(dt){
+  if(!driveMode) return;
+  if(carMode==='manual'){
+    const f=(KEY['arrowup']||KEY['w']?1:0)-(KEY['arrowdown']||KEY['s']?1:0);
+    car.speed+=f*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
+    const s=(KEY['arrowleft']||KEY['a']?1:0)-(KEY['arrowright']||KEY['d']?1:0);
+    car.heading+=s*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
+  } else if(carMode==='route'){
+    let tgt=routePts[Math.min(routeIdx,routePts.length-1)];
+    let dx=tgt.x-car.x, dz=tgt.z-car.z, dist=Math.hypot(dx,dz);
+    const passed=(dx*Math.sin(car.heading)+dz*Math.cos(car.heading))<0;   // waypoint is behind us
+    if(dist<6 || (passed && dist<12)){                                   // hug the waypoint before advancing
+      if(routeIdx<routePts.length-1){ routeIdx++; tgt=routePts[routeIdx]; dx=tgt.x-car.x; dz=tgt.z-car.z; dist=Math.hypot(dx,dz); }
+      else { carMode='manual'; introActive=false; }                       // end of road → you take over
+    }
+    let dh=Math.atan2(dx,dz)-car.heading; dh=Math.atan2(Math.sin(dh),Math.cos(dh));
+    car.heading+=Math.max(-1.3*dt,Math.min(1.3*dt,dh));                   // slower, smoother turns
+    car.speed+=((Math.abs(dh)>0.8?5:9)-car.speed)*1.6*dt;                 // ease off for sharp turns
+  }
+  car.x+=Math.sin(car.heading)*car.speed*dt; car.z+=Math.cos(car.heading)*car.speed*dt;
+  const y=heightAt(car.x,car.z);
+  car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
+  const spin=car.speed*dt/0.36; for(const w of wheels) w.rotation.x+=spin;
+  if(introActive){ introT+=dt; chaseCam(Math.min(0.15,0.02+0.13*(introT/introDur))); if(introT>=introDur) introActive=false; }
+  else chaseCam(0.12);
+}
+
+// ---- photo-match camera -------------------------------------------------
+let camGizmo=null;
+function dropCamera(){
+  if(camGizmo) scene.remove(camGizmo);
+  camGizmo=new THREE.Group();
+  box(camGizmo,3,2,4,0,0,0,MAT(0x1a1a1a,.4,.4));
+  const lens=new THREE.Mesh(new THREE.ConeGeometry(1.1,2.4,12),MAT(0x0a0a0a,.3,.5));lens.rotation.x=-Math.PI/2;lens.position.z=3;camGizmo.add(lens);
+  camGizmo.position.copy(cam.position); camGizmo.lookAt(controls.target); scene.add(camGizmo);
+  const east=cam.position.x,north=-cam.position.z,elev=gmin+cam.position.y/VEX;
+  info.innerHTML=`📷 camera dropped<br>E ${east.toFixed(0)} · N ${north.toFixed(0)} m<br>eye ${elev.toFixed(0)} m (${(elev*3.28084).toFixed(0)} ft)`;
+}
+
+// ---- UI wiring ----------------------------------------------------------
+const $=id=>document.getElementById(id);
+$('vex').oninput=e=>{$('vexv').textContent=(+e.target.value).toFixed(1)+'×';applyVex(+e.target.value);};
+let aerial=true;
+$('mode').onclick=()=>{aerial=!aerial;for(const m of mats){m.map=aerial?tex:null;m.vertexColors=!aerial;m.color.set(0xffffff);m.needsUpdate=true;}
+  $('mode').textContent=aerial?'show elevation colors':'show aerial photo';};
+$('head').oninput=e=>{$('headv').textContent=e.target.value+'°'; if(sel){sel.group.rotation.y=THREE.MathUtils.degToRad(+e.target.value); updateSelInfo();}};
+$('size').oninput=e=>{$('sizev').textContent=(+e.target.value).toFixed(2)+'×'; if(sel){sel.group.scale.setScalar(+e.target.value); updateSelInfo();}};
+$('place').onclick=()=>placeStructure($('type').value,marker.position.x,marker.position.z);
+$('undo').onclick=()=>{const o=placed.pop();if(o)scene.remove(o.group); sel=placed[placed.length-1]||null;};
+$('treeN').oninput=e=>{$('treeNv').textContent=e.target.value;buildTreesFrom(+e.target.value);};
+$('bbSize').oninput=e=>{const v=+e.target.value; $('bbSizev').textContent=v.toFixed(2); if(impHU)impHU.value=v;};
+$('bbY').oninput=e=>{const v=+e.target.value; $('bbYv').textContent=v.toFixed(2); if(impYU)impYU.value=v;};
+$('treeStyle').onchange=e=>setTreeStyle(e.target.value);
+$('reseed').onclick=()=>buildTreesFrom(+$('treeN').value);
+$('rmtree').onclick=()=>{ if(selTree){const id=selTree.id; removedTrees.add(id); selTree=null; buildTreesFrom(+$('treeN').value); info.innerHTML='removed tree #'+id;} else info.innerHTML='click a tree first'; };
+$('cptree').onclick=()=>{ $('dump').value=JSON.stringify([...removedTrees]); try{navigator.clipboard.writeText($('dump').value);}catch(e){} info.innerHTML=removedTrees.size+' removed ids copied'; };
+$('drive').onclick=()=> driveMode?endDrive():beginDrive('manual');
+$('radd').onclick=()=>{routeAdd=!routeAdd; $('radd').textContent=routeAdd?'tap terrain… (done)':'add waypoints';};
+$('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='add waypoints';};
+$('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
+$('rintro').onclick=playIntro;
+$('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value);}catch(e){}};
+function setPanel(open){$('panel').style.display=open?'block':'none'; $('fab').style.display=open?'none':'block';}
+$('min').onclick=()=>setPanel(false); $('fab').onclick=()=>setPanel(true);
+setPanel(false);   // start collapsed — just the ＋ button
+const bindHold=(id,key)=>{const b=$(id); b.addEventListener('pointerdown',e=>{e.preventDefault();KEY[key]=true;});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>KEY[key]=false));};
+bindHold('dU','arrowup'); bindHold('dD','arrowdown'); bindHold('dL','arrowleft'); bindHold('dR','arrowright');
+const ov=$('ov');
+$('photo').onchange=e=>{const f=e.target.files[0];if(!f)return;ov.src=URL.createObjectURL(f);ov.style.display='block';$('ovtog').textContent='hide';};
+$('ovop').oninput=e=>ov.style.opacity=e.target.value;
+$('ovtog').onclick=()=>{const on=ov.style.display!=='none';ov.style.display=on?'none':'block';$('ovtog').textContent=on?'show':'hide';};
+$('fov').oninput=e=>{$('fovv').textContent=e.target.value+'°';cam.fov=+e.target.value;cam.updateProjectionMatrix();};
+$('stand').onclick=()=>{                    // put the eye at the marker (photographer spot), look at the buildings
+  let tx=0,tz=0; if(placed.length){for(const o of placed){tx+=o.x;tz+=o.z;}tx/=placed.length;tz/=placed.length;}
+  controls.target.set(tx,heightAt(tx,tz)+3,tz);
+  cam.position.set(marker.position.x,heightAt(marker.position.x,marker.position.z)+1.6,marker.position.z);
+  controls.update();
+};
+$('dropcam').onclick=dropCamera;
+$('nw').onclick=()=>nudge(-1,0); $('ne').onclick=()=>nudge(1,0); $('nn').onclick=()=>nudge(0,1); $('ns').onclick=()=>nudge(0,-1);
+$('copy').onclick=()=>{const txt=JSON.stringify(dumpLayout(),null,1); $('dump').value=txt; try{navigator.clipboard.writeText(txt);}catch(e){} $('dump').select();};
+$('topview').onclick=()=>{controls.target.set(0,heightAt(0,0),0); cam.position.set(0,gmin+relief+380,0.1); controls.update();};
+
+$('hud').innerHTML=`<b>Paradise Valley, MT</b><br>wide ${(2*cHalf).toFixed(0)} m · center ${(2*fHalf).toFixed(0)} m @1m<br>`+
+  `elev ${M.globalMin.toFixed(0)}–${M.globalMax.toFixed(0)} m · relief ${relief.toFixed(0)} m<br>drag orbit · tap = coords`;
+
+applyVex(1);
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+renderer.setSize(innerWidth,innerHeight);
+const cmp=document.querySelector('#compass span');
+controls.target.set(0,heightAt(0,0),0); controls.update();   // pivot on the ground, not underground
+const _pd=new THREE.Vector3(), _pr=new THREE.Vector3(), _pu=new THREE.Vector3(0,1,0), _pm=new THREE.Vector3();
+function panCam(dt){                                    // WASD translates the camera in builder mode
+  const f=(KEY['w']?1:0)-(KEY['s']?1:0), st=(KEY['d']?1:0)-(KEY['a']?1:0);
+  if(!f&&!st) return;
+  cam.getWorldDirection(_pd); _pd.y=0; if(_pd.lengthSq()<1e-6) return; _pd.normalize();
+  _pr.crossVectors(_pd,_pu).normalize();
+  const spd=Math.min(250,Math.max(10,cam.position.distanceTo(controls.target)*0.5))*dt;
+  _pm.set(0,0,0).addScaledVector(_pd,f*spd).addScaledVector(_pr,st*spd);
+  cam.position.add(_pm); controls.target.add(_pm);
+}
+const AUTO_INTRO=true; if(AUTO_INTRO) playIntro();   // start with the car driving down the road
+let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
+(function loop(){requestAnimationFrame(loop);
+  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  updateCar(dt); if(!driveMode){ panCam(dt); controls.update(); }
+  if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
+  updateTreeLOD();                                  // swap detailed↔billboard by distance from the camera
+  const v=new THREE.Vector3(0,0,-1).project(cam);
+  cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
+  renderer.render(scene,cam);
+  frames++; if(now-fpsT>=300){const fps=frames*1000/(now-fpsT);
+    statsEl.innerHTML=`${fps.toFixed(0)} fps · ${(1000/fps).toFixed(1)} ms<br>${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`;
+    frames=0; fpsT=now;}
+})();
+</script>
+</body>
+</html>

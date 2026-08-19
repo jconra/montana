@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>impostor bake</title>
+<style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body><script type="module">
+import * as THREE from 'three';
+const want=new URLSearchParams(location.search).get('v')||'pine_large';
+// square-ish transparent canvas; orthographic so it's a clean side elevation
+const W=320,H=384;
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1); renderer.setSize(W,H); renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.setClearColor(0x000000,0); document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff,0x557755,1.0));
+const sun=new THREE.DirectionalLight(0xffffff,1.25); sun.position.set(0.4,0.8,0.7); scene.add(sun);
+const man=await (await fetch('./trees/manifest.json?v=7')).json();
+const v=man.variants.find(x=>x.name===want);
+const tl=new THREE.TextureLoader();
+const T=(u,s)=>{const t=tl.load('./trees/'+u,()=>{}); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
+const dec=s=>{const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;};
+const f32=s=>new Float32Array(dec(s)),u32=s=>new Uint32Array(dec(s));
+const mk=p=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));const uv=f32(p.uv);g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));if(p.index)g.setIndex(new THREE.BufferAttribute(u32(p.index),1));return g;};
+const d=await (await fetch('./trees/'+v.file+'?v=7')).json(); const x=v.tex;
+const barkMat=new THREE.MeshStandardMaterial({map:T(x.barkColor,true),normalMap:T(x.barkNormal),roughness:1});
+const leafMat=new THREE.MeshStandardMaterial({map:T(x.leaf,true),alphaTest:0.35,side:THREE.DoubleSide,roughness:1});
+const g=new THREE.Group();
+g.add(new THREE.Mesh(mk(d.branches),barkMat)); g.add(new THREE.Mesh(mk(d.leaves),leafMat));
+scene.add(g);
+// frame the unit-height tree (base y=0..1) with an ortho cam looking down -Z
+const aspect=W/H, halfH=0.52, cy=0.5;
+const cam=new THREE.OrthographicCamera(-halfH*aspect,halfH*aspect, cy+halfH, cy-halfH, 0.01,10);
+cam.position.set(0,cy,3); cam.lookAt(0,cy,0);
+const t0=performance.now();
+function loop(){ renderer.render(scene,cam); if(performance.now()-t0<4500) requestAnimationFrame(loop); else window.__ready=true; }  // burst so leaf PNG decodes
+loop();
+</script></body></html>
