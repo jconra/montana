@@ -88,13 +88,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeBufferGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildHouse } from './house-model.js';
+import { buildHouse } from './assets/house-model.js';
 
-const M = await (await fetch('./manifest.json')).json();
-let houseSchema=null; try{ houseSchema=await (await fetch('./montana-home.json')).json(); }catch(e){}   // redesigned house
+const M = await (await fetch('./assets/manifest.json')).json();
+let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
 const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
 const loadBin = async u => new Float32Array(await (await fetch(u)).arrayBuffer());
-const [cData, fData] = await Promise.all([loadBin('./'+M.coarse.bin), loadBin('./'+M.fine.bin)]);
+const [cData, fData] = await Promise.all([loadBin('./assets/'+M.coarse.bin), loadBin('./assets/'+M.fine.bin)]);
 
 const cHalf = (M.coarse.W-1)*M.coarse.px/2;   // ~750 m
 const fHalf = (M.fine.W-1)*M.fine.px/2;       // ~250 m
@@ -123,7 +123,7 @@ const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide, depthWrite:false, de
 const skyDome=new THREE.Mesh(new THREE.SphereGeometry(60000,24,14),skyMat); skyDome.renderOrder=-1000; scene.add(skyDome);
 
 // shared aerial texture
-const tex = new THREE.TextureLoader().load('./'+M.coarse.aerial);
+const tex = new THREE.TextureLoader().load('./assets/'+M.coarse.aerial);
 tex.encoding = THREE.sRGBEncoding;
 tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
@@ -248,9 +248,22 @@ function buildFromParts(schema){
     sw.position.set(midX*S,(westTop+eastTop)/2*S,zc*S); g.add(sw);}   // step wall between wing and block
   return g;
 }
+// the Home Designer works in FEET; montana's world is metres (USGS LiDAR). Bake the conversion
+// into the geometry (flattened) so optimizeGroup can still merge it and the placement scale slider works.
+const FT=0.3048;
+function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
+  const out=new THREE.Group();
+  src.traverse(o=>{ if(o.isMesh && o.geometry){ const g2=o.geometry.clone(); g2.applyMatrix4(o.matrixWorld);
+    const mat=Array.isArray(o.material)?o.material[0]:o.material;   // two-tone walls carry a material array; collapse to the exterior one for the distant terrain view
+    out.add(new THREE.Mesh(g2,mat)); } });
+  // centre on the footprint (X/Z) so it lands where the old origin-centred model did; keep the base on the ground (Y)
+  const bb=new THREE.Box3().setFromObject(out), cx=(bb.min.x+bb.max.x)/2, cz=(bb.min.z+bb.max.z)/2;
+  out.children.forEach(m=>m.geometry.translate(-cx,0,-cz));
+  return out; }
 function makeHouse(){
-  const saved=localStorage.getItem('montanaHouse');                  // design from the Home Designer
-  if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return h; }catch(e){} }
+  const saved=localStorage.getItem('montanaHouse');                  // live design from the Home Designer (same-origin)
+  if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return bakedFt(h); }catch(e){} }
+  if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length) return bakedFt(h); }catch(e){} }   // committed montana-home.json
   const g=new THREE.Group(), w=15,d=9,wh=6.2,rh=4.6,eave=0.7,fh=0.6;
   const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
         stone=MAT(COL.stone),tank=MAT(COL.tank,.5,.2),wood=MAT(COL.wood),pipe=MAT(0x242424,.5,.4);
@@ -364,7 +377,7 @@ function makeCabin(){
 
 const BUILD={house:makeHouse, garage:makeGarageApt, cabin:makeCabin};
 // collapse a building's ~100s of little box meshes into one merged mesh per material → far fewer draw calls
-function matKey(m){return (m.map?'t':'')+m.color.getHexString()+'_'+m.roughness+'_'+m.metalness+(m.flatShading?'f':'');}
+function matKey(m){ if(Array.isArray(m)) m=m[0]; if(!m||!m.color) return 'x'; return (m.map?'t':'')+m.color.getHexString()+'_'+m.roughness+'_'+m.metalness+(m.flatShading?'f':'');}
 function optimizeGroup(g){
   const groups=new Map();
   for(const o of [...g.children]){
@@ -502,10 +515,10 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
 }
 (async()=>{
   try{
-    const man=await (await fetch('./trees/manifest.json?v=7')).json();
+    const man=await (await fetch('./assets/trees/manifest.json?v=7')).json();
     const tl=new THREE.TextureLoader(), texCache={};
     const T=(u,srgb,noMip)=>{ const key=u+(noMip?'#nm':''); if(texCache[key]) return texCache[key];
-      const t=tl.load('./trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding;
+      const t=tl.load('./assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding;
       if(noMip){ t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; }          // alpha-fade fix: no mip alpha shrink
       t.anisotropy=8; texCache[key]=t; return t; };
     const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
@@ -517,7 +530,7 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
       if(p.index) g.setIndex(new THREE.BufferAttribute(u32(p.index),1)); return g;};
     const loaded=[];
     for(const v of man.variants){ if(v.role==='mid'||v.role==='far') continue;      // skip the geo-LOD experiments; we use impostors for far
-      const d=await (await fetch('./trees/'+v.file+'?v=7')).json(); const x=v.tex;
+      const d=await (await fetch('./assets/trees/'+v.file+'?v=7')).json(); const x=v.tex;
       const barkMat=new THREE.MeshStandardMaterial({map:T(x.barkColor,true),normalMap:T(x.barkNormal),roughnessMap:T(x.barkRough),aoMap:T(x.barkAO),roughness:1,metalness:0});
       const leafMat=new THREE.MeshStandardMaterial({map:T(x.leaf,true),alphaTest:v.alphaTest??0.4,side:THREE.DoubleSide,roughness:1,metalness:0});
       leafMat.alphaToCoverage=true;   // MSAA-smoothed cutout: keeps needles from harshly vanishing, no mip-off shimmer
@@ -671,7 +684,7 @@ function updateTreeLOD(force){
   ezPines.forEach((v,idx)=>{ if(buckets[idx].length){ detMeshes.push(mkInstEz(v.bark,v.barkMat,buckets[idx])); detMeshes.push(mkInstEz(v.leaf,v.leafMat,buckets[idx])); } });
 }
 (async()=>{
-  try{ realXZ=new Float32Array(await (await fetch('./trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
+  try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
   sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
   buildTreesFrom(+sl.value);
@@ -679,8 +692,8 @@ function updateTreeLOD(force){
 
 // ---- distant low-poly mountains (60 km regional DEM, hole for the detailed scene) ----
 (async()=>{
-  const dj=await (await fetch('./distant.json')).json();
-  const dz=new Float32Array(await (await fetch('./distant.bin')).arrayBuffer());
+  const dj=await (await fetch('./assets/distant.json')).json();
+  const dz=new Float32Array(await (await fetch('./assets/distant.bin')).arrayBuffer());
   const {W,H,span}=dj, hole=450;
   function ramp(e){
     const s=[[1500,0x3f5a2f],[1900,0x50632f],[2300,0x6b6a45],[2650,0x776a55],[2900,0x8a8378],[3100,0xb9b4ab],[3350,0xf4f4f4]];
@@ -970,6 +983,20 @@ $('topview').onclick=()=>{controls.target.set(0,heightAt(0,0),0); cam.position.s
 $('hud').innerHTML=`<b>Paradise Valley, MT</b><br>wide ${(2*cHalf).toFixed(0)} m · center ${(2*fHalf).toFixed(0)} m @1m<br>`+
   `elev ${M.globalMin.toFixed(0)}–${M.globalMax.toFixed(0)} m · relief ${relief.toFixed(0)} m<br>drag orbit · tap = coords`;
 
+// ---- flatten a building pad into the slope: carve terrain in a rect down to `padY`, ramping out over `blend` metres ----
+function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
+  for(const t of tiles){ for(let i=0;i<t.pos.count;i++){ const x=t.pos.getX(i), z=t.pos.getZ(i);
+    const m=Math.max(Math.abs(x-cx)-halfW, Math.abs(z-cz)-halfD);   // 0 inside the pad, grows outside
+    const w = m<=0?1:(m>=blend?0:1-m/blend);
+    if(w>0) t.baseY[i]=t.baseY[i]*(1-w)+padY*w; } }   // applyVex re-applies baseY->pos.y + re-places the house at heightAt
+}
+{ // set the house into the hill: pad at the average grade across the footprint (~driveway level; back cuts into the slope, front near grade)
+  const hx=8, hz=-8, hw=13, hd=8;
+  let sum=0, n=0;
+  for(let a=-hw;a<=hw;a+=hw/3) for(let b=-hd;b<=hd;b+=hd/3){ sum+=heightAt(hx+a,hz+b); n++; }
+  const padY = sum/n - 0.3;        // average grade, just recessed
+  flattenPad(hx,hz,hw,hd,padY,5);
+}
 applyVex(1);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 renderer.setSize(innerWidth,innerHeight);

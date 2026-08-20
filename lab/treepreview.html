@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>ez-pine preview</title>
 <style>html,body{margin:0;height:100%;background:#9fc3e8;overflow:hidden}#c{display:block}</style>
-<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"../node_modules/three/build/three.module.js","three/addons/":"../node_modules/three/examples/jsm/"}}</script>
 </head><body>
 <script type="module">
 import * as THREE from 'three';
@@ -27,9 +27,9 @@ const grd=new THREE.Mesh(new THREE.CircleGeometry(300,48).rotateX(-Math.PI/2),gm
 scene.add(grd);
 
 const _o=new THREE.Object3D(), _c=new THREE.Color();
-const man=await (await fetch('./trees/manifest.json?v=7')).json();
+const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const tl=new THREE.TextureLoader(), texCache={};
-const T=(u,srgb)=>{ if(texCache[u]) return texCache[u]; const t=tl.load('./trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding; texCache[u]=t; return t; };
+const T=(u,srgb)=>{ if(texCache[u]) return texCache[u]; const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding; texCache[u]=t; return t; };
 const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
 const f32=(s)=>new Float32Array(dec(s)), u32=(s)=>new Uint32Array(dec(s));
 const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
@@ -42,7 +42,7 @@ const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
 const H={ pine_large:22, pine_bush:11, aspen:18 };
 let x=-32;
 for(const v of man.variants){
-  const d=await (await fetch('./trees/'+v.file+'?v=7')).json(); const xt=v.tex;
+  const d=await (await fetch('../assets/trees/'+v.file+'?v=7')).json(); const xt=v.tex;
   const barkMat=new THREE.MeshStandardMaterial({map:T(xt.barkColor,true),normalMap:T(xt.barkNormal),roughnessMap:T(xt.barkRough),aoMap:T(xt.barkAO),roughness:1,metalness:0});
   const leafMat=new THREE.MeshStandardMaterial({map:T(xt.leaf,true),alphaTest:v.alphaTest??0.5,side:THREE.DoubleSide,roughness:1,metalness:0});
   const bark=mkGeo(d.branches), leaf=mkGeo(d.leaves), h=H[v.name]||18;

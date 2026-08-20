@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>impostor bake</title>
 <style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}</style>
-<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"../node_modules/three/build/three.module.js"}}</script>
 </head><body><script type="module">
 import * as THREE from 'three';
 const want=new URLSearchParams(location.search).get('v')||'pine_large';
@@ -12,14 +12,14 @@ renderer.setClearColor(0x000000,0); document.body.appendChild(renderer.domElemen
 const scene=new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xffffff,0x557755,1.0));
 const sun=new THREE.DirectionalLight(0xffffff,1.25); sun.position.set(0.4,0.8,0.7); scene.add(sun);
-const man=await (await fetch('./trees/manifest.json?v=7')).json();
+const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const v=man.variants.find(x=>x.name===want);
 const tl=new THREE.TextureLoader();
-const T=(u,s)=>{const t=tl.load('./trees/'+u,()=>{}); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
+const T=(u,s)=>{const t=tl.load('../assets/trees/'+u,()=>{}); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
 const dec=s=>{const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;};
 const f32=s=>new Float32Array(dec(s)),u32=s=>new Uint32Array(dec(s));
 const mk=p=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));const uv=f32(p.uv);g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));if(p.index)g.setIndex(new THREE.BufferAttribute(u32(p.index),1));return g;};
-const d=await (await fetch('./trees/'+v.file+'?v=7')).json(); const x=v.tex;
+const d=await (await fetch('../assets/trees/'+v.file+'?v=7')).json(); const x=v.tex;
 const barkMat=new THREE.MeshStandardMaterial({map:T(x.barkColor,true),normalMap:T(x.barkNormal),roughness:1});
 const leafMat=new THREE.MeshStandardMaterial({map:T(x.leaf,true),alphaTest:0.35,side:THREE.DoubleSide,roughness:1});
 const g=new THREE.Group();

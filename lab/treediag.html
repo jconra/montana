@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><title>diag</title>
 <style>html,body{margin:0;height:100%;background:#9fc3e8;overflow:hidden}</style>
-<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"../node_modules/three/build/three.module.js","three/addons/":"../node_modules/three/examples/jsm/"}}</script>
 </head><body><script type="module">
 import * as THREE from 'three';
 const want=new URLSearchParams(location.search).get('v')||'aspen';
@@ -14,15 +14,15 @@ const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,2000); cam.p
 scene.add(new THREE.HemisphereLight(0xffffff,0x668855,1.1));
 const sun=new THREE.DirectionalLight(0xffffff,1.2); sun.position.set(30,50,40); scene.add(sun);
 if(!transparent) scene.add(new THREE.Mesh(new THREE.CircleGeometry(200,32).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x5c6b3a,roughness:1})));
-const man=await (await fetch('./trees/manifest.json?v=7')).json();
+const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const v=man.variants.find(v=>v.name===want);
 const q=new URLSearchParams(location.search);
 const tl=new THREE.TextureLoader();
-const T=(u,s)=>{const t=tl.load('./trees/'+u,()=>console.log('LOADED',u),undefined,e=>console.error('TEXFAIL',u)); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
+const T=(u,s)=>{const t=tl.load('../assets/trees/'+u,()=>console.log('LOADED',u),undefined,e=>console.error('TEXFAIL',u)); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
 const dec=(s)=>{const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;};
 const f32=s=>new Float32Array(dec(s)),u32=s=>new Uint32Array(dec(s));
 const mk=p=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));const uv=f32(p.uv);g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));if(p.index)g.setIndex(new THREE.BufferAttribute(u32(p.index),1));return g;};
-const d=await (await fetch('./trees/'+v.file+'?v=7')).json();
+const d=await (await fetch('../assets/trees/'+v.file+'?v=7')).json();
 const btex=q.get('btex')? 'tex/'+q.get('btex') : v.tex.barkColor;
 const ltex=q.get('ltex')? 'tex/'+q.get('ltex') : v.tex.leaf;
 const bark=new THREE.Mesh(mk(d.branches),new THREE.MeshStandardMaterial({map:T(btex,true),roughness:1}));
