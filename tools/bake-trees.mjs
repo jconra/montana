@@ -4,9 +4,16 @@ import fs from 'fs';
 const THREE = await import('three');
 const { Tree } = await import('@dgreenheck/ez-tree');
 
-const OUT = '/var/www/html/terrain/trees';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url));
+const args=process.argv.slice(2);
+if(args.includes('--help')) { console.log('node tools/bake-trees.mjs [--out DIRECTORY]'); process.exit(0); }
+if(args.length && (args.length!==2 || args[0]!=='--out')) throw new Error('Expected --out DIRECTORY');
+const OUT=args.length ? path.resolve(args[1]) : path.resolve(here,'../assets/vegetation-lab');
+if(OUT===path.resolve(here,'../assets/trees')) throw new Error('Use a staging directory; production trees need matching impostors before promotion.');
 fs.mkdirSync(OUT+'/tex', {recursive:true});
-const A='node_modules/@dgreenheck/ez-tree/src/lib/assets';
+const A=path.join(here,'node_modules/@dgreenheck/ez-tree/src/lib/assets');
 const cp=(s,d)=>fs.copyFileSync(A+'/'+s, OUT+'/tex/'+d);
 // bark sets + leaf cards we use
 cp('bark/pine_color_1k.jpg','pine_color.jpg');  cp('bark/pine_normal_1k.jpg','pine_normal.jpg');  cp('bark/pine_roughness_1k.jpg','pine_rough.jpg');  cp('bark/pine_ao_1k.jpg','pine_ao.jpg');
@@ -27,51 +34,30 @@ function packGeo(g){
   return o;
 }
 // center X/Z at 0, base at y=0, scale so height=1, then fan out horizontally by `spread` (cheap fullness, no extra tris)
-function normalize(mesh, height, cx, cz, spread){
+function normalize(mesh, height, cx, cz, spread, baseY){
   const g=mesh.geometry; const p=g.getAttribute('position'); const arr=p.array;
-  for(let i=0;i<arr.length;i+=3){ arr[i]=(arr[i]-cx)/height*spread; arr[i+1]=arr[i+1]/height; arr[i+2]=(arr[i+2]-cz)/height*spread; }
+  for(let i=0;i<arr.length;i+=3){ arr[i]=(arr[i]-cx)/height*spread; arr[i+1]=(arr[i+1]-baseY)/height; arr[i+2]=(arr[i+2]-cz)/height*spread; }
   p.needsUpdate=true; g.computeVertexNormals?.();
 }
 
 // variant roster: role (canopy=full detail, zoned | grove=aspen clusters | mid/far=distance LODs); preset + tweaks; tex; spread; leaf alphaTest
-const variants = [
-  { name:'pine_large', role:'canopy', preset:'Pine Large', seed:777, tex:'pine', spread:1.18, alphaTest:0.5,
-    tweak:o=>{ o.branch.length['1']=10; } },   // shorter mid branches → skinnier through the middle
-  { name:'pine_bush',  role:'canopy', preset:'Pine Small', seed:308, tex:'pine', spread:1.42, alphaTest:0.4,
-    tweak:o=>{ o.branch.start['1']=0.02;           // child branches start almost at the ground → bushy to the base
-               o.branch.children['0']=95;           // moderate branching (perf: fewer tube branches)
-               o.branch.length['1']=15;             // side branches wide but not straggly
-               o.branch.angle['1']=126;             // sweep them out/down
-               o.branch.segments['1']=4;            // fewer radial segments per branch (lighter tubes)
-               o.leaves.count=26; o.leaves.size=1.45; o.leaves.start=0; } },  // fewer but bigger leaf cards keep it full
-  { name:'aspen',      role:'grove', preset:'Aspen Medium', seed:18020, tex:'aspen', spread:1.2, alphaTest:0.3,
-    tweak:o=>{ o.branch.children['0']=20; o.branch.children['1']=5;   // some twigs to hang leaves on
-               o.branch.length['1']=9;
-               o.leaves.count=17; o.leaves.size=2.9; o.leaves.start=0.05; } },  // less dense crown (see-through, real aspen)
-  // ---- distance LODs (same pine textures so they match the detailed pines) ----
-  { name:'pine_mid',   role:'mid', preset:'Pine Large', seed:501, tex:'pine', spread:1.28, alphaTest:0.32,
-    tweak:o=>{ o.branch.children['0']=12;           // ~10% of the branches…
-               o.branch.segments['0']=5; o.branch.segments['1']=3;  // …lighter tubes
-               o.leaves.count=10; o.leaves.size=3.2; o.leaves.start=0; } },  // …but big fat foliage clumps to fill the silhouette
-  { name:'pine_far',   role:'far', preset:'Pine Large', seed:88, tex:'pine', spread:1.15, alphaTest:0.3,
-    tweak:o=>{ o.branch.children['0']=5;             // just a few branches…
-               o.branch.start['1']=0.42;             // …up toward the top
-               o.branch.segments['0']=4; o.branch.segments['1']=3;
-               o.leaves.count=8; o.leaves.size=4.4; o.leaves.start=0.3; } },  // big cards clustered near the crown (crowded-back-forest impostor)
-];
+import { variants } from './tree-presets.mjs';
 
-const manifest={ variants:[] };
+const manifest={generator:{ezTree:'1.1.0',three:THREE.REVISION}, variants:[] };
+fs.copyFileSync(path.join(here,'node_modules/@dgreenheck/ez-tree/LICENSE'),path.join(OUT,'EZ-TREE-LICENSE.txt'));
 for(const v of variants){
   const t=new Tree(); t.loadPreset(v.preset); t.options.seed=v.seed; if(v.tweak) v.tweak(t.options); t.generate();
   const bg=t.branchesMesh.geometry, lg=t.leavesMesh.geometry;
   bg.computeBoundingBox(); lg.computeBoundingBox();
-  const height=Math.max(bg.boundingBox.max.y, lg.boundingBox.max.y);
+  const baseY=Math.min(bg.boundingBox.min.y, lg.boundingBox.min.y);
+  const height=Math.max(bg.boundingBox.max.y, lg.boundingBox.max.y)-baseY;
+  if(!Number.isFinite(height)||height<=0) throw new Error(`Invalid height: ${v.name}`);
   const cx=(bg.boundingBox.min.x+bg.boundingBox.max.x)/2, cz=(bg.boundingBox.min.z+bg.boundingBox.max.z)/2;
-  normalize(t.branchesMesh,height,cx,cz,v.spread); normalize(t.leavesMesh,height,cx,cz,v.spread);
+  normalize(t.branchesMesh,height,cx,cz,v.spread,baseY); normalize(t.leavesMesh,height,cx,cz,v.spread,baseY);
   const data={ name:v.name, srcHeight:height, branches:packGeo(bg), leaves:packGeo(lg) };
   fs.writeFileSync(OUT+'/'+v.name+'.json', JSON.stringify(data));
   const sz=(fs.statSync(OUT+'/'+v.name+'.json').size/1024).toFixed(0);
-  manifest.variants.push({ name:v.name, role:v.role, file:v.name+'.json', srcHeight:+height.toFixed(2), tex:TEX[v.tex], alphaTest:v.alphaTest });
+  manifest.variants.push({ name:v.name, role:v.role, file:v.name+'.json', srcHeight:+height.toFixed(2), tex:TEX[v.tex], alphaTest:v.alphaTest, seed:v.seed, preset:v.preset, label:v.label||v.name.replaceAll('_',' '), displayHeight:v.displayHeight||(v.role==='grove'?7:16), leafTint:v.leafTint||0xffffff, triangles:(bg.getIndex().count+lg.getIndex().count)/3, bytes:fs.statSync(OUT+'/'+v.name+'.json').size });
   console.log(v.name.padEnd(11), v.preset.padEnd(12), 'srcH', height.toFixed(1), 'bark', (bg.getIndex().count/3)|0, 'leaf', (lg.getIndex().count/3)|0, sz+'KB');
 }
 fs.writeFileSync(OUT+'/manifest.json', JSON.stringify(manifest,null,2));

@@ -1,29 +1,72 @@
-# tools — data generation for the Montana terrain
+# Montana vegetation and terrain tools
 
-Offline scripts used to build the terrain + forest data in `../assets/`.
-They're archival — kept for reproducibility. Paths inside them point at the
-pre-reorg `/var/www/html/terrain/` location; update output paths to
-`../assets/` (and `../assets/trees/`) if you re-run them.
+## Reproducible vegetation bake
 
-## `lidar-trees.py` — tree detection from LiDAR
-Reads USGS 1 m LiDAR `.laz` tiles and extracts individual tree positions.
-- **Input:** `.laz` tiles in `/tmp/laz/` (UTM 12N; scene centered on the property pin `CX,CY`).
-- **Method:** rasterize to a 1.5 m grid → ground min (class 2) + canopy max → height-above-ground →
-  3×3 local-maxima peaks with HAG > 2.5 m → non-max suppression at 2.5 m spacing.
-- **Output:** `trees.bin` — packed little-endian `float32 (x, z, height)` triples (`z = -North`).
-- **Deps:** `pip install laspy numpy` · run `python3 lidar-trees.py`
+Node 18 or newer is required. From the repository root:
 
-## `bake-trees.mjs` — ez-tree geometry baking
-Generates the pine/aspen tree meshes from [ez-tree](https://github.com/dgreenheck/ez-tree)
-presets, offline in Node (stubs `document` since ez-tree touches it on import).
-- **Input:** `@dgreenheck/ez-tree` + `three` in `node_modules`; bark/leaf textures from the ez-tree assets.
-- **Method:** load presets (Pine Large/Small, Aspen), tweak, normalize (center X/Z, base y=0, unit height,
-  horizontal `spread` for fullness), pack geometry to base64.
-- **Output:** `trees/<variant>.json` (+ `trees/manifest.json`) and copied textures in `trees/tex/`.
-- **Run:** `node bake-trees.mjs` (needs Node ≥ 18 and three ≥ 0.167 for ez-tree).
+```sh
+npm ci --prefix tools
+npm run bake --prefix tools
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/lab/vegetation.html`. The generated files are committed,
+so viewing the lab does not require Node or running the baker.
+
+The toolchain pins `@dgreenheck/ez-tree` 1.1.0 and Three.js 0.167.1 in its own
+`tools/node_modules`. The site's existing Three.js 0.140.0 stays unchanged.
+The lockfile captures the selected toolchain, not the unrecovered historical
+installation. In particular the recovered bush recipe does not reproduce the
+committed production bush exactly (source height differs).
+
+`tree-presets.mjs` contains the recovered recipes plus lab-only shrub candidates.
+Each recipe has a fixed seed. Adjust branch structure, leaf size/count and spread
+there, then bake again. Compact evergreen and low broadleaf shrubs are shape
+studies, not species identification. Broadleaf shrubs currently reuse oak foliage;
+they are not a faithful sagebrush asset.
+
+The default output is `assets/vegetation-lab/`, resolved relative to the script,
+regardless of the working directory. To generate a separate comparison:
+
+```sh
+node tools/bake-trees.mjs --out /tmp/montana-vegetation-check
+```
+
+The manifest records seeds, triangle counts, geometry byte sizes, suggested display
+heights and tool versions. Geometry is grounded and normalized to unit height.
+Textures and the upstream MIT license accompany each bake. See
+https://github.com/dgreenheck/ez-tree for the source library.
+
+The baker refuses to write directly to `assets/trees`. Promotion is a separate
+step: compare silhouettes and foliage in the lab, measure performance on target
+hardware, generate matching distant impostors, then update the main scene.
+The current scene and its tree placement data are not changed by a lab bake.
+
+## Comparison lab
+
+`lab/vegetation.html` compares two candidates with orbit/zoom, equal-height or
+suggested-height modes, a one-meter grid, daylight/low sun, and repeated patches.
+It displays geometry size and renderer statistics. Geometry KB excludes textures;
+frame rate depends on device and is not a production-scene benchmark. Instancing
+and production LOD integration remain a subsequent step.
+
+## LiDAR tree extraction (archival)
+
+`lidar-trees.py` reads `.laz` tiles from `/tmp/laz` in UTM 12N and writes
+`/var/www/html/terrain/trees.bin`. Update those paths before rerunning it.
+Install `laspy[lazrs]` and `numpy` to support compressed LAZ input.
+
+The output is little-endian float32 `(x, z, height)` triples with `z = -North`.
+The script rasterizes returns at 1.5 m spacing, uses minimum ground in 15 m
+blocks, finds 3x3 canopy maxima above 2.5 m and suppresses peaks within 2.5 m.
+This is an approximate canopy detector: sloping ground can inflate heights,
+and buildings or other non-vegetation returns can become candidates. Missing
+ground blocks use the global median, despite an old propagation comment.
+Do not overwrite the existing tree data without comparing results and masks.
 
 ## Not recovered
-Two one-off shell scripts weren't saved as editor files, so they're gone:
-- **Terrain heightmap generator** — built `coarse.bin` / `fine.bin` / `manifest.json` from the LiDAR
-  ground surface + draped the NAIP aerial (`aerial.jpg`). The *outputs* live in `../assets/`.
-- **Pure-Python PNG cropper** — tight-cropped the tree impostor billboard to its alpha bbox.
+
+- Terrain heightmap/aerial preparation script. Existing coarse/fine grids,
+  manifest and aerial image remain usable for rendering and material work.
+- Tree billboard crop helper. The lab does not regenerate or overwrite the
+  production impostor; new silhouettes need a corresponding bake before promotion.

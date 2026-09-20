@@ -1,0 +1,218 @@
+{
+  "generator": {
+    "ezTree": "1.1.0",
+    "three": "167"
+  },
+  "variants": [
+    {
+      "name": "pine_large",
+      "role": "canopy",
+      "file": "pine_large.json",
+      "srcHeight": 68.38,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.5,
+      "seed": 777,
+      "preset": "Pine Large",
+      "label": "pine large",
+      "displayHeight": 16,
+      "leafTint": 16777215,
+      "triangles": 19392,
+      "bytes": 1258492
+    },
+    {
+      "name": "pine_bush",
+      "role": "canopy",
+      "file": "pine_bush.json",
+      "srcHeight": 48.37,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.4,
+      "seed": 308,
+      "preset": "Pine Small",
+      "label": "pine bush",
+      "displayHeight": 16,
+      "leafTint": 16777215,
+      "triangles": 17672,
+      "bytes": 1354067
+    },
+    {
+      "name": "aspen",
+      "role": "grove",
+      "file": "aspen.json",
+      "srcHeight": 74.33,
+      "tex": {
+        "barkColor": "tex/birch_color.jpg",
+        "barkNormal": "tex/birch_normal.jpg",
+        "barkRough": "tex/birch_rough.jpg",
+        "barkAO": "tex/birch_ao.jpg",
+        "leaf": "tex/oak_leaf.png"
+      },
+      "alphaTest": 0.3,
+      "seed": 18020,
+      "preset": "Aspen Medium",
+      "label": "aspen",
+      "displayHeight": 7,
+      "leafTint": 16777215,
+      "triangles": 21168,
+      "bytes": 1461111
+    },
+    {
+      "name": "pine_mid",
+      "role": "mid",
+      "file": "pine_mid.json",
+      "srcHeight": 67.78,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.32,
+      "seed": 501,
+      "preset": "Pine Large",
+      "label": "pine mid",
+      "displayHeight": 16,
+      "leafTint": 16777215,
+      "triangles": 1320,
+      "bytes": 88215
+    },
+    {
+      "name": "pine_far",
+      "role": "far",
+      "file": "pine_far.json",
+      "srcHeight": 70.15,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.3,
+      "seed": 88,
+      "preset": "Pine Large",
+      "label": "pine far",
+      "displayHeight": 16,
+      "leafTint": 16777215,
+      "triangles": 556,
+      "bytes": 34989
+    },
+    {
+      "name": "evergreen_shrub_1301",
+      "role": "shrub",
+      "file": "evergreen_shrub_1301.json",
+      "srcHeight": 19.98,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.4,
+      "seed": 1301,
+      "preset": "Pine Small",
+      "label": "Compact evergreen · 1301",
+      "displayHeight": 1.6,
+      "leafTint": 11846560,
+      "triangles": 6816,
+      "bytes": 529835
+    },
+    {
+      "name": "evergreen_shrub_1302",
+      "role": "shrub",
+      "file": "evergreen_shrub_1302.json",
+      "srcHeight": 20.5,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.4,
+      "seed": 1302,
+      "preset": "Pine Small",
+      "label": "Compact evergreen · 1302",
+      "displayHeight": 1.6,
+      "leafTint": 11846560,
+      "triangles": 6816,
+      "bytes": 529835
+    },
+    {
+      "name": "evergreen_shrub_1303",
+      "role": "shrub",
+      "file": "evergreen_shrub_1303.json",
+      "srcHeight": 19.46,
+      "tex": {
+        "barkColor": "tex/pine_color.jpg",
+        "barkNormal": "tex/pine_normal.jpg",
+        "barkRough": "tex/pine_rough.jpg",
+        "barkAO": "tex/pine_ao.jpg",
+        "leaf": "tex/pine_leaf.png"
+      },
+      "alphaTest": 0.4,
+      "seed": 1303,
+      "preset": "Pine Small",
+      "label": "Compact evergreen · 1303",
+      "displayHeight": 1.6,
+      "leafTint": 11846560,
+      "triangles": 6816,
+      "bytes": 529835
+    },
+    {
+      "name": "broadleaf_shrub_2401",
+      "role": "shrub",
+      "file": "broadleaf_shrub_2401.json",
+      "srcHeight": 10.77,
+      "tex": {
+        "barkColor": "tex/birch_color.jpg",
+        "barkNormal": "tex/birch_normal.jpg",
+        "barkRough": "tex/birch_rough.jpg",
+        "barkAO": "tex/birch_ao.jpg",
+        "leaf": "tex/oak_leaf.png"
+      },
+      "alphaTest": 0.3,
+      "seed": 2401,
+      "preset": "Aspen Medium",
+      "label": "Low broadleaf · 2401",
+      "displayHeight": 1.2,
+      "leafTint": 12043165,
+      "triangles": 5440,
+      "bytes": 366211
+    },
+    {
+      "name": "broadleaf_shrub_2402",
+      "role": "shrub",
+      "file": "broadleaf_shrub_2402.json",
+      "srcHeight": 10.81,
+      "tex": {
+        "barkColor": "tex/birch_color.jpg",
+        "barkNormal": "tex/birch_normal.jpg",
+        "barkRough": "tex/birch_rough.jpg",
+        "barkAO": "tex/birch_ao.jpg",
+        "leaf": "tex/oak_leaf.png"
+      },
+      "alphaTest": 0.3,
+      "seed": 2402,
+      "preset": "Aspen Medium",
+      "label": "Low broadleaf · 2402",
+      "displayHeight": 1.2,
+      "leafTint": 12043165,
+      "triangles": 5440,
+      "bytes": 366211
+    }
+  ]
+}
