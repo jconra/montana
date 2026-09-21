@@ -65,7 +65,8 @@ async function generate(){if(busy)return;setBusy(true);error('');$('status').tex
     const recipe={preset:$('preset').value,...values(treeFields),...values(advancedFields)};
     const data=await requestTree(recipe),aspen=recipe.preset==='aspen';
     const [bark,leaf]=await Promise.all([texture(aspen?'birch_color.jpg':'pine_color.jpg'),texture(aspen?'oak_leaf.png':'pine_leaf.png')]);
-    candidate=new THREE.Group();data.parts.forEach((p,i)=>candidate.add(new THREE.Mesh(geometry(p),new THREE.MeshStandardMaterial({map:i?leaf:bark,alphaTest:i?.35:0,side:i?THREE.DoubleSide:THREE.FrontSide,roughness:1}))));
+    // Smooth foliage cutouts with the viewer's MSAA samples, including instanced trees.
+    candidate=new THREE.Group();data.parts.forEach((p,i)=>candidate.add(new THREE.Mesh(geometry(p),new THREE.MeshStandardMaterial({map:i?leaf:bark,alphaTest:i?.35:0,alphaToCoverage:i===1,side:i?THREE.DoubleSide:THREE.FrontSide,roughness:1}))));
     newAtlas=await bake(candidate);
     disposeForest();disposeSource(source);atlas?.target.dispose();source=candidate;atlas=newAtlas;parts=source.children;
     activeRecipe=recipe;activeOptions=data.options;triangleCount=parts.reduce((n,m)=>n+m.geometry.index.count/3,0);
