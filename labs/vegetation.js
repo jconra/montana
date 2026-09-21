@@ -1,9 +1,16 @@
 import * as THREE from 'three';
+// Keep the existing authored colors while upgrading the runtime.
+THREE.ColorManagement.enabled=false;
+// r158 still falls back to WebGL1; ?webgl=1 explicitly selects it.
+const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const $=id=>document.getElementById(id), host=$('view');
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xd9e1dd);
-const renderer=new THREE.WebGLRenderer({canvas:host.querySelector('canvas'),antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputEncoding=THREE.sRGBEncoding;
+const renderer=new Renderer({canvas:host.querySelector('canvas'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+// Preserve the scene lighting authored before r155.
+renderer.useLegacyLights=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const camera=new THREE.PerspectiveCamera(45,1,0.05,2000);
 const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;
@@ -15,7 +22,7 @@ const grid=new THREE.GridHelper(120,120,0x777c69,0x949986);grid.material.transpa
 const root=new THREE.Group();scene.add(root);
 const base='../assets/vegetation-lab/',cache=new Map(),textureCache=new Map();
 const loader=new THREE.TextureLoader();let manifest,selection=0,frames=0,last=performance.now(),fps=0;
-function texture(url,srgb=false){if(!textureCache.has(url)){const t=loader.load(base+url,undefined,undefined,()=>{$('error').textContent=`Could not load texture ${url}`;});t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(srgb)t.encoding=THREE.sRGBEncoding;textureCache.set(url,t);}return textureCache.get(url);}
+function texture(url,srgb=false){if(!textureCache.has(url)){const t=loader.load(base+url,undefined,undefined,()=>{$('error').textContent=`Could not load texture ${url}`;});t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(srgb)t.colorSpace=THREE.SRGBColorSpace;textureCache.set(url,t);}return textureCache.get(url);}
 function decode(s,Type){return new Type(Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer);}
 function geometry(p){const g=new THREE.BufferGeometry();for(const [name,size] of [['position',3],['normal',3],['uv',2]])g.setAttribute(name,new THREE.BufferAttribute(decode(p[name],Float32Array),size));g.setAttribute('uv2',g.attributes.uv);if(p.index)g.setIndex(new THREE.BufferAttribute(decode(p.index,Uint32Array),1));return g;}
 async function asset(v){if(!cache.has(v.name))cache.set(v.name,(async()=>{const r=await fetch(base+v.file);if(!r.ok)throw new Error(`${v.file}: HTTP ${r.status}`);const d=await r.json(),t=v.tex;

@@ -16,9 +16,15 @@
 <div id="hint">drag to orbit · scroll to zoom · watch the far end of each row</div>
 <script type="module">
 import * as THREE from 'three';
+// Keep the existing authored colors while upgrading the runtime.
+THREE.ColorManagement.enabled=false;
+// r158 still falls back to WebGL1; ?webgl=1 explicitly selects it.
+const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
-renderer.outputEncoding=THREE.sRGBEncoding; document.body.appendChild(renderer.domElement);
+const renderer=new Renderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+// Preserve the scene lighting authored before r155.
+renderer.useLegacyLights=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace; document.body.appendChild(renderer.domElement);
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x9fc3e8); scene.fog=new THREE.Fog(0x9fc3e8,260,620);
 const cam=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.5,3000); cam.position.set(-78,20,70);
@@ -30,7 +36,7 @@ scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1400,1400).rotateX(-Math.PI/2),
 const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const v=man.variants.find(x=>x.name==='pine_large'), x=v.tex;
 const tl=new THREE.TextureLoader();
-const load=(u,s,noMip)=>{const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; if(noMip){t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;} t.anisotropy=8; return t;};
+const load=(u,s,noMip)=>{const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.colorSpace=THREE.SRGBColorSpace; if(noMip){t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;} t.anisotropy=8; return t;};
 const dec=s=>{const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;};
 const f32=s=>new Float32Array(dec(s)),u32=s=>new Uint32Array(dec(s));
 const mk=p=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));const uv=f32(p.uv);g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));if(p.index)g.setIndex(new THREE.BufferAttribute(u32(p.index),1));return g;};

@@ -71,7 +71,7 @@ export function texThumb(id,size){ size=size||40; const cv=document.createElemen
 const _texCache={};
 function makeMap(THREE,id,mode){ const key=id+'|'+(mode||'face'); if(_texCache[key]) return _texCache[key];
   const S=256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
-  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=4; if('sRGBEncoding'in THREE) t.encoding=THREE.sRGBEncoding;
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=4; if('SRGBColorSpace'in THREE) t.colorSpace=THREE.SRGBColorSpace;
   if(mode==='world'){ const ft=TEX_FEET[id]||6; t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
   _texCache[key]=t; return t; }
 // rewrite a BoxGeometry's UVs into world feet, so a world-mode texture tiles evenly no matter the face size

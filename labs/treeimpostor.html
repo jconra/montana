@@ -3,11 +3,17 @@
 <script type="importmap">{"imports":{"three":"../vendor/three/three.module.js"}}</script>
 </head><body><script type="module">
 import * as THREE from 'three';
+// Keep the existing authored colors while upgrading the runtime.
+THREE.ColorManagement.enabled=false;
+// r158 still falls back to WebGL1; ?webgl=1 explicitly selects it.
+const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
 const want=new URLSearchParams(location.search).get('v')||'pine_large';
 // square-ish transparent canvas; orthographic so it's a clean side elevation
 const W=320,H=384;
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
-renderer.setPixelRatio(1); renderer.setSize(W,H); renderer.outputEncoding=THREE.sRGBEncoding;
+const renderer=new Renderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1); renderer.setSize(W,H); // Preserve the scene lighting authored before r155.
+renderer.useLegacyLights=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000,0); document.body.appendChild(renderer.domElement);
 const scene=new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xffffff,0x557755,1.0));
@@ -15,7 +21,7 @@ const sun=new THREE.DirectionalLight(0xffffff,1.25); sun.position.set(0.4,0.8,0.
 const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const v=man.variants.find(x=>x.name===want);
 const tl=new THREE.TextureLoader();
-const T=(u,s)=>{const t=tl.load('../assets/trees/'+u,()=>{}); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.encoding=THREE.sRGBEncoding; return t;};
+const T=(u,s)=>{const t=tl.load('../assets/trees/'+u,()=>{}); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(s)t.colorSpace=THREE.SRGBColorSpace; return t;};
 const dec=s=>{const b=atob(s);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;};
 const f32=s=>new Float32Array(dec(s)),u32=s=>new Uint32Array(dec(s));
 const mk=p=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));const uv=f32(p.uv);g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));if(p.index)g.setIndex(new THREE.BufferAttribute(u32(p.index),1));return g;};

@@ -41,6 +41,10 @@ window.onerror=(m,s,l)=>{const e=document.getElementById('err');e.style.display=
 </script>
 <script type="module">
 import * as THREE from 'three';
+// Keep the existing authored colors while upgrading the runtime.
+THREE.ColorManagement.enabled=false;
+// r158 still falls back to WebGL1; ?webgl=1 explicitly selects it.
+const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const hud = document.getElementById('hud');
@@ -52,9 +56,11 @@ const { W, H, min, max, pxX, pxY } = meta;
 const spanX = (W-1)*pxX, spanZ = (H-1)*pxY;   // ground size in meters
 const relief = max - min;
 
-const renderer = new THREE.WebGLRenderer({canvas:document.getElementById('c'), antialias:true});
+const renderer = new Renderer({canvas:document.getElementById('c'), antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.outputEncoding = THREE.sRGBEncoding;
+// Preserve the scene lighting authored before r155.
+renderer.useLegacyLights=true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d1117);
 
@@ -100,7 +106,7 @@ geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
 
 // aerial photo texture (NAIP), draped via the plane's default UVs (north-up aligned)
 const tex = new THREE.TextureLoader().load('./assets/terrain/aerial.jpg');
-tex.encoding = THREE.sRGBEncoding;
+tex.colorSpace = THREE.SRGBColorSpace;
 tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
 const mat = new THREE.MeshStandardMaterial({map:tex, roughness:1, metalness:0, flatShading:false});

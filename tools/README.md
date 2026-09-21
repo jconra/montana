@@ -14,7 +14,7 @@ Open `http://localhost:8000/labs/vegetation.html`. The generated files are commi
 so viewing the lab does not require Node or running the baker.
 
 The toolchain pins `@dgreenheck/ez-tree` 1.1.0 and Three.js 0.167.1 in its own
-`tools/node_modules`. The site's existing Three.js 0.140.0 stays unchanged.
+`tools/node_modules`. The browser runtime is pinned separately to Three.js 0.158.0 for WebGL1 support.
 The lockfile captures the selected toolchain, not the unrecovered historical
 installation. In particular the recovered bush recipe does not reproduce the
 committed production bush exactly (source height differs).

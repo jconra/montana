@@ -4,11 +4,17 @@
 </head><body>
 <script type="module">
 import * as THREE from 'three';
+// Keep the existing authored colors while upgrading the runtime.
+THREE.ColorManagement.enabled=false;
+// r158 still falls back to WebGL1; ?webgl=1 explicitly selects it.
+const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.WebGL1Renderer : THREE.WebGLRenderer;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const renderer=new THREE.WebGLRenderer({antialias:false});
+const renderer=new Renderer({antialias:false});
 renderer.setPixelRatio(1); renderer.setSize(innerWidth,innerHeight);
-renderer.outputEncoding=THREE.sRGBEncoding; renderer.shadowMap.enabled=false;
+// Preserve the scene lighting authored before r155.
+renderer.useLegacyLights=true;
+renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.shadowMap.enabled=false;
 document.body.appendChild(renderer.domElement); renderer.domElement.id='c';
 
 const scene=new THREE.Scene();
@@ -29,7 +35,7 @@ scene.add(grd);
 const _o=new THREE.Object3D(), _c=new THREE.Color();
 const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
 const tl=new THREE.TextureLoader(), texCache={};
-const T=(u,srgb)=>{ if(texCache[u]) return texCache[u]; const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding; texCache[u]=t; return t; };
+const T=(u,srgb)=>{ if(texCache[u]) return texCache[u]; const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.colorSpace=THREE.SRGBColorSpace; texCache[u]=t; return t; };
 const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
 const f32=(s)=>new Float32Array(dec(s)), u32=(s)=>new Uint32Array(dec(s));
 const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
