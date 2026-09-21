@@ -37,8 +37,9 @@ scene.add(new THREE.HemisphereLight(0xdce8f1,0x6c6650,.8));
 const sun=new THREE.DirectionalLight(0xfff2d6,1.2);sun.position.set(-20,35,25);scene.add(sun);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(16000,16000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x68785b,roughness:1}));ground.position.y=-.05;scene.add(ground);
 const root=new THREE.Group();scene.add(root);
+let models=[],activeMix="single";
 let parts=[],atlas=null,source=null,triangleCount=0,activeRecipe=null,activeOptions=null;
-let forest=[],forestSettings=null,meshBatches=[],sprite=null,spriteMaterial=null,nearCount=0,farCount=0;
+let forest=[],forestSettings=null,nearCount=0,farCount=0;
 let busy=false,paused=false,inspection=false,generation=0,frameTimes=[],previous=performance.now(),lastStats=0,lastLOD=0;
 let measurement=null,lastAtlasCanvas=null;
 const textures=new Map(),textureLoader=new THREE.TextureLoader();
@@ -55,46 +56,68 @@ function requestTree(recipe){return new Promise((resolve,reject)=>{
   worker.onerror=e=>{clearTimeout(timer);worker.terminate();reject(new Error(e.message||'Could not load generator worker.'));};
   worker.postMessage({id,recipe});
 });}
-function setBusy(value){busy=value;for(const id of ['generate','randomize','bake','applyForest','single','overview','measure','export','downloadAtlas'])$(id).disabled=value;measurement=null;frameTimes=[];previous=performance.now();}
-function disposeForest(){for(const m of meshBatches)m.dispose();meshBatches=[];
-  if(sprite){sprite.geometry.dispose();sprite=null;}if(spriteMaterial){spriteMaterial.dispose();spriteMaterial=null;}root.clear();}
+function setBusy(value){busy=value;for(const id of ['generate','randomize','bake','applyForest','single','overview','measure','export','downloadAtlas','atlasModel'])$(id).disabled=value;measurement=null;frameTimes=[];previous=performance.now();}
+function disposeForest(){for(const model of models){
+  for(const mesh of model.meshBatches||[])mesh.dispose();model.meshBatches=[];
+  if(model.sprite){model.sprite.geometry.dispose();model.sprite.material.dispose();model.sprite=null;}
+}root.clear();}
 function disposeSource(tree){if(tree)for(const m of tree.children){m.geometry.dispose();m.material.dispose();}}
-async function generate(){if(busy)return;setBusy(true);error('');$('status').textContent='Generating tree in background…';
-  let candidate=null,newAtlas=null;
-  try{
-    const recipe={preset:$('preset').value,...values(treeFields),...values(advancedFields)};
-    const data=await requestTree(recipe),aspen=recipe.preset==='aspen';
+function disposeModel(model){disposeSource(model.source);model.atlas?.target.dispose();}
+async function makeModel(recipe,label){const model={recipe,label,source:new THREE.Group(),meshBatches:[]};
+  try{const data=await requestTree(recipe),aspen=recipe.preset==='aspen';
     const [bark,leaf]=await Promise.all([texture(aspen?'birch_color.jpg':'pine_color.jpg'),texture(aspen?'oak_leaf.png':'pine_leaf.png')]);
-    // Smooth foliage cutouts with the viewer's MSAA samples, including instanced trees.
-    candidate=new THREE.Group();data.parts.forEach((p,i)=>candidate.add(new THREE.Mesh(geometry(p),new THREE.MeshStandardMaterial({map:i?leaf:bark,alphaTest:i?.35:0,alphaToCoverage:i===1,side:i?THREE.DoubleSide:THREE.FrontSide,roughness:1}))));
-    newAtlas=await bake(candidate);
-    disposeForest();disposeSource(source);atlas?.target.dispose();source=candidate;atlas=newAtlas;parts=source.children;
-    activeRecipe=recipe;activeOptions=data.options;triangleCount=parts.reduce((n,m)=>n+m.geometry.index.count/3,0);
-    lastAtlasCanvas=null;inspection=false;rebuildForest(true);await previewAtlas();
+    data.parts.forEach((p,i)=>model.source.add(new THREE.Mesh(geometry(p),new THREE.MeshStandardMaterial({map:i?leaf:bark,alphaTest:i?.35:0,alphaToCoverage:i===1,side:i?THREE.DoubleSide:THREE.FrontSide,roughness:1}))));
+    model.atlas=await bake(model.source);model.options=data.options;model.parts=model.source.children;
+    model.triangleCount=model.parts.reduce((n,m)=>n+m.geometry.index.count/3,0);return model;
+  }catch(e){disposeModel(model);throw e;}
+}
+async function generate(recipeOverride=null){if(busy)return;setBusy(true);error('');$('status').textContent='Generating trees in background…';
+  const next=[];
+  try{
+    const recipe=recipeOverride||{preset:$('preset').value,...values(treeFields),...values(advancedFields)};
+    const mix=$('mix').value;
+    next.push(await makeModel(recipe,'Designer'));
+    if(mix==='mixed')for(const [index,preset] of ['pine','open','aspen'].entries()){
+      const defaults=Object.fromEntries([...treeFields,...advancedFields].map(([id,,,,,value])=>[id,value]));
+      next.push(await makeModel({...defaults,...presetSettings[preset],preset,seed:(recipe.seed+1009*(index+1))%65536}, {pine:'Full pine',open:'Open pine',aspen:'Aspen'}[preset]));
+    }
+    planForest({...values(forestFields),mode:$('mode').value},next,false);
+    disposeForest();models.forEach(disposeModel);models=next;activeMix=mix;
+    ({source,atlas,parts,triangleCount}=models[0]);activeRecipe=recipe;activeOptions=models[0].options;
+    lastAtlasCanvas=null;$('atlasModel').replaceChildren(...models.map((m,i)=>new Option(m.label,i)));inspection=false;rebuildForest(!recipeOverride);await previewAtlas();
     $('status').textContent='Ready · '+(renderer.capabilities.isWebGL2?'WebGL2':'WebGL1');window.__forestReady=true;
-  }catch(e){if(candidate!==source)disposeSource(candidate);if(newAtlas&&newAtlas!==atlas)newAtlas.target.dispose();error(e);$('status').textContent='Generation failed; adjust controls and retry.';}
+  }catch(e){if(models!==next)next.forEach(disposeModel);error(e);$('status').textContent='Generation failed; adjust controls and retry.';}
   finally{setBusy(false);}
 }
 async function bake(tree){const grid=+$('views').value,tile=+$('tile').value;
   return bakeAtlas(renderer,tree,grid,tile,(row,total)=>{$('status').textContent=`Baking octahedral views · ${row*grid} / ${total*grid}`;});}
-async function rebake(){if(busy||!source)return;setBusy(true);error('');try{
-  const next=await bake(source);disposeForest();atlas.target.dispose();atlas=next;lastAtlasCanvas=null;
-  rebuildForest(false);await previewAtlas();$('status').textContent='Atlas ready';
-}catch(e){error(e);}finally{setBusy(false);}}
-async function previewAtlas(){lastAtlasCanvas=atlasCanvas(renderer,atlas);const c=$('atlasPreview');c.getContext('2d').clearRect(0,0,c.width,c.height);c.getContext('2d').drawImage(lastAtlasCanvas,0,0,c.width,c.height);}
+async function rebake(){if(busy||!source)return;setBusy(true);error('');const next=[];try{
+  planForest({...values(forestFields),mode:$('mode').value},models,inspection);
+  for(const model of models)next.push(await bake(model.source));
+  disposeForest();models.forEach((model,i)=>{model.atlas.target.dispose();model.atlas=next[i];});atlas=models[0].atlas;lastAtlasCanvas=null;
+  rebuildForest(false);await previewAtlas();$('status').textContent='Atlases ready';
+}catch(e){for(const item of next)if(!models.some(m=>m.atlas===item))item.target.dispose();error(e);}finally{setBusy(false);}}
+async function previewAtlas(){lastAtlasCanvas=atlasCanvas(renderer,models[+$('atlasModel').value]?.atlas||atlas);const c=$('atlasPreview');c.getContext('2d').clearRect(0,0,c.width,c.height);c.getContext('2d').drawImage(lastAtlasCanvas,0,0,c.width,c.height);}
 function rng(seed){return()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};}
-function rebuildForest(reframe=false){if(!source||!atlas)return;
-  const f=values(forestFields);f.count=Math.floor(f.count);f.budget=Math.floor(f.budget);f.mode=$('mode').value;
-  if(!inspection&&f.mode==='mesh'&&f.count*triangleCount>25000000)throw new Error(`Mesh mode would draw ${(f.count*triangleCount/1e6).toFixed(1)}M triangles. Use fewer than ${Math.floor(25000000/triangleCount)} trees, or choose Hybrid / Impostors.`);
-  if(!renderer.capabilities.isWebGL2&&!renderer.extensions.has('ANGLE_instanced_arrays'))throw new Error('Forest rendering needs WebGL1 instancing (ANGLE_instanced_arrays).');
-  disposeForest();forestSettings=f;const random=rng(f.forestSeed),count=inspection?1:f.count,cols=Math.ceil(Math.sqrt(count)),rows=Math.ceil(count/cols);
-  forest=Array.from({length:count},(_,i)=>({
-    x:inspection?0:((i%cols)-(cols-1)/2+(random()-.5)*.7)*f.spacing,
+function planForest(f,modelSet,inspection){
+  const random=rng(f.forestSeed),types=rng(f.forestSeed^0x9e3779b9),count=inspection?1:f.count,cols=Math.ceil(Math.sqrt(count)),rows=Math.ceil(count/cols);
+  const nextForest=Array.from({length:count},(_,i)=>{const model=inspection?0:Math.floor(types()*modelSet.length);return {
+    model,x:inspection?0:((i%cols)-(cols-1)/2+(random()-.5)*.7)*f.spacing,
     z:inspection?0:(Math.floor(i/cols)-(rows-1)/2+(random()-.5)*.7)*f.spacing,
-    height:activeRecipe.height*(inspection?1:1+(random()*2-1)*f.variation),yaw:inspection?0:random()*Math.PI*2
-  }));
-  const mode=inspection?'mesh':f.mode;
-  if(mode!=='impostor')for(const part of parts){const mesh=new THREE.InstancedMesh(part.geometry,part.material,count);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;meshBatches.push(mesh);root.add(mesh);}
+    height:modelSet[model].recipe.height*(inspection?1:1+(random()*2-1)*f.variation),yaw:inspection?0:random()*Math.PI*2
+  };});
+  const triangles=nextForest.reduce((n,p)=>n+modelSet[p.model].triangleCount,0);
+  if(!inspection&&f.mode==='mesh'&&triangles>25000000)throw new Error(`Mesh mode would draw ${(triangles/1e6).toFixed(1)}M triangles. Reduce the tree count or choose Hybrid / Impostors.`);
+  return nextForest;
+}
+function rebuildForest(reframe=false){if(!source||!atlas)return;
+  const f=values(forestFields);f.count=Math.floor(f.count);f.budget=Math.floor(f.budget);f.mode=$('mode').value;f.mix=activeMix;
+  if(!renderer.capabilities.isWebGL2&&!renderer.extensions.has('ANGLE_instanced_arrays'))throw new Error('Forest rendering needs WebGL1 instancing (ANGLE_instanced_arrays).');
+  const nextForest=planForest(f,models,inspection);
+  disposeForest();forestSettings=f;forest=nextForest;
+  const mode=inspection?'mesh':f.mode,count=forest.length;
+  for(const model of models){const {parts,atlas}=model;const count=forest.filter(p=>models[p.model]===model).length;if(!count)continue;let spriteMaterial,sprite;
+  if(mode!=='impostor')for(const part of parts){const mesh=new THREE.InstancedMesh(part.geometry,part.material,count);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;model.meshBatches.push(mesh);root.add(mesh);}
   if(mode!=='mesh'){
     const base=new THREE.PlaneGeometry(1,1),g=new THREE.InstancedBufferGeometry();g.index=base.index;g.attributes=base.attributes;
     g.setAttribute('instanceData',new THREE.InstancedBufferAttribute(new Float32Array(count*4),4).setUsage(THREE.DynamicDrawUsage));
@@ -102,31 +125,37 @@ function rebuildForest(reframe=false){if(!source||!atlas)return;
     spriteMaterial=impostorMaterial(atlas,scene.fog);spriteMaterial.uniforms.blendViews.value=+$('blend').value;spriteMaterial.uniforms.cutoff.value=f.cutoff;
     sprite=new THREE.Mesh(g,spriteMaterial);sprite.frustumCulled=false;root.add(sprite);
   }
+    model.sprite=sprite;
+  }
   renderer.setPixelRatio(+$('dpr').value);resize();
   if(reframe)frameForest();updateLOD();frameTimes=[];measurement=null;
-  window.__forestState={mode,requested:count,trianglesPerTree:triangleCount,atlasGrid:atlas.grid,atlasTile:atlas.tile};
+  window.__forestState={mode,requested:count,trianglesPerTree:triangleCount,atlasGrid:atlas.grid,atlasTile:atlas.tile,mix:activeMix,models:models.map((m,i)=>({label:m.label,count:forest.filter(p=>p.model===i).length,triangles:m.triangleCount}))};
+  $('composition').textContent=window.__forestState.models.map(m=>`${m.label}: ${m.count.toLocaleString()}`).join(' · ');
 }
 const dummy=new THREE.Object3D();
 function updateLOD(){if(!forestSettings)return;const mode=inspection?'mesh':forestSettings.mode;
   const selected=new Set();
   if(mode==='hybrid'){
-    const max=Math.min(forestSettings.budget,Math.floor(12000000/triangleCount));
+    const max=forestSettings.budget;let triangles=0;
     const candidates=forest.map((p,i)=>({i,d:(camera.position.x-p.x)**2+(camera.position.z-p.z)**2+(camera.position.y-p.height*.5)**2})).filter(p=>p.d<forestSettings.near**2).sort((a,b)=>a.d-b.d);
-    for(const p of candidates.slice(0,max))selected.add(p.i);
+    for(const p of candidates){const cost=models[forest[p.i].model].triangleCount;if(selected.size>=max)break;if(triangles+cost<=12000000){selected.add(p.i);triangles+=cost;}}
   }
-  nearCount=farCount=0;
+  nearCount=farCount=0;for(const model of models)model.nearCount=model.farCount=0;
   forest.forEach((p,i)=>{
+    const model=models[p.model],sprite=model.sprite;
     if(mode==='mesh'||selected.has(i)){
       dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,p.yaw,0);dummy.scale.setScalar(p.height);dummy.updateMatrix();
-      for(const mesh of meshBatches)mesh.setMatrixAt(nearCount,dummy.matrix);nearCount++;
-    }else if(sprite){sprite.geometry.attributes.instanceData.setXYZW(farCount,p.x,0,p.z,p.height);sprite.geometry.attributes.instanceYaw.setX(farCount,p.yaw);farCount++;}
+      for(const mesh of model.meshBatches)mesh.setMatrixAt(model.nearCount,dummy.matrix);model.nearCount++;nearCount++;
+    }else if(sprite){sprite.geometry.attributes.instanceData.setXYZW(model.farCount,p.x,0,p.z,p.height);sprite.geometry.attributes.instanceYaw.setX(model.farCount,p.yaw);model.farCount++;farCount++;}
   });
-  for(const mesh of meshBatches){mesh.count=nearCount;mesh.instanceMatrix.needsUpdate=true;}
-  if(sprite){sprite.geometry.instanceCount=farCount;sprite.geometry.attributes.instanceData.needsUpdate=true;sprite.geometry.attributes.instanceYaw.needsUpdate=true;}
+  for(const model of models){const sprite=model.sprite;
+  for(const mesh of model.meshBatches){mesh.count=model.nearCount;mesh.instanceMatrix.needsUpdate=true;}
+  if(sprite){sprite.geometry.instanceCount=model.farCount;sprite.geometry.attributes.instanceData.needsUpdate=true;sprite.geometry.attributes.instanceYaw.needsUpdate=true;}
+  }
 }
 function frameForest(){
   const box=new THREE.Box3();
-  for(const p of forest){const r=atlas.radius*p.height,c=atlas.center.clone().multiplyScalar(p.height).add(new THREE.Vector3(p.x,0,p.z));
+  for(const p of forest){const atlas=models[p.model].atlas;const r=atlas.radius*p.height,c=atlas.center.clone().multiplyScalar(p.height).add(new THREE.Vector3(p.x,0,p.z));
     box.expandByPoint(c.clone().addScalar(r));box.expandByPoint(c.clone().addScalar(-r));}
   const center=box.getCenter(new THREE.Vector3()),radius=box.getSize(new THREE.Vector3()).length()*.5;
   const halfFov=Math.min(THREE.MathUtils.degToRad(camera.fov)*.5,Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)*.5)*camera.aspect));
@@ -135,21 +164,23 @@ function frameForest(){
 }
 function resize(){const host=$('view');renderer.setSize(host.clientWidth,host.clientHeight,false);camera.aspect=host.clientWidth/host.clientHeight;camera.updateProjectionMatrix();}
 new ResizeObserver(resize).observe($('view'));
-function apply(){if(busy)return;try{error('');inspection=false;rebuildForest(false);}catch(e){error(e);}}
-$('generate').onclick=generate;$('bake').onclick=rebake;$('applyForest').onclick=apply;
+async function apply(){if(busy)return;if($('mix').value!==activeMix){await generate(activeRecipe);return;}const previous=inspection;try{error('');inspection=false;rebuildForest(false);}catch(e){inspection=previous;error(e);}}
+$('generate').onclick=()=>generate();$('bake').onclick=rebake;$('applyForest').onclick=apply;
 $('randomize').onclick=()=>{$('seed').value=Math.floor(Math.random()*65536);$('seedValue').value=$('seed').value;generate();};
-$('preset').onchange=()=>{const preset=$('preset').value;const settings={crown:{crown:.64,branches:48,leaves:20,height:28,width:1.2,angle:100},pine:{crown:.18,branches:64,leaves:18,height:24,width:1,angle:115},open:{crown:.35,branches:18,leaves:8,height:24,width:1,angle:105},aspen:{crown:.35,branches:12,leaves:10,height:18,width:1,angle:55}}[preset];
+const presetSettings={crown:{crown:.64,branches:48,leaves:20,height:28,width:1.2,angle:100},pine:{crown:.18,branches:64,leaves:18,height:24,width:1,angle:115},open:{crown:.35,branches:18,leaves:8,height:24,width:1,angle:105},aspen:{crown:.35,branches:12,leaves:10,height:18,width:1,angle:55}};
+$('preset').onchange=()=>{const settings=presetSettings[$('preset').value];
   for(const [id,value] of Object.entries(settings)){$(id).value=value;$(id+'Value').value=value;}
   $('status').textContent='Preset selected · press Generate & bake';};
-$('blend').onchange=()=>{if(spriteMaterial)spriteMaterial.uniforms.blendViews.value=+$('blend').value;frameTimes=[];measurement=null;};
+$('blend').onchange=()=>{for(const model of models)if(model.sprite)model.sprite.material.uniforms.blendViews.value=+$('blend').value;frameTimes=[];measurement=null;};
 $('single').onclick=()=>{try{inspection=true;rebuildForest(true);}catch(e){error(e);}};
-$('overview').onclick=()=>{try{inspection=false;rebuildForest(true);}catch(e){error(e);}};
+$('overview').onclick=()=>{const previous=inspection;try{inspection=false;rebuildForest(true);}catch(e){inspection=previous;error(e);}};
 $('orbit').onclick=()=>{controls.autoRotate=!controls.autoRotate;$('orbit').textContent='Orbit: '+(controls.autoRotate?'on':'off');frameTimes=[];measurement=null;};
 $('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'Resume':'Pause';previous=performance.now();measurement=null;};
 $('measure').onclick=()=>{if(paused){error('Resume rendering before measuring.');return;}measurement={start:performance.now(),times:[],mode:inspection?'mesh':forestSettings.mode,count:forest.length};$('measurement').textContent='Measuring 10 seconds… keep this tab visible.';};
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-$('export').onclick=()=>{if(!activeRecipe)return;download(new Blob([JSON.stringify({version:1,recipe:activeRecipe,ezTreeOptions:activeOptions,atlas:{grid:atlas.grid,tile:atlas.tile,center:atlas.center.toArray(),radius:atlas.radius,mapping:'full-sphere-y-up-octahedral',gutter:2},forest:forestSettings,view:{blend:+$('blend').value,pixelRatio:renderer.getPixelRatio(),camera:camera.position.toArray(),target:controls.target.toArray(),inspection}},null,2)],{type:'application/json'}),'montana-tree-recipe.json');};
-$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw new Error('Recipe file is too large.');const data=JSON.parse(await file.text());if(data.version!==1||!['crown','pine','open','aspen'].includes(data.recipe?.preset))throw new Error('Unsupported tree recipe.');
+$('export').onclick=()=>{if(!activeRecipe)return;download(new Blob([JSON.stringify({version:1,recipe:activeRecipe,ezTreeOptions:activeOptions,models:models.map(m=>({label:m.label,recipe:m.recipe,ezTreeOptions:m.options,atlas:{center:m.atlas.center.toArray(),radius:m.atlas.radius}})),atlas:{grid:atlas.grid,tile:atlas.tile,center:atlas.center.toArray(),radius:atlas.radius,mapping:'full-sphere-y-up-octahedral',gutter:2},forest:forestSettings,view:{blend:+$('blend').value,pixelRatio:renderer.getPixelRatio(),camera:camera.position.toArray(),target:controls.target.toArray(),inspection}},null,2)],{type:'application/json'}),'montana-tree-recipe.json');};
+$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file||busy)return;if(file.size>100000)throw new Error('Recipe file is too large.');const data=JSON.parse(await file.text());if(data.version!==1||!['crown','pine','open','aspen'].includes(data.recipe?.preset))throw new Error('Unsupported tree recipe.');
+  $('mix').value=data.forest?.mix==='mixed'?'mixed':'single';
   $('preset').value=data.recipe.preset;for(const [id] of [...treeFields,...advancedFields])if(Number.isFinite(data.recipe[id])){$(id).value=data.recipe[id];$(id+'Value').value=$(id).value;}
   for(const [id] of forestFields)if(Number.isFinite(data.forest?.[id])){$(id).value=data.forest[id];$(id+'Value').value=$(id).value;}
   if(['mesh','hybrid','impostor'].includes(data.forest?.mode))$('mode').value=data.forest.mode;
@@ -162,7 +193,8 @@ $('import').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;
   const validVector=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<12000);
   if(validVector(data.view?.camera)&&validVector(data.view?.target)){camera.position.fromArray(data.view.camera);controls.target.fromArray(data.view.target);controls.update();}
 }catch(e){error(e);}finally{$('import').value='';}};
-$('downloadAtlas').onclick=()=>lastAtlasCanvas?.toBlob(blob=>{if(blob)download(blob,'montana-octahedral-atlas.png');});
+$('atlasModel').onchange=()=>{if(!busy)previewAtlas();};
+$('downloadAtlas').onclick=()=>lastAtlasCanvas?.toBlob(blob=>{if(blob)download(blob,`montana-octahedral-atlas-${$('atlasModel').value}.png`);});
 document.addEventListener('visibilitychange',()=>{measurement=null;frameTimes=[];previous=performance.now();});
 function animate(now){requestAnimationFrame(animate);const dt=now-previous;previous=now;if(paused||busy||document.hidden||!atlas)return;
   controls.update();if(now-lastLOD>200&&forestSettings?.mode==='hybrid'){updateLOD();lastLOD=now;}
@@ -170,7 +202,7 @@ function animate(now){requestAnimationFrame(animate);const dt=now-previous;previ
   if(measurement){measurement.times.push(dt);if(now-measurement.start>=10000){const t=measurement.times,avg=t.reduce((a,b)=>a+b,0)/t.length,sorted=[...t].sort((a,b)=>a-b);$('measurement').textContent=`${measurement.mode} · ${measurement.count.toLocaleString()} trees · ${(1000/avg).toFixed(1)} FPS · ${avg.toFixed(1)} ms mean · ${sorted[Math.floor((sorted.length-1)*.95)].toFixed(1)} ms p95 · ${renderer.domElement.width} × ${renderer.domElement.height}px. CPU/display frame timing, not GPU timer.`;measurement=null;}}
   if(now-lastStats>650){const avg=frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length;
     $('stats').textContent=`${(1000/avg).toFixed(1)} FPS · ${avg.toFixed(1)} ms/frame · ${renderer.info.render.calls} draws · ${renderer.info.render.triangles.toLocaleString()} triangles`;
-    $('cost').textContent=`${nearCount.toLocaleString()} meshes + ${farCount.toLocaleString()} impostors · ${triangleCount.toLocaleString()} tris/source · atlas ${(atlas.bytes/1048576).toFixed(1)} MiB color (+ depth) · ${renderer.domElement.width} × ${renderer.domElement.height}px`;
+    $('cost').textContent=`${nearCount.toLocaleString()} meshes + ${farCount.toLocaleString()} impostors · ${models.length} models · atlases ${(models.reduce((n,m)=>n+m.atlas.bytes,0)/1048576).toFixed(1)} MiB color (+ depth) · ${renderer.domElement.width} × ${renderer.domElement.height}px`;
     window.__forestCounts={near:nearCount,far:farCount,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};lastStats=now;
   }
 }

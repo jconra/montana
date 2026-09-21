@@ -15,8 +15,11 @@
 <h2>2 · Bake the views</h2>
 <label>Atlas grid<select id="views"><option value="4">4 × 4 · fast</option><option value="8" selected>8 × 8 · balanced</option><option value="12">12 × 12 · smoother</option></select></label>
 <label>Pixels per view<select id="tile"><option value="64">64 · lightweight</option><option value="128" selected>128 · balanced</option><option value="256">256 · detailed</option></select></label>
-<button id="bake">Rebake atlas</button><details><summary>Atlas preview & export</summary><canvas id="atlasPreview" width="256" height="256"></canvas><button id="downloadAtlas">Save atlas PNG</button><p class="hint">Preview/export is sRGB; runtime atlas stores linear color. Recipe export includes layout and bounds for rebuilding.</p></details>
+<button id="bake">Rebake all atlases</button><details><summary>Atlas preview & export</summary><label>Model<select id="atlasModel"><option value="0">Designer</option></select></label><canvas id="atlasPreview" width="256" height="256"></canvas><button id="downloadAtlas">Save atlas PNG</button><p class="hint">Preview/export is sRGB; runtime atlas stores linear color. Each model has a separate atlas.</p></details>
 <h2>3 · Grow a forest</h2>
+<label>Tree mix<select id="mix"><option value="single">Designer tree only</option><option value="mixed">Mixed · designer + full pine + open pine + aspen</option></select></label>
+<p class="hint">Mixed forests distribute four distinct models equally by probability, with separate instancing batches and atlases. Apply forest to rebuild the mix. Inspect one tree shows the designer tree.</p>
+<p id="composition" class="hint"></p>
 <label>Render mode<select id="mode"><option value="impostor">Octahedral impostors</option><option value="mesh">Instanced meshes</option><option value="hybrid">Mesh near / impostor far</option></select></label>
 <label>View sampling<select id="blend"><option value="1">Blend three views</option><option value="0">Nearest view</option></select></label>
 <div id="forestControls"></div>
