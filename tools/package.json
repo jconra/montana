@@ -6,10 +6,14 @@
     "node": ">=18"
   },
   "scripts": {
-    "bake": "node bake-trees.mjs"
+    "bake": "node bake-trees.mjs",
+    "build:forest": "node build-forest-worker.mjs"
   },
   "dependencies": {
     "@dgreenheck/ez-tree": "1.1.0",
     "three": "0.167.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.11"
   }
 }

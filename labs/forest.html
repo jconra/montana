@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Montana · Forest & Tree Designer</title>
+<link rel="stylesheet" href="forest.css">
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script></head>
+<body><header><div><small>MONTANA / FIELD STUDIES</small><h1>Forest & Tree Designer</h1></div><a href="./">← All labs</a></header>
+<main><aside>
+<h2>1 · Shape a tree</h2>
+<label>Starting form<select id="preset"><option value="crown">Tall crown pine</option><option value="pine">Full pine</option><option value="open">Open pine</option><option value="aspen">Aspen form</option></select></label>
+<div id="treeControls"></div>
+<details><summary>Branch structure & geometry</summary><div id="advancedControls"></div></details>
+<div class="row"><button id="generate">Generate & bake</button><button id="randomize">New seed</button></div>
+<p class="hint">Tall crown pine keeps branches high on a long trunk. Crown start is a fraction of the generator trunk; drooping branches may extend below it.</p>
+<div class="row"><button id="export">Save recipe</button><label class="button">Load recipe<input id="import" type="file" accept="application/json,.json" hidden></label></div>
+<h2>2 · Bake the views</h2>
+<label>Atlas grid<select id="views"><option value="4">4 × 4 · fast</option><option value="8" selected>8 × 8 · balanced</option><option value="12">12 × 12 · smoother</option></select></label>
+<label>Pixels per view<select id="tile"><option value="64">64 · lightweight</option><option value="128" selected>128 · balanced</option><option value="256">256 · detailed</option></select></label>
+<button id="bake">Rebake atlas</button><details><summary>Atlas preview & export</summary><canvas id="atlasPreview" width="256" height="256"></canvas><button id="downloadAtlas">Save atlas PNG</button><p class="hint">Preview/export is sRGB; runtime atlas stores linear color. Recipe export includes layout and bounds for rebuilding.</p></details>
+<h2>3 · Grow a forest</h2>
+<label>Render mode<select id="mode"><option value="impostor">Octahedral impostors</option><option value="mesh">Instanced meshes</option><option value="hybrid">Mesh near / impostor far</option></select></label>
+<label>View sampling<select id="blend"><option value="1">Blend three views</option><option value="0">Nearest view</option></select></label>
+<div id="forestControls"></div>
+<label>Pixel ratio<select id="dpr"><option value="0.5">0.5 · half resolution</option><option value="1" selected>1 · native CSS pixels</option><option value="2">2 · high resolution</option></select></label>
+<button id="applyForest">Apply forest</button><div class="row"><button id="single">Inspect one tree</button><button id="overview">Frame forest</button></div>
+<div class="row"><button id="orbit">Orbit: off</button><button id="pause">Pause</button></div>
+<button id="measure">Measure 10 seconds</button><p id="measurement" class="hint">Measurement uses the current camera. Compare modes at the same count, seed, and pixel ratio.</p>
+<p class="hint">Color impostor experiment: full-sphere octahedral views, alpha cutout, no depth/parallax correction or dynamic shadows. Lighting is baked; random yaw rotates that baked lighting. View blending can soften silhouettes. Thin-client performance depends on fill rate as well as triangle count.</p>
+</aside><section id="view"><canvas id="scene"></canvas><div id="hud"><b id="status">Loading…</b><div id="stats"></div><div id="cost"></div></div><p id="error" role="alert"></p><div id="caption">Drag to orbit · scroll to zoom · recipes regenerate when you press Generate & bake</div></section></main>
+<script type="module" src="forest.js"></script></body></html>

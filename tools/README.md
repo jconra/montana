@@ -44,6 +44,53 @@ The current scene and its tree placement data are not changed by a lab bake.
 
 ## Comparison lab
 
+### Forest & Tree Designer
+
+Open `labs/forest.html` (append `?webgl=1` to force WebGL1). The committed worker
+generates ez-tree geometry off the UI thread, with its own bundled Three.js
+0.167.1. The viewer and atlas baker remain on r158. No server-side generator is
+required. To rebuild the worker after editing `forest-worker.mjs`:
+
+```sh
+npm ci --prefix tools
+npm run build:forest --prefix tools
+```
+
+The worker bundles upstream ez-tree source with texture loading replaced by null
+stubs; materials and textures are supplied by the viewer. It reconstructs indices
+from the original arrays to avoid upstream Uint16 overflow. Both upstream licenses
+are shipped alongside the worker. The normal offline bake command is unchanged.
+
+Tall crown pine defaults to branches starting 64% up the trunk, with independently
+adjustable crown density, width, leaf size, branch angle, and geometry detail.
+Recipe JSON exports the active recipe, full ez-tree options, and atlas metadata;
+loading it restores tree controls, forest and atlas settings, pixel ratio, sampling,
+and camera position. Press Generate & bake to apply tree changes.
+
+The impostor is a full-sphere Y-up octahedral color atlas. Each cell is an
+orthographic capture with the same bounding sphere and two-pixel gutter. The
+shader selects the nearest view or blends the three vertices of the enclosing
+octahedral grid triangle, projecting the billboard into each capture basis.
+There is no depth atlas, parallax correction, relighting, or impostor shadow pass.
+The linear RGBA8 atlas uses no mipmaps; exported PNGs convert to sRGB. Exported
+images use top-left image coordinates; the runtime atlas uses bottom-left UVs.
+
+Forest modes reuse deterministic positions, heights, and yaw. Mesh mode refuses
+more than 25M triangles. Hybrid mode picks the closest trees within the distance
+and count budgets, further bounded to 12M source triangles, with a hard LOD switch.
+Trees outside the near budget remain impostors, even inside the distance threshold.
+No per-tree frustum culling is implemented; displayed counts are submitted counts.
+WebGL1 requires ANGLE_instanced_arrays, plus OES_element_index_uint for trees above
+65,535 vertices per part. There is no requirement for WebGL2-only texture arrays.
+
+For a fair comparison, keep camera, forest seed, count, and pixel ratio fixed.
+Use Apply forest after changing forest settings. Single-tree inspection uses the
+mesh; Frame forest restores the selected mode. The 10-second measurement reports
+CPU/display frame intervals, not GPU timer results; atlas generation is excluded,
+and hiding the tab cancels the measurement. High counts may be fill-rate limited
+despite two triangles per impostor. Atlas memory shown excludes depth and driver
+overhead. Normal automatic WebGL1 fallback is retained.
+
 `labs/vegetation.html` compares two candidates with orbit/zoom, equal-height or
 suggested-height modes, a one-meter grid, daylight/low sun, and repeated patches.
 It displays geometry size and renderer statistics. Geometry KB excludes textures;
