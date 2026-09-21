@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ez-pine preview</title>
+<style>html,body{margin:0;height:100%;background:#9fc3e8;overflow:hidden}#c{display:block}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const renderer=new THREE.WebGLRenderer({antialias:false});
+renderer.setPixelRatio(1); renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding; renderer.shadowMap.enabled=false;
+document.body.appendChild(renderer.domElement); renderer.domElement.id='c';
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9fc3e8);
+scene.fog=new THREE.Fog(0x9fc3e8,120,400);
+const cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,2000);
+cam.position.set(22,15,58);
+const ctr=new OrbitControls(cam,renderer.domElement); ctr.target.set(0,9,0);
+
+scene.add(new THREE.HemisphereLight(0xbfd7ff,0x556644,0.75));
+const sun=new THREE.DirectionalLight(0xfff2d8,1.5); sun.position.set(60,90,40); scene.add(sun);
+
+// ground
+const gmat=new THREE.MeshStandardMaterial({color:0x5c6b3a,roughness:1,metalness:0});
+const grd=new THREE.Mesh(new THREE.CircleGeometry(300,48).rotateX(-Math.PI/2),gmat);
+scene.add(grd);
+
+const _o=new THREE.Object3D(), _c=new THREE.Color();
+const man=await (await fetch('../assets/trees/manifest.json?v=7')).json();
+const tl=new THREE.TextureLoader(), texCache={};
+const T=(u,srgb)=>{ if(texCache[u]) return texCache[u]; const t=tl.load('../assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.encoding=THREE.sRGBEncoding; texCache[u]=t; return t; };
+const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
+const f32=(s)=>new Float32Array(dec(s)), u32=(s)=>new Uint32Array(dec(s));
+const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));
+  g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));
+  const uv=f32(p.uv); g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));
+  if(p.index) g.setIndex(new THREE.BufferAttribute(u32(p.index),1)); return g;};
+
+// representative real heights (m) so the proportions read true
+const H={ pine_large:22, pine_bush:11, aspen:18 };
+let x=-32;
+for(const v of man.variants){
+  const d=await (await fetch('../assets/trees/'+v.file+'?v=7')).json(); const xt=v.tex;
+  const barkMat=new THREE.MeshStandardMaterial({map:T(xt.barkColor,true),normalMap:T(xt.barkNormal),roughnessMap:T(xt.barkRough),aoMap:T(xt.barkAO),roughness:1,metalness:0});
+  const leafMat=new THREE.MeshStandardMaterial({map:T(xt.leaf,true),alphaTest:v.alphaTest??0.5,side:THREE.DoubleSide,roughness:1,metalness:0});
+  const bark=mkGeo(d.branches), leaf=mkGeo(d.leaves), h=H[v.name]||18;
+  for(const [g,m] of [[bark,barkMat],[leaf,leafMat]]){
+    const mesh=new THREE.Mesh(g,m); mesh.position.set(x,0,0); mesh.scale.setScalar(h); scene.add(mesh);
+  }
+  x+=32;
+}
+// render a short burst (lets textures decode) then stop so a screenshot capture isn't starved by the rAF loop
+const t0=performance.now();
+function loop(){ ctr.update(); renderer.render(scene,cam); if(performance.now()-t0<4000) requestAnimationFrame(loop); else window.__ready=true; }   // give palette leaf PNGs time to decode
+loop();
+</script></body></html>

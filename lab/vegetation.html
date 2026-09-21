@@ -1,16 +1,4 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Montana · Vegetation lab</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#edf0e8;color:#20332c;font:15px system-ui}header{padding:18px 24px;background:#203b32;color:#faf7ed;display:flex;justify-content:space-between;align-items:center}h1{font-size:22px;margin:3px 0}a{color:inherit}small{letter-spacing:.08em}main{display:grid;grid-template-columns:300px 1fr;height:calc(100dvh - 89px)}aside{padding:22px;overflow:auto;background:#faf9f3}label{display:block;margin:18px 0 6px;font-weight:600}select,input,button{width:100%;padding:9px;font:inherit}input[type=checkbox]{width:auto}button{background:#203b32;color:white;border:0;border-radius:4px;cursor:pointer;margin-top:14px}p{line-height:1.5;font-size:13px}.muted{color:#65756a}#view{position:relative;min-width:0;min-height:300px}canvas{display:block;width:100%;height:100%;touch-action:none}#stats{position:absolute;bottom:16px;left:16px;background:#ffffffdf;padding:10px 14px;border-radius:6px;font-size:12px;pointer-events:none}#error{color:#a02d20;white-space:pre-wrap}#badges{display:flex;justify-content:space-around;position:absolute;top:16px;width:100%;pointer-events:none}#badges span{background:#ffffffdf;padding:6px 12px;border-radius:20px;font-size:12px} @media(max-width:700px){main{display:flex;flex-direction:column;height:auto}aside{order:2}#view{height:56dvh}header{padding:14px}h1{font-size:19px}}
-</style><script type="importmap">{"imports":{"three":"../node_modules/three/build/three.module.js","three/addons/":"../node_modules/three/examples/jsm/"}}</script></head>
-<body><header><div><small>MONTANA / FIELD STUDIES</small><h1>Vegetation lab</h1></div><a href="../index.html">Property ↗</a></header><main><aside>
-<p>Compare silhouettes, foliage and scale before choosing assets for the property.</p>
-<label for="left">Candidate A</label><select id="left"></select><label for="right">Candidate B</label><select id="right"></select>
-<label for="height">Height <output id="heightValue">1.6 m</output></label><input id="height" type="range" min="0.5" max="25" step="0.1" value="1.6">
-<label for="mode">Arrangement</label><select id="mode"><option value="single">Individual plants</option><option value="patch">Repeated patch · 9 plants each</option></select>
-<label for="light">Lighting</label><select id="light"><option value="day">Daylight</option><option value="low">Low sun</option></select>
-<label><input id="equal" type="checkbox" checked> Compare at equal height</label><button id="reset">Frame both candidates</button>
-<p id="details"></p><p class="muted">Shrubs are exploratory forms, not verified species. Broadleaf candidates currently use an oak leaf texture; gray-green fine foliage still needs a better texture.</p>
-<p><a href="treelab.html">Original tree distance lab ↗</a></p><p id="error" role="alert"></p></aside>
-<section id="view" aria-label="Interactive vegetation comparison"><canvas></canvas><div id="badges"><span>A</span><span>B</span></div><div id="stats">Loading vegetation…</div></section></main>
-<script type="module" src="vegetation.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lab moved</title></head><body>
+<p>This lab has moved. <a href="../labs/vegetation.html">Open the lab</a> or <a href="../labs/">browse all labs</a>.</p>
+<script>location.replace('../labs/vegetation.html'+location.search+location.hash);</script>
+</body></html>

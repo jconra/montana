@@ -10,7 +10,7 @@ npm run bake --prefix tools
 python3 -m http.server 8000
 ```
 
-Open `http://localhost:8000/lab/vegetation.html`. The generated files are committed,
+Open `http://localhost:8000/labs/vegetation.html`. The generated files are committed,
 so viewing the lab does not require Node or running the baker.
 
 The toolchain pins `@dgreenheck/ez-tree` 1.1.0 and Three.js 0.167.1 in its own
@@ -44,7 +44,7 @@ The current scene and its tree placement data are not changed by a lab bake.
 
 ## Comparison lab
 
-`lab/vegetation.html` compares two candidates with orbit/zoom, equal-height or
+`labs/vegetation.html` compares two candidates with orbit/zoom, equal-height or
 suggested-height modes, a one-meter grid, daylight/low sun, and repeated patches.
 It displays geometry size and renderer statistics. Geometry KB excludes textures;
 frame rate depends on device and is not a production-scene benchmark. Instancing
