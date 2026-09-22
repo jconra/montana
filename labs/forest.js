@@ -77,9 +77,9 @@ async function generate(recipeOverride=null){if(busy)return;setBusy(true);error(
     const recipe=recipeOverride||{preset:$('preset').value,...values(treeFields),...values(advancedFields)};
     const mix=$('mix').value;
     next.push(await makeModel(recipe,'Designer'));
-    if(mix==='mixed')for(const [index,preset] of ['pine','open','aspen'].entries()){
+    if(mix!=='single')for(const [index,preset] of (mix==='mixedEvergreen'?['pine','open','aspen','evergreen']:['pine','open','aspen']).entries()){
       const defaults=Object.fromEntries([...treeFields,...advancedFields].map(([id,,,,,value])=>[id,value]));
-      next.push(await makeModel({...defaults,...presetSettings[preset],preset,seed:(recipe.seed+1009*(index+1))%65536}, {pine:'Full pine',open:'Open pine',aspen:'Aspen'}[preset]));
+      next.push(await makeModel({...defaults,...presetSettings[preset],preset,seed:(recipe.seed+1009*(index+1))%65536}, {pine:'Full pine',open:'Open pine',aspen:'Aspen',evergreen:'Compact evergreen'}[preset]));
     }
     planForest({...values(forestFields),mode:$('mode').value},next,false);
     disposeForest();models.forEach(disposeModel);models=next;activeMix=mix;
@@ -190,7 +190,7 @@ new ResizeObserver(resize).observe($('view'));
 async function apply(){if(busy)return;if($('mix').value!==activeMix){await generate(activeRecipe);return;}const previous=inspection;try{error('');inspection=false;rebuildForest(false);}catch(e){inspection=previous;error(e);}}
 $('generate').onclick=()=>generate();$('bake').onclick=rebake;$('applyForest').onclick=apply;
 $('randomize').onclick=()=>{$('seed').value=Math.floor(Math.random()*65536);$('seedValue').value=$('seed').value;generate();};
-const presetSettings={crown:{crown:.64,branches:48,leaves:20,height:28,width:1.2,angle:100},pine:{crown:.18,branches:64,leaves:18,height:24,width:1,angle:115},open:{crown:.35,branches:18,leaves:8,height:24,width:1,angle:105},aspen:{crown:.35,branches:12,leaves:10,height:18,width:1,angle:55}};
+const presetSettings={evergreen:{height:8,crown:.08,branches:80,leaves:28,width:.85,leafSize:1.6,secondary:3,length:.85,angle:100,leafStart:.05,trunk:.65,bend:.01,segments:5,sections:6},crown:{crown:.64,branches:48,leaves:20,height:28,width:1.2,angle:100},pine:{crown:.18,branches:64,leaves:18,height:24,width:1,angle:115},open:{crown:.35,branches:18,leaves:8,height:24,width:1,angle:105},aspen:{crown:.35,branches:12,leaves:10,height:18,width:1,angle:55}};
 $('preset').onchange=()=>{const settings=presetSettings[$('preset').value];
   for(const [id,value] of Object.entries(settings)){$(id).value=value;$(id+'Value').value=value;}
   $('status').textContent='Preset selected · press Generate & bake';};
@@ -202,8 +202,8 @@ $('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'Resume':'P
 $('measure').onclick=()=>{if(paused){error('Resume rendering before measuring.');return;}measurement={start:performance.now(),times:[],mode:inspection?'mesh':forestSettings.mode,count:forest.length};$('measurement').textContent='Measuring 10 seconds… keep this tab visible.';};
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('export').onclick=()=>{if(!activeRecipe)return;download(new Blob([JSON.stringify({version:1,recipe:activeRecipe,ezTreeOptions:activeOptions,models:models.map(m=>({label:m.label,recipe:m.recipe,ezTreeOptions:m.options,atlas:{center:m.atlas.center.toArray(),radius:m.atlas.radius}})),atlas:{grid:atlas.grid,tile:atlas.tile,center:atlas.center.toArray(),radius:atlas.radius,mapping:'full-sphere-y-up-octahedral',gutter:2},forest:forestSettings,view:{blend:+$('blend').value,pixelRatio:renderer.getPixelRatio(),camera:camera.position.toArray(),target:controls.target.toArray(),inspection}},null,2)],{type:'application/json'}),'montana-tree-recipe.json');};
-$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file||busy)return;if(file.size>100000)throw new Error('Recipe file is too large.');const data=JSON.parse(await file.text());if(data.version!==1||!['crown','pine','open','aspen'].includes(data.recipe?.preset))throw new Error('Unsupported tree recipe.');
-  $('mix').value=data.forest?.mix==='mixed'?'mixed':'single';
+$('import').onchange=async e=>{try{const file=e.target.files[0];if(!file||busy)return;if(file.size>100000)throw new Error('Recipe file is too large.');const data=JSON.parse(await file.text());if(data.version!==1||!['crown','pine','open','aspen','evergreen'].includes(data.recipe?.preset))throw new Error('Unsupported tree recipe.');
+  $('mix').value=['mixed','mixedEvergreen'].includes(data.forest?.mix)?data.forest.mix:'single';
   $('preset').value=data.recipe.preset;for(const [id] of [...treeFields,...advancedFields])if(Number.isFinite(data.recipe[id])){$(id).value=data.recipe[id];$(id+'Value').value=$(id).value;}
   for(const [id] of forestFields)if(Number.isFinite(data.forest?.[id])){$(id).value=data.forest[id];$(id+'Value').value=$(id).value;}
   if(['mesh','hybrid','impostor'].includes(data.forest?.mode))$('mode').value=data.forest.mode;

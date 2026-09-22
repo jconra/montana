@@ -71,7 +71,10 @@ random stream from placement. Companion tree seeds derive from the designer seed
 The HUD reports combined atlas color memory, and the controls show counts by type.
 Atlas preview/export has a model selector. Hybrid mesh-count and triangle budgets
 apply across all types together. Four populated types use five impostor draws or
-nine mesh draws including the ground. Single-model mode remains the default.
+nine mesh draws including the ground. Single-model mode remains the default. The Compact evergreen designer preset is
+an 8 m conifer with low branches and a narrow, full crown. Select Mixed + compact
+evergreen for a five-model forest (six impostor draws or eleven mesh draws
+including the ground). The original four-model mix is preserved for saved recipes.
 
 Hybrid transitions use a 0.35-second crossfade (adjustable from zero to one second).
 Mesh and impostor shaders use complementary screen-space dither coverage with
