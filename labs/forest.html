@@ -23,6 +23,7 @@
 <label>Render mode<select id="mode"><option value="impostor">Octahedral impostors</option><option value="mesh">Instanced meshes</option><option value="hybrid">Mesh near / impostor far</option></select></label>
 <label>View sampling<select id="blend"><option value="1">Blend three views</option><option value="0">Nearest view</option></select></label>
 <div id="forestControls"></div>
+<p class="hint">Hybrid LOD crossfade blends meshes and impostors using complementary pixel coverage. Set its duration to zero for instant switches. During a fade both representations draw; departing meshes retain their budget slots until the fade finishes.</p>
 <label>Pixel ratio<select id="dpr"><option value="0.5">0.5 · half resolution</option><option value="1" selected>1 · native CSS pixels</option><option value="2">2 · high resolution</option></select></label>
 <button id="applyForest">Apply forest</button><div class="row"><button id="single">Inspect one tree</button><button id="overview">Frame forest</button></div>
 <div class="row"><button id="orbit">Orbit: off</button><button id="pause">Pause</button></div>

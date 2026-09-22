@@ -1,5 +1,23 @@
 import * as THREE from 'three';
 
+// Complementary screen-door coverage preserves depth writes and avoids sorting
+// thousands of transparent trees. The two representations never cover the same pixel.
+export const lodDither=`
+varying float vMeshFade;
+float lodNoise(){return fract(52.9829189*fract(dot(floor(gl_FragCoord.xy),vec2(.06711056,.00583715))));}
+`;
+export function fadingMeshMaterial(original){
+  const material=original.clone();
+  material.onBeforeCompile=shader=>{
+    shader.vertexShader='attribute float meshFade;\nvarying float vMeshFade;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvMeshFade=meshFade;');
+    shader.fragmentShader=lodDither+shader.fragmentShader;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>','#include <alphatest_fragment>\nif(lodNoise()>=vMeshFade)discard;');
+  };
+  material.customProgramCacheKey=()=> 'forest-lod-crossfade-v1';
+  return material;
+}
+
 // Y-up full-sphere octahedral mapping; JS bake and GLSL lookup use the same fold.
 export function octDecode(u,v){
   let x=u*2-1,z=v*2-1,y=1-Math.abs(x)-Math.abs(z);
@@ -49,6 +67,8 @@ export async function bakeAtlas(renderer,tree,grid,tile,onProgress){
 const vertexShader=`
 attribute vec4 instanceData;
 attribute float instanceYaw;
+attribute float meshFade;
+varying float vMeshFade;
 uniform vec3 treeCenter;
 uniform float treeRadius;
 uniform float gridSize;
@@ -78,6 +98,7 @@ vec2 projectFrame(vec3 p,vec2 frame){
   return (frame*tileSize+vec2(2.5)+uv*(tileSize-5.0))/(gridSize*tileSize);
 }
 void main(){
+  vMeshFade=meshFade;
   float c=cos(instanceYaw),s=sin(instanceYaw);
   mat3 yaw=mat3(c,0,-s, 0,1,0, s,0,c);
   vec3 center=instanceData.xyz+yaw*treeCenter*instanceData.w;
@@ -96,7 +117,7 @@ void main(){
   vec4 mv=viewMatrix*vec4(wp,1);distanceToEye=-mv.z;
   gl_Position=projectionMatrix*mv;
 }`;
-const fragmentShader=`
+const fragmentShader=lodDither+`
 uniform sampler2D atlas;
 uniform float cutoff;
 uniform float blendViews;
@@ -114,6 +135,7 @@ void main(){
   color=(a.rgb*a.a*weights.x+b.rgb*b.a*weights.y+c.rgb*c.a*weights.z)/max(alpha,.0001);
   }
   if(alpha<cutoff)discard;
+  if(lodNoise()<vMeshFade)discard;
   color=mix(color,fogColor,smoothstep(fogRange.x,fogRange.y,distanceToEye));
   gl_FragColor=vec4(color,1.0);
   #include <tonemapping_fragment>

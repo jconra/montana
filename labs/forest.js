@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { bakeAtlas, impostorMaterial, atlasCanvas } from './octahedral.js';
+import { bakeAtlas, impostorMaterial, atlasCanvas, fadingMeshMaterial } from './octahedral.js';
 THREE.ColorManagement.enabled=false;
 const $=id=>document.getElementById(id);
 const treeFields=[
@@ -15,7 +15,7 @@ const advancedFields=[['secondary','Twigs / branch (aspen)',1,6,1,3],['length','
   ['segments','Radial segments',3,8,1,5],['sections','Lengthwise sections',3,12,1,6]];
 const forestFields=[['count','Trees',1,30000,1,900],['spacing','Tree spacing (m)',2,30,.5,7],
   ['variation','Height variation',0,.45,.05,.2],['forestSeed','Forest seed',0,65535,1,2026],
-  ['near','Mesh distance (m)',10,300,5,65],['budget','Max near meshes',0,250,1,60],['cutoff','Impostor alpha cutoff',.05,.8,.05,.3]];
+  ['fade','LOD crossfade (seconds)',0,1,.05,.35],['near','Mesh distance (m)',10,300,5,65],['budget','Max near meshes',0,250,1,60],['cutoff','Impostor alpha cutoff',.05,.8,.05,.3]];
 function fields(target,items){for(const [id,title,min,max,step,value] of items){
   const label=document.createElement('label');label.textContent=title;
   const output=document.createElement('output');output.id=id+'Value';output.value=value;
@@ -58,7 +58,7 @@ function requestTree(recipe){return new Promise((resolve,reject)=>{
 });}
 function setBusy(value){busy=value;for(const id of ['generate','randomize','bake','applyForest','single','overview','measure','export','downloadAtlas','atlasModel'])$(id).disabled=value;measurement=null;frameTimes=[];previous=performance.now();}
 function disposeForest(){for(const model of models){
-  for(const mesh of model.meshBatches||[])mesh.dispose();model.meshBatches=[];
+  for(const mesh of model.meshBatches||[]){mesh.dispose();mesh.geometry.dispose();mesh.material.dispose();}model.meshBatches=[];
   if(model.sprite){model.sprite.geometry.dispose();model.sprite.material.dispose();model.sprite=null;}
 }root.clear();}
 function disposeSource(tree){if(tree)for(const m of tree.children){m.geometry.dispose();m.material.dispose();}}
@@ -117,10 +117,11 @@ function rebuildForest(reframe=false){if(!source||!atlas)return;
   disposeForest();forestSettings=f;forest=nextForest;
   const mode=inspection?'mesh':f.mode,count=forest.length;
   for(const model of models){const {parts,atlas}=model;const count=forest.filter(p=>models[p.model]===model).length;if(!count)continue;let spriteMaterial,sprite;
-  if(mode!=='impostor')for(const part of parts){const mesh=new THREE.InstancedMesh(part.geometry,part.material,count);mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;model.meshBatches.push(mesh);root.add(mesh);}
+  if(mode!=='impostor')for(const part of parts){const mesh=new THREE.InstancedMesh(part.geometry.clone(),fadingMeshMaterial(part.material),count);mesh.geometry.setAttribute('meshFade',new THREE.InstancedBufferAttribute(new Float32Array(count),1).setUsage(THREE.DynamicDrawUsage));mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;model.meshBatches.push(mesh);root.add(mesh);}
   if(mode!=='mesh'){
     const base=new THREE.PlaneGeometry(1,1),g=new THREE.InstancedBufferGeometry();g.index=base.index;g.attributes=base.attributes;
     g.setAttribute('instanceData',new THREE.InstancedBufferAttribute(new Float32Array(count*4),4).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('meshFade',new THREE.InstancedBufferAttribute(new Float32Array(count),1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('instanceYaw',new THREE.InstancedBufferAttribute(new Float32Array(count),1).setUsage(THREE.DynamicDrawUsage));
     spriteMaterial=impostorMaterial(atlas,scene.fog);spriteMaterial.uniforms.blendViews.value=+$('blend').value;spriteMaterial.uniforms.cutoff.value=f.cutoff;
     sprite=new THREE.Mesh(g,spriteMaterial);sprite.frustumCulled=false;root.add(sprite);
@@ -133,24 +134,46 @@ function rebuildForest(reframe=false){if(!source||!atlas)return;
   $('composition').textContent=window.__forestState.models.map(m=>`${m.label}: ${m.count.toLocaleString()}`).join(' · ');
 }
 const dummy=new THREE.Object3D();
-function updateLOD(){if(!forestSettings)return;const mode=inspection?'mesh':forestSettings.mode;
-  const selected=new Set();
+let lodSelection=new Set(),transitioning=false;
+function updateLOD(dt=0,choose=true){if(!forestSettings)return;const mode=inspection?'mesh':forestSettings.mode;
+  if(choose){lodSelection=new Set();
   if(mode==='hybrid'){
     const max=forestSettings.budget;let triangles=0;
     const candidates=forest.map((p,i)=>({i,d:(camera.position.x-p.x)**2+(camera.position.z-p.z)**2+(camera.position.y-p.height*.5)**2})).filter(p=>p.d<forestSettings.near**2).sort((a,b)=>a.d-b.d);
-    for(const p of candidates){const cost=models[forest[p.i].model].triangleCount;if(selected.size>=max)break;if(triangles+cost<=12000000){selected.add(p.i);triangles+=cost;}}
+    for(const p of candidates){const cost=models[forest[p.i].model].triangleCount;if(lodSelection.size>=max)break;if(triangles+cost<=12000000){lodSelection.add(p.i);triangles+=cost;}}
+  }
+  }
+  const step=forestSettings.fade>0?dt/(forestSettings.fade*1000):1;
+  // Fade departing meshes out before admitting replacements, keeping both global
+  // mesh budgets strict even while representations overlap.
+  for(const [i,p] of forest.entries()){
+    const target=mode==='mesh'||lodSelection.has(i);
+    if(p.fade===undefined)p.fade=target?1:0;
+    if(!target)p.fade=Math.max(0,p.fade-step);
+  }
+  let occupied=forest.filter(p=>p.fade>0).length;
+  let triangles=forest.reduce((n,p)=>n+(p.fade>0?models[p.model].triangleCount:0),0);
+  transitioning=false;
+  for(const [i,p] of forest.entries()){
+    if(mode==='mesh'||lodSelection.has(i)){
+      const cost=models[p.model].triangleCount;
+      if(p.fade>0||mode==='mesh'||(occupied<forestSettings.budget&&triangles+cost<=12000000)){
+        if(p.fade===0){occupied++;triangles+=cost;}p.fade=Math.min(1,p.fade+step);
+      }
+      if(p.fade<1)transitioning=true;
+    }else if(p.fade>0)transitioning=true;
   }
   nearCount=farCount=0;for(const model of models)model.nearCount=model.farCount=0;
   forest.forEach((p,i)=>{
     const model=models[p.model],sprite=model.sprite;
-    if(mode==='mesh'||selected.has(i)){
+    if(p.fade>0){
       dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,p.yaw,0);dummy.scale.setScalar(p.height);dummy.updateMatrix();
-      for(const mesh of model.meshBatches)mesh.setMatrixAt(model.nearCount,dummy.matrix);model.nearCount++;nearCount++;
-    }else if(sprite){sprite.geometry.attributes.instanceData.setXYZW(model.farCount,p.x,0,p.z,p.height);sprite.geometry.attributes.instanceYaw.setX(model.farCount,p.yaw);model.farCount++;farCount++;}
+      for(const mesh of model.meshBatches){mesh.setMatrixAt(model.nearCount,dummy.matrix);mesh.geometry.attributes.meshFade.setX(model.nearCount,p.fade);}model.nearCount++;nearCount++;
+    }if(sprite&&p.fade<1){sprite.geometry.attributes.meshFade.setX(model.farCount,p.fade);sprite.geometry.attributes.instanceData.setXYZW(model.farCount,p.x,0,p.z,p.height);sprite.geometry.attributes.instanceYaw.setX(model.farCount,p.yaw);model.farCount++;farCount++;}
   });
   for(const model of models){const sprite=model.sprite;
-  for(const mesh of model.meshBatches){mesh.count=model.nearCount;mesh.instanceMatrix.needsUpdate=true;}
-  if(sprite){sprite.geometry.instanceCount=model.farCount;sprite.geometry.attributes.instanceData.needsUpdate=true;sprite.geometry.attributes.instanceYaw.needsUpdate=true;}
+  for(const mesh of model.meshBatches){mesh.count=model.nearCount;mesh.instanceMatrix.needsUpdate=true;mesh.geometry.attributes.meshFade.needsUpdate=true;}
+  if(sprite){sprite.geometry.instanceCount=model.farCount;sprite.geometry.attributes.meshFade.needsUpdate=true;sprite.geometry.attributes.instanceData.needsUpdate=true;sprite.geometry.attributes.instanceYaw.needsUpdate=true;}
   }
 }
 function frameForest(){
@@ -197,7 +220,7 @@ $('atlasModel').onchange=()=>{if(!busy)previewAtlas();};
 $('downloadAtlas').onclick=()=>lastAtlasCanvas?.toBlob(blob=>{if(blob)download(blob,`montana-octahedral-atlas-${$('atlasModel').value}.png`);});
 document.addEventListener('visibilitychange',()=>{measurement=null;frameTimes=[];previous=performance.now();});
 function animate(now){requestAnimationFrame(animate);const dt=now-previous;previous=now;if(paused||busy||document.hidden||!atlas)return;
-  controls.update();if(now-lastLOD>200&&forestSettings?.mode==='hybrid'){updateLOD();lastLOD=now;}
+  controls.update();if(forestSettings?.mode==='hybrid'){const choose=now-lastLOD>200;if(choose||transitioning)updateLOD(Math.min(dt,100),choose);if(choose)lastLOD=now;}
   renderer.render(scene,camera);frameTimes.push(dt);if(frameTimes.length>120)frameTimes.shift();
   if(measurement){measurement.times.push(dt);if(now-measurement.start>=10000){const t=measurement.times,avg=t.reduce((a,b)=>a+b,0)/t.length,sorted=[...t].sort((a,b)=>a-b);$('measurement').textContent=`${measurement.mode} · ${measurement.count.toLocaleString()} trees · ${(1000/avg).toFixed(1)} FPS · ${avg.toFixed(1)} ms mean · ${sorted[Math.floor((sorted.length-1)*.95)].toFixed(1)} ms p95 · ${renderer.domElement.width} × ${renderer.domElement.height}px. CPU/display frame timing, not GPU timer.`;measurement=null;}}
   if(now-lastStats>650){const avg=frameTimes.reduce((a,b)=>a+b,0)/frameTimes.length;

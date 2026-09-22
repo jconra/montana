@@ -73,6 +73,16 @@ Atlas preview/export has a model selector. Hybrid mesh-count and triangle budget
 apply across all types together. Four populated types use five impostor draws or
 nine mesh draws including the ground. Single-model mode remains the default.
 
+Hybrid transitions use a 0.35-second crossfade (adjustable from zero to one second).
+Mesh and impostor shaders use complementary screen-space dither coverage with
+depth writes enabled, avoiding per-tree transparency sorting. Brief stippling can
+be visible during a fade, particularly at low resolution. Both representations
+draw during transitions, so mesh + impostor counts can temporarily exceed tree
+count. Departing meshes retain their slots until fully faded; incoming meshes
+wait when needed to keep the shared count and triangle budgets strict. Atlas
+baking uses the original materials and is unaffected. Run `node tests/forest-lod.cjs`
+to check fade progression, reversals, and budget allocation without a browser.
+
 Recipe JSON exports the active recipe, full ez-tree options, and atlas metadata;
 loading it restores tree controls, forest and atlas settings, pixel ratio, sampling,
 and camera position. Press Generate & bake to apply tree changes.
