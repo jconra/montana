@@ -5,9 +5,12 @@ import { BufferGeometry, BufferAttribute, Box3, Vector3 } from 'three';
 const number=(value,min,max)=>Math.min(max,Math.max(min,Number(value)||0));
 self.onmessage=({data:{id,recipe:r}})=>{
   try {
-    const o=loadPreset(r.preset==='aspen'?'Aspen Medium':'Pine Large');
+    const broadleaf=['aspen','bush'].includes(r.preset);
+    const o=loadPreset(broadleaf?'Aspen Medium':'Pine Large');
+    if(r.preset==='bush'){o.branch.length[0]=3;o.branch.length[1]=4;o.branch.length[2]=2;o.branch.radius[0]=.12;o.leaves.size=1.2;}
+    if(r.preset==='evergreenBush'){o.branch.length[0]=12;o.branch.length[1]=6;o.branch.radius[0]=.3;o.leaves.size=1.8;}
     o.seed=number(r.seed,0,65535)|0;
-    o.branch.levels=r.preset==='aspen'?2:1;
+    o.branch.levels=broadleaf?2:1;
     o.branch.children[0]=number(r.branches,4,100)|0;
     o.branch.children[1]=number(r.secondary,1,6)|0;
     o.branch.start[1]=number(r.crown,.05,.9);

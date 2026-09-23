@@ -6,19 +6,19 @@
 <body><header><div><small>MONTANA / FIELD STUDIES</small><h1>Forest & Tree Designer</h1></div><a href="./">← All labs</a></header>
 <main><aside>
 <h2>1 · Shape a tree</h2>
-<label>Starting form<select id="preset"><option value="crown">Tall crown pine</option><option value="pine">Full pine</option><option value="open">Open pine</option><option value="aspen">Aspen form</option><option value="evergreen">Compact evergreen</option></select></label>
+<label>Starting form<select id="preset"><option value="crown">Tall crown pine</option><option value="pine">Full pine</option><option value="open">Open pine</option><option value="aspen">Aspen form</option><option value="evergreen">Compact evergreen</option><option value="bush">Low broadleaf bush</option><option value="evergreenBush">Evergreen bush</option></select></label>
 <div id="treeControls"></div>
 <details><summary>Branch structure & geometry</summary><div id="advancedControls"></div></details>
 <div class="row"><button id="generate">Generate & bake</button><button id="randomize">New seed</button></div>
 <p class="hint">Tall crown pine keeps branches high on a long trunk. Crown start is a fraction of the generator trunk; drooping branches may extend below it. Compact evergreen starts at 8 m with low branches and a narrow, full crown.</p>
 <div class="row"><button id="export">Save recipe</button><label class="button">Load recipe<input id="import" type="file" accept="application/json,.json" hidden></label></div>
 <h2>2 · Bake the views</h2>
-<label>Atlas grid<select id="views"><option value="4">4 × 4 · fast</option><option value="8" selected>8 × 8 · balanced</option><option value="12">12 × 12 · smoother</option></select></label>
-<label>Pixels per view<select id="tile"><option value="64">64 · lightweight</option><option value="128" selected>128 · balanced</option><option value="256">256 · detailed</option></select></label>
-<button id="bake">Rebake all atlases</button><details><summary>Atlas preview & export</summary><label>Model<select id="atlasModel"><option value="0">Designer</option></select></label><canvas id="atlasPreview" width="256" height="256"></canvas><button id="downloadAtlas">Save atlas PNG</button><p class="hint">Preview/export is sRGB; runtime atlas stores linear color. Each model has a separate atlas.</p></details>
+<label>Atlas grid<select id="views"><option value="4">4 × 4 · fast</option><option value="8">8 × 8 · balanced</option><option value="12" selected>12 × 12 · smoother</option></select></label>
+<label>Pixels per view<select id="tile"><option value="64">64 · lightweight</option><option value="128">128 · balanced</option><option value="192" selected>192 · property default</option><option value="256">256 · detailed</option></select></label>
+<button id="bake">Rebake all atlases</button><details><summary>Atlas preview & export</summary><label>Model<select id="atlasModel"><option value="0">Designer</option></select></label><canvas id="atlasPreview" width="256" height="256"></canvas><button id="downloadAtlas">Save atlas PNG</button><button id="downloadModel">Save 3D model JSON</button><p class="hint">Preview/export is sRGB; runtime atlas stores linear color. Each model has a separate atlas. Model JSON includes geometry and textures in metres; load it with Three.js ObjectLoader. Save recipe above preserves the designer, forest, LOD and bake settings.</p></details>
 <h2>3 · Grow a forest</h2>
-<label>Tree mix<select id="mix"><option value="single">Designer tree only</option><option value="mixed">Mixed · designer + full pine + open pine + aspen</option><option value="mixedEvergreen">Mixed + compact evergreen</option></select></label>
-<p class="hint">Mixed forests distribute four models (five with compact evergreen) equally by probability, with separate instancing batches and atlases. Apply forest to rebuild the mix. Inspect one tree shows the designer tree.</p>
+<label>Tree mix<select id="mix"><option value="single">Designer tree only</option><option value="mixed">Mixed · designer + full pine + open pine + aspen</option><option value="mixedEvergreen">Mixed + compact evergreen</option><option value="understory">Understory · designer + evergreen + two bushes</option></select></label>
+<p class="hint">Mixed forests distribute the selected models equally by probability, with separate instancing batches and atlases. Apply forest to rebuild the mix. Inspect one tree shows the designer tree.</p>
 <p id="composition" class="hint"></p>
 <label>Render mode<select id="mode"><option value="impostor">Octahedral impostors</option><option value="mesh">Instanced meshes</option><option value="hybrid">Mesh near / impostor far</option></select></label>
 <label>View sampling<select id="blend"><option value="1">Blend three views</option><option value="0">Nearest view</option></select></label>

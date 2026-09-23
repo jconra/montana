@@ -76,7 +76,7 @@ an 8 m conifer with low branches and a narrow, full crown. Select Mixed + compac
 evergreen for a five-model forest (six impostor draws or eleven mesh draws
 including the ground). The original four-model mix is preserved for saved recipes.
 
-Hybrid transitions use a 0.35-second crossfade (adjustable from zero to one second).
+Hybrid transitions use a 0.55-second crossfade (adjustable from zero to one second).
 Mesh and impostor shaders use complementary screen-space dither coverage with
 depth writes enabled, avoiding per-tree transparency sorting. Brief stippling can
 be visible during a fade, particularly at low resolution. Both representations
@@ -100,7 +100,7 @@ images use top-left image coordinates; the runtime atlas uses bottom-left UVs.
 
 Forest modes reuse deterministic positions, heights, and yaw. Mesh mode refuses
 more than 25M triangles. Hybrid mode picks the closest trees within the distance
-and count budgets, further bounded to 12M source triangles, with a hard LOD switch.
+and count budgets, further bounded to 12M source triangles, with the adjustable LOD crossfade.
 Trees outside the near budget remain impostors, even inside the distance threshold.
 No per-tree frustum culling is implemented; displayed counts are submitted counts.
 WebGL1 requires ANGLE_instanced_arrays, plus OES_element_index_uint for trees above
@@ -140,3 +140,36 @@ Do not overwrite the existing tree data without comparing results and masks.
   manifest and aerial image remain usable for rendering and material work.
 - Tree billboard crop helper. The lab does not regenerate or overwrite the
   production impostor; new silhouettes need a corresponding bake before promotion.
+
+## Property ground detail and bush workflow
+
+The forest designer now includes editable low broadleaf (1.2 m) and evergreen
+(1.6 m) bushes, plus an Understory mix. These are shape candidates, not verified
+species identifications. Height spans 0.3–50 m. Default bake is 12×12 views at
+192 px/view; 64/128 and 256 remain available. User-selected forest defaults are
+0.55 s crossfade, 155 m mesh distance, 150 near meshes, and 0.15 impostor cutoff.
+The global 12M near-mesh triangle budget remains in force.
+
+Save recipe exports regeneration parameters and active forest settings. Under
+Atlas preview & export, Save atlas PNG exports the selected model's atlas and
+Save 3D model JSON exports a Three.js ObjectLoader document with embedded textures,
+geometry, metre-scale transform, and recipe metadata. This is not GLTF and is not
+an automatic deployment into the production scene. Atlas bounds in metadata are
+unit-height; the exported group transform supplies the selected physical height.
+
+The main scene uses `assets/ground-detail.js`: deterministic tileable soil, gravel,
+and stone maps blend over the aerial near the camera, with slope-based stone and
+a driveway mask. The mask follows the original driveway polyline, independent of
+editable driving waypoints; its 4 m gravel core and 7 m shoulders are provisional.
+Ground detail can be disabled in the Tools panel and does not affect elevation
+colors. Four deterministic rock meshes retain coincident triangle corners, unlike
+the old random per-corner deformation. The main scene uses the existing broadleaf
+and evergreen shrub candidates in instanced batches, with a blob fallback if their
+assets fail. Rocks, bushes, and grass avoid the driveway; no new road geometry or
+terrain heights are introduced. Maps and foliage are local; r158/WebGL1 is retained.
+
+This is a provisional appearance pass without property-photo calibration. The
+available saved images were setup screenshots, not property references. To match
+the site, obtain ground-level road/rock/bush photos and wider views with approximate
+camera position and direction. Do not interpret the procedural scatter as surveyed
+vegetation or rock placement.
