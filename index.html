@@ -37,6 +37,7 @@
   <label>vertical scale <input id="vex" type="range" min="0.5" max="3" step="0.1" value="1"><span id="vexv">1.0×</span></label>
   <label><button id="mode">show elevation colors</button></label>
   <label>ground detail <input id="groundDetail" type="checkbox" checked></label>
+  <label>ground greenery <input id="groundGreen" type="range" min="0" max="1" step="0.05" value="0.85"></label>
 
   <div class="sec">structures</div>
   <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
@@ -768,6 +769,29 @@ function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.le
   for(let i=0;i<420;i++){const[x,z]=pt(Z);if(near(x,z,10)||groundRoadDistance(x,z)<3.5)continue;const big=R()<0.12,s=big?1.4+R()*1.2:0.3+R()*0.8;rocks.push({x,z,s,sy:0.75+R()*0.35,r:R()*6.283,rx:(R()-0.5)*0.3,dy:-s*0.12,tint:0.8+R()*0.4});}
   for(let i=0;i<120;i++){const[x,z]=pt(Z);if(near(x,z,10)||groundRoadDistance(x,z)<4)continue;bushes.push({x,z,s:0.6+R()*1.1,r:R()*6.283,tint:0.82+R()*0.36});}
   for(let i=0;i<4500;i++){const[x,z]=pt(Z);if(near(x,z,9)||groundRoadDistance(x,z)<2.5)continue;grass.push({x,z,s:0.35+R()*0.5,sy:0.8+R()*0.7,r:R()*6.283,tint:0.78+R()*0.4});}
+  // Sample by route length so short bends and long straight sections get equal coverage.
+  // Retain the central clearing scatter, adding detail along both sides of the entire drive.
+  const segments=DRIVEWAY.slice(1).map((b,i)=>{const a=DRIVEWAY[i],length=Math.hypot(b.x-a.x,b.z-a.z);return {a,b,length};});
+  const routeLength=segments.reduce((sum,s)=>sum+s.length,0);
+  function besideRoad(min,max){
+    let d=R()*routeLength,seg=segments[segments.length-1];
+    for(const s of segments){if(d<=s.length){seg=s;break;}d-=s.length;}
+    const {a,b,length}=seg,t=d/length,side=R()<.5?-1:1,offset=(min+R()*(max-min))*side;
+    return [a.x+(b.x-a.x)*t-(b.z-a.z)/length*offset,a.z+(b.z-a.z)*t+(b.x-a.x)/length*offset];
+  }
+  for(let i=0;i<500;i++){
+    const [x,z]=besideRoad(4,24);if(near(x,z,10)||groundRoadDistance(x,z)<3.5)continue;
+    const s=R()<.08?1.1+R()*.8:.2+R()*.65;
+    rocks.push({x,z,s,sy:.7+R()*.35,r:R()*6.283,rx:(R()-.5)*.3,dy:-s*.18,tint:.85+R()*.3});
+  }
+  for(let i=0;i<240;i++){
+    const [x,z]=besideRoad(5,30);if(near(x,z,10)||groundRoadDistance(x,z)<4)continue;
+    bushes.push({x,z,s:.45+R()*.85,r:R()*6.283,tint:.85+R()*.3});
+  }
+  for(let i=0;i<6000;i++){
+    const [x,z]=besideRoad(3,19);if(near(x,z,9)||groundRoadDistance(x,z)<2.5)continue;
+    grass.push({x,z,s:.3+R()*.55,sy:.7+R()*.7,r:R()*6.283,tint:.85+R()*.3});
+  }
   rockGeos.forEach((geo,k)=>addGround(geo,rockMat,rocks.filter((_,i)=>i%rockGeos.length===k)));
   if(shrubModels.length)shrubModels.forEach((parts,k)=>{const list=bushes.filter((_,i)=>i%shrubModels.length===k);for(const part of parts)addGround(part.geometry,part.material,list);});
   else addGround(bushGeo,bushMat,bushes);
@@ -965,6 +989,7 @@ function dropCamera(){
 // ---- UI wiring ----------------------------------------------------------
 const $=id=>document.getElementById(id);
 $('vex').oninput=e=>{$('vexv').textContent=(+e.target.value).toFixed(1)+'×';applyVex(+e.target.value);};
+$('groundGreen').oninput=()=>groundDetail.uniforms.greenness.value=+$('groundGreen').value;
 $('groundDetail').onchange=()=>groundDetail.uniforms.detailEnabled.value=$('groundDetail').checked?1:0;
 let aerial=true;
 $('mode').onclick=()=>{aerial=!aerial;for(const m of mats){m.map=aerial?tex:null;m.vertexColors=!aerial;m.color.set(0xffffff);m.needsUpdate=true;}
