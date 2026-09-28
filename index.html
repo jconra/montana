@@ -95,6 +95,7 @@ const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.W
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
+import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js';
 
 const M = await (await fetch('./assets/manifest.json')).json();
@@ -859,6 +860,13 @@ function makeRav4(){
   return g;
 }
 const car={x:16,z:-14,heading:Math.PI,speed:0,group:makeRav4()};
+let rav4Rig=null,carSteering=0;
+// Load locally, without an expiring S3 URL; keep the placeholder on failure.
+loadRav4().then(rig=>{
+  const previous=car.group;car.group=rig.model;car.group.position.copy(previous.position);car.group.rotation.copy(previous.rotation);
+  scene.add(car.group);scene.remove(previous);previous.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});wheels.length=0;rav4Rig=rig;
+  window.__rav4Ready=true;
+}).catch(e=>{console.warn('RAV4 model failed; retaining placeholder.',e);info.textContent='RAV4 model could not load; using the basic car.';});
 scene.add(car.group);
 car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading;
 
@@ -912,10 +920,12 @@ function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypo
 
 function updateCar(dt){
   if(!driveMode) return;
+  let steerTarget=0;
   if(carMode==='manual'){
     const f=(KEY['arrowup']||KEY['w']?1:0)-(KEY['arrowdown']||KEY['s']?1:0);
     car.speed+=f*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
     const s=(KEY['arrowleft']||KEY['a']?1:0)-(KEY['arrowright']||KEY['d']?1:0);
+    steerTarget=s*.48;
     car.heading+=s*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
   } else if(carMode==='route'){
     let tgt=routePts[Math.min(routeIdx,routePts.length-1)];
@@ -926,13 +936,16 @@ function updateCar(dt){
       else { carMode='manual'; introActive=false; }                       // end of road → you take over
     }
     let dh=Math.atan2(dx,dz)-car.heading; dh=Math.atan2(Math.sin(dh),Math.cos(dh));
+    steerTarget=Math.max(-.48,Math.min(.48,Math.atan(2.7*THREE.MathUtils.clamp(dh,-1.3,1.3)/Math.max(1,Math.abs(car.speed)))));
     car.heading+=Math.max(-1.3*dt,Math.min(1.3*dt,dh));                   // slower, smoother turns
     car.speed+=((Math.abs(dh)>0.8?5:9)-car.speed)*1.6*dt;                 // ease off for sharp turns
   }
   car.x+=Math.sin(car.heading)*car.speed*dt; car.z+=Math.cos(car.heading)*car.speed*dt;
   const y=heightAt(car.x,car.z);
   car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
-  const spin=car.speed*dt/0.36; for(const w of wheels) w.rotation.x+=spin;
+  carSteering=THREE.MathUtils.lerp(carSteering,steerTarget,1-Math.exp(-10*dt));
+  if(rav4Rig)rav4Rig.update(carSteering,car.speed*dt);
+  else {const spin=car.speed*dt/0.36;for(const w of wheels)w.rotation.x+=spin;}
   if(introActive){ introT+=dt; chaseCam(Math.min(0.15,0.02+0.13*(introT/introDur))); if(introT>=introDur) introActive=false; }
   else chaseCam(0.12);
 }

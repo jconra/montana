@@ -9,6 +9,7 @@ These files are copied unchanged from the npm `three@0.158.0` package:
 - `build/three.module.js` → `three.module.js`
 - `examples/jsm/controls/OrbitControls.js` → `addons/controls/OrbitControls.js`
 - `examples/jsm/utils/BufferGeometryUtils.js` → `addons/utils/BufferGeometryUtils.js`
+- `examples/jsm/loaders/GLTFLoader.js` → `addons/loaders/GLTFLoader.js`
 - `LICENSE` → `LICENSE`
 
 Keep core and addons on the same version. Pages use r158 color-space APIs and
