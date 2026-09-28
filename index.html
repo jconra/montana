@@ -520,7 +520,7 @@ function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65
 // ---- photoreal ez-pines (baked from ez-tree → trees/*.json). Near = detailed (alpha-fade); far = billboard impostor ----
 let treeAssetsSettled=false,lidarSettled=false;
 let ezPines=null;      // [{name, bark:Geo, leaf:Geo, barkMat, leafMat}]; null until loaded
-let ezImpostor=null;   // {mat} — camera-facing billboard using a baked image of the pine (cheap far LOD)
+let ezImpostor=null;   // {mat} — shared atlas with matching multi-view images for each model
 let impCamU=null, impHU=null, impYU=null;   // impostor shader uniforms: camera pos (per-frame facing) + size + y-offset (sliders)
 // LOD cross-fade band (m from camera): detailed dissolves OUT and billboard dissolves IN across F0→F1
 const lodUniforms={lodEnd:{value:95},lodOpacity:{value:1}};
@@ -557,21 +557,35 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
       leafMat.alphaToCoverage=true;   // MSAA-smoothed cutout: keeps needles from harshly vanishing, no mip-off shimmer
       addDitherFadeOut(barkMat); addDitherFadeOut(leafMat);   // dissolve out as they approach the LOD hand-off
       loaded.push({name:v.name, bark:mkGeo(d.branches), leaf:mkGeo(d.leaves), barkMat, leafMat}); }
+    const impMeta=await (await fetch('./assets/trees/tex/impostor_variants.json')).json();
+    for(const v of loaded){v.impostor=impMeta.frames[v.name];if(!v.impostor)throw new Error('Missing impostor for '+v.name);}
     ezPines=loaded;
-    // billboard impostor material (Y-axis camera-facing GPU billboard; dissolves IN as its detailed twin dissolves out)
-    const impTex=T('tex/impostor_pine_large.png?v=2',true); impTex.anisotropy=8;
-    const impMat=new THREE.MeshBasicMaterial({map:impTex,alphaTest:0.3,side:THREE.DoubleSide,fog:true});
-    impMat.color.setScalar(0.72);   // impostor is unlit/full-bright → darken it to match the shaded detailed pines
+    // Multi-view GPU billboard: model and rotation choose the atlas frame; fades against its matching mesh.
+    const impTex=await tl.loadAsync('./assets/trees/tex/'+impMeta.atlas);impTex.colorSpace=THREE.SRGBColorSpace;impTex.anisotropy=8;
+    const impMat=new THREE.MeshBasicMaterial({map:impTex,alphaTest:0.3,alphaToCoverage:true,side:THREE.DoubleSide,fog:true});
+    // Atlas already contains the main scene lighting; do not darken it again.
     impMat.onBeforeCompile=(sh)=>{
       Object.assign(sh.uniforms,lodUniforms);
+      sh.uniforms.uAtlas={value:new THREE.Vector3(impMeta.pixelsPerView/impMeta.size,impMeta.columns,impMeta.azimuthViews)};
       sh.uniforms.uCam={value:new THREE.Vector3()}; impCamU=sh.uniforms.uCam;   // MeshBasicMaterial doesn't auto-refresh cameraPosition → feed it ourselves each frame
       sh.uniforms.uHScale={value:1.0}; sh.uniforms.uYOff={value:0.0}; impHU=sh.uniforms.uHScale; impYU=sh.uniforms.uYOff;   // live billboard size + vertical offset (sliders)
-      sh.vertexShader=('attribute float aDetail;\nuniform vec3 uCam;\nuniform float uHScale;\nuniform float uYOff;\nvarying float vDist;\nvarying float vDet;\n'+sh.vertexShader).replace('#include <project_vertex>', `
+      sh.vertexShader=('uniform vec3 uAtlas;\nattribute vec2 aImpostorData;\nattribute float aDetail;\nuniform vec3 uCam;\nuniform float uHScale;\nuniform float uYOff;\nvarying float vDist;\nvarying float vDet;\n'+sh.vertexShader).replace('#include <project_vertex>', `
         vec3 iC=(modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0)).xyz;
         float sX=length(instanceMatrix[0].xyz), sY=length(instanceMatrix[1].xyz);
-        vec3 dir=uCam-iC; dir.y=0.0; dir=normalize(dir);
-        vec3 rgt=normalize(cross(vec3(0.0,1.0,0.0),dir));
-        vec3 wp=iC + rgt*(position.x*sX*uHScale) + vec3(0.0,1.0,0.0)*(position.y*sY*uHScale + uYOff*sY);
+        vec3 dir=normalize(uCam-iC);
+        vec3 horizontal=vec3(dir.x,0.0,dir.z);
+        if(length(horizontal)<0.0001)horizontal=vec3(0.0,0.0,1.0);
+        float yaw=atan(horizontal.x,horizontal.z)-aImpostorData.y;
+        float azimuth=mod(floor(yaw/6.28318530718*uAtlas.z+0.5),uAtlas.z);
+        float pitch=atan(dir.y,length(dir.xz));
+        float elevation=pitch>1.134464?2.0:(pitch>0.392699?1.0:0.0);
+        float frame=aImpostorData.x+elevation*uAtlas.z+azimuth;
+        #ifdef USE_MAP
+        vMapUv=vec2(mod(frame,uAtlas.y)*uAtlas.x,1.0-(floor(frame/uAtlas.y)+1.0)*uAtlas.x)+uv*uAtlas.x;
+        #endif
+        vec3 rgt=normalize(cross(vec3(0.0,1.0,0.0),horizontal));
+        vec3 up=normalize(cross(dir,rgt));
+        vec3 wp=iC + rgt*(position.x*sX*uHScale) + up*(position.y*sY*uHScale)+vec3(0.0,uYOff*sY,0.0);
         vec4 mvPosition=viewMatrix*vec4(wp,1.0);
         gl_Position=projectionMatrix*mvPosition; vDist=length(uCam-iC); vDet=aDetail;`);
       sh.fragmentShader=(lodFragment+'varying float vDist;\nvarying float vDet;\n'+_IGN+'\n'+sh.fragmentShader).replace('void main() {',
@@ -581,11 +595,10 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
     if(trees.length) buildTreeMesh();                 // rebuild now that the photoreal pines are ready
   }catch(e){ console.warn('ez-pines load failed, using fallback pine',e); }finally{treeAssetsSettled=true;}
 })();
-const _impGeo=new THREE.PlaneGeometry(1,1).translate(0,0.5,0);   // unit billboard: x∈[-.5,.5], y∈[0,1]
-const IMP_ASPECT=0.261;  // impostor image width/height (tightly cropped 73/280) → quad width = height*aspect
+const _impGeo=new THREE.PlaneGeometry(1,1);   // centered, fully camera-facing multi-view billboard
 const _UP=new THREE.Vector3(0,1,0), _XAX=new THREE.Vector3(1,0,0), _q=new THREE.Quaternion();
 const _zeroMat=new THREE.Matrix4().makeScale(0,0,0);            // collapse a hidden impostor instance
-function impMatrix(t){ const h=(t.h||10); _o.position.set(t.x,t.gy,t.z); _o.quaternion.identity(); _o.scale.set(h*IMP_ASPECT,h,1); _o.updateMatrix(); return _o.matrix; }  // tight crop → base at ground, height = real tree height
+function impMatrix(t){const h=t.h||10,frame=ezPines[t.variant].impostor;_o.position.set(t.x,t.gy+h*frame.centerY,t.z);_o.quaternion.identity();_o.scale.set(h*frame.span,h*frame.span,1);_o.updateMatrix();return _o.matrix;}
 // build one detailed InstancedMesh (bark or leaf) over a list; returns {im,list} (does NOT track in treeMeshes)
 function mkInstEz(geo,mat,list){
   const im=new THREE.InstancedMesh(geo,mat,list.length);
@@ -680,6 +693,9 @@ function buildTreeMesh(){
   impMesh.frustumCulled=false;
   impDetailAttr=new THREE.InstancedBufferAttribute(new Float32Array(trees.length),1);   // 1 = has a detailed twin right now (billboard cross-fades)
   impMesh.geometry.setAttribute('aDetail',impDetailAttr);
+  const impostorData=new Float32Array(trees.length*2);
+  for(let i=0;i<trees.length;i++)impostorData.set([ezPines[trees[i].variant].impostor.firstFrame,trees[i].r],i*2);
+  impMesh.geometry.setAttribute('aImpostorData',new THREE.InstancedBufferAttribute(impostorData,2));
   for(let i=0;i<trees.length;i++){ const t=trees[i]; impMesh.setMatrixAt(i,impMatrix(t)); impMesh.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint)); }
   impMesh.instanceMatrix.needsUpdate=true; if(impMesh.instanceColor) impMesh.instanceColor.needsUpdate=true;
   scene.add(impMesh);

@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "atlas": "impostor_variants.png",
+  "size": 2048,
+  "columns": 10,
+  "pixelsPerView": 192,
+  "azimuthViews": 8,
+  "elevations": [
+    0,
+    45,
+    85
+  ],
+  "frames": {
+    "pine_large": {
+      "span": 1.063409041562695,
+      "centerY": 0.5,
+      "firstFrame": 0,
+      "views": 24,
+      "pixelsPerView": 192,
+      "source": "pine_large.json"
+    },
+    "pine_bush": {
+      "span": 1.5659683788859504,
+      "centerY": 0.40913156419992447,
+      "firstFrame": 24,
+      "views": 24,
+      "pixelsPerView": 192,
+      "source": "pine_bush.json"
+    },
+    "aspen": {
+      "span": 1.0726014199718479,
+      "centerY": 0.5,
+      "firstFrame": 48,
+      "views": 24,
+      "pixelsPerView": 192,
+      "source": "aspen.json"
+    }
+  }
+}

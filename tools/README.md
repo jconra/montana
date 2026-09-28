@@ -173,3 +173,20 @@ available saved images were setup screenshots, not property references. To match
 the site, obtain ground-level road/rock/bush photos and wider views with approximate
 camera position and direction. Do not interpret the procedural scatter as surveyed
 vegetation or rock placement.
+
+### Main-scene multi-view impostors
+
+Serve the repository over HTTP and open `tools/bake-main-impostors.html`.
+Download the atlas and JSON into `assets/trees/tex/` together. The baker uses
+all non-LOD variants in `assets/trees/manifest.json` and their actual mesh
+geometry, textures, alpha cutoffs and the main scene's lighting.
+
+Each of the three models has 24 views: eight azimuths at elevations of
+0, 45 and 85 degrees, at **192 × 192 pixels per view**. They share one
+2048 × 2048 RGBA atlas (about 21.3 MiB including mipmaps). Main-scene
+quality settings do not lower this bake resolution. Per-instance model
+and rotation select the appropriate atlas frame; model-specific bounds
+keep mesh and impostor size and position aligned. Camera-facing quads
+support elevated views as well as ground-level driving. Views select the
+nearest angle; these are multi-view billboards, not the forest lab's
+separate octahedral atlas pipeline.

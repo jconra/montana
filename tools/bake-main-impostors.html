@@ -1,0 +1,47 @@
+<!doctype html><meta charset="utf-8"><title>Main scene impostor baker</title>
+<p>Bakes the same geometry, cutouts and lighting used by the main scene. Serve the repository over HTTP, open this page, then download both files into assets/trees/tex/.</p>
+<button id="save" disabled>Download atlas and metadata</button><pre id="status">Baking…</pre>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled=false;
+const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
+renderer.useLegacyLights=true;renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setPixelRatio(1);renderer.setSize(192,192);renderer.setClearColor(0,0);
+const atlas=document.createElement('canvas');atlas.width=2048;atlas.height=2048;document.body.append(atlas);atlas.style.height='640px';
+const ctx=atlas.getContext('2d'),frames={};
+const tl=new THREE.TextureLoader();
+const texture=async(path,color=false)=>{const t=await tl.loadAsync('../assets/trees/'+path);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(color)t.colorSpace=THREE.SRGBColorSpace;return t;};
+const decode=(s,Type)=>new Type(Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer);
+function geometry(data){const g=new THREE.BufferGeometry();for(const [name,size] of [['position',3],['normal',3],['uv',2]])g.setAttribute(name,new THREE.BufferAttribute(decode(data[name],Float32Array),size));g.setAttribute('uv2',g.attributes.uv);if(data.index){const ix=decode(data.index,Uint32Array);g.setIndex(new THREE.BufferAttribute(g.attributes.position.count<65536?new Uint16Array(ix):ix,1));}return g;}
+try{
+const manifest=await (await fetch('../assets/trees/manifest.json')).json();
+const variants=manifest.variants.filter(v=>v.role!=='mid'&&v.role!=='far');
+if(variants.length*24>100)throw new Error('Expand the atlas layout before adding more models; keep at least 192 pixels per view.');
+for(const [i,v] of variants.entries()){
+ const data=await (await fetch('../assets/trees/'+v.file)).json(),x=v.tex;
+ const bark=new THREE.MeshStandardMaterial({map:await texture(x.barkColor,true),normalMap:await texture(x.barkNormal),roughnessMap:await texture(x.barkRough),aoMap:await texture(x.barkAO),roughness:1});
+ const leaves=new THREE.MeshStandardMaterial({map:await texture(x.leaf,true),alphaTest:v.alphaTest??.4,alphaToCoverage:true,side:THREE.DoubleSide,roughness:1});
+ const group=new THREE.Group();group.add(new THREE.Mesh(geometry(data.branches),bark),new THREE.Mesh(geometry(data.leaves),leaves));
+ const bounds=new THREE.Box3().setFromObject(group);let radius=0;
+ group.traverse(o=>{if(o.isMesh){const p=o.geometry.attributes.position;for(let j=0;j<p.count;j++)radius=Math.max(radius,Math.hypot(p.getX(j),p.getZ(j)));}});
+ // One fixed square bound per model keeps all views at the same world scale.
+ const centerY=(bounds.min.y+bounds.max.y)/2;let sphereRadius=0;
+ group.traverse(o=>{if(o.isMesh){const p=o.geometry.attributes.position;for(let j=0;j<p.count;j++)sphereRadius=Math.max(sphereRadius,Math.hypot(p.getX(j),p.getY(j)-centerY,p.getZ(j)));}});
+ const span=sphereRadius*2*1.06;
+ const scene=new THREE.Scene();scene.add(group,new THREE.HemisphereLight(0xbcd4ff,0x2a2420,.6));const sun=new THREE.DirectionalLight(0xfff2d8,1.4);sun.position.set(-1,1.3,-.6);scene.add(sun);
+ for(let elevation=0;elevation<3;elevation++)for(let azimuth=0;azimuth<8;azimuth++){
+   const pitch=[0,45,85][elevation]*Math.PI/180,yaw=azimuth*Math.PI/4;
+   const camera=new THREE.OrthographicCamera(-span/2,span/2,span/2,-span/2,.01,20);
+   camera.position.set(Math.sin(yaw)*Math.cos(pitch)*5,centerY+Math.sin(pitch)*5,Math.cos(yaw)*Math.cos(pitch)*5);camera.lookAt(0,centerY,0);
+   renderer.render(scene,camera);const frame=i*24+elevation*8+azimuth,col=frame%10,row=Math.floor(frame/10);ctx.drawImage(renderer.domElement,col*192,row*192);
+ }
+ frames[v.name]={span,centerY,firstFrame:i*24,views:24,pixelsPerView:192,source:v.file};
+ group.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const key of ['map','normalMap','roughnessMap','aoMap'])o.material[key]?.dispose();o.material.dispose();}});
+}
+window.bakedImpostors={image:atlas.toDataURL('image/png'),metadata:{version:2,atlas:'impostor_variants.png',size:2048,columns:10,pixelsPerView:192,azimuthViews:8,elevations:[0,45,85],frames}};
+document.getElementById('status').textContent=JSON.stringify(window.bakedImpostors.metadata,null,2);
+document.getElementById('save').disabled=false;document.getElementById('save').onclick=()=>{for(const [name,url] of [['impostor_variants.png',window.bakedImpostors.image],['impostor_variants.json',URL.createObjectURL(new Blob([JSON.stringify(window.bakedImpostors.metadata,null,2)+'\n'],{type:'application/json'}))]]){const a=document.createElement('a');a.href=url;a.download=name;a.click();}};
+renderer.dispose();
+}catch(e){document.getElementById('status').textContent=String(e);throw e;}
+</script>
