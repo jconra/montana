@@ -39,6 +39,11 @@
   <label>ground detail <input id="groundDetail" type="checkbox" checked></label>
   <label>ground greenery <input id="groundGreen" type="range" min="0" max="1" step="0.05" value="0.85"></label>
 
+  <div class="sec">performance</div>
+  <label>quality <select id="qualityMode"><option value="auto">Auto</option><option value="0">Minimal</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option><option value="4">Ultra</option></select></label>
+  <label>target <select id="targetFPS"><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
+  <div id="qualityStatus" style="font-size:11px;color:#9aa4af" aria-live="polite"></div>
+
   <div class="sec">structures</div>
   <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
 
@@ -96,6 +101,7 @@ const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.W
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
+import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js';
 
@@ -109,7 +115,7 @@ const cHalf = (M.coarse.W-1)*M.coarse.px/2;   // ~750 m
 const fHalf = (M.fine.W-1)*M.fine.px/2;       // ~250 m
 
 const renderer = new Renderer({canvas:c, antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,1));
 // Preserve the scene lighting authored before r155.
 renderer.useLegacyLights=true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -512,18 +518,20 @@ const pineFoliageGeo=(()=>{
 const pineFoliageMat=new THREE.MeshStandardMaterial({map:branchTex(),alphaTest:0.42,side:THREE.DoubleSide,roughness:1,metalness:0});
 function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65*65) return true; } return false; }
 // ---- photoreal ez-pines (baked from ez-tree → trees/*.json). Near = detailed (alpha-fade); far = billboard impostor ----
+let treeAssetsSettled=false,lidarSettled=false;
 let ezPines=null;      // [{name, bark:Geo, leaf:Geo, barkMat, leafMat}]; null until loaded
 let ezImpostor=null;   // {mat} — camera-facing billboard using a baked image of the pine (cheap far LOD)
 let impCamU=null, impHU=null, impYU=null;   // impostor shader uniforms: camera pos (per-frame facing) + size + y-offset (sliders)
 // LOD cross-fade band (m from camera): detailed dissolves OUT and billboard dissolves IN across F0→F1
-const _F0=150.0, _F1=180.0;
+const lodUniforms={lodEnd:{value:95},lodOpacity:{value:1}};
 const _IGN='float _ign(vec2 p){return fract(52.9829189*fract(dot(p,vec2(0.06711056,0.00583715))));}';   // stable per-pixel dither threshold
-const _BAND=(_F1-_F0).toFixed(1);
+const lodFragment='uniform float lodEnd;uniform float lodOpacity;';
 function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissolves to nothing by F1
   mat.onBeforeCompile=(sh)=>{
+    Object.assign(sh.uniforms,lodUniforms);
     sh.vertexShader='varying float vDist;\n'+sh.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n  vDist=length(mvPosition.xyz);');
-    sh.fragmentShader='varying float vDist;\n'+_IGN+'\n'+sh.fragmentShader.replace('void main() {',
-      'void main() {\n  float _fd=clamp(('+_F1.toFixed(1)+'-vDist)/'+_BAND+',0.0,1.0); if(_ign(gl_FragCoord.xy)>_fd) discard;');
+    sh.fragmentShader=lodFragment+'varying float vDist;\n'+_IGN+'\n'+sh.fragmentShader.replace('void main() {',
+      'void main() {\n  float _fd=lodOpacity*clamp((lodEnd-vDist)/30.,0.0,1.0); if(_ign(gl_FragCoord.xy)>_fd) discard;');
   };
 }
 (async()=>{
@@ -555,6 +563,7 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
     const impMat=new THREE.MeshBasicMaterial({map:impTex,alphaTest:0.3,side:THREE.DoubleSide,fog:true});
     impMat.color.setScalar(0.72);   // impostor is unlit/full-bright → darken it to match the shaded detailed pines
     impMat.onBeforeCompile=(sh)=>{
+      Object.assign(sh.uniforms,lodUniforms);
       sh.uniforms.uCam={value:new THREE.Vector3()}; impCamU=sh.uniforms.uCam;   // MeshBasicMaterial doesn't auto-refresh cameraPosition → feed it ourselves each frame
       sh.uniforms.uHScale={value:1.0}; sh.uniforms.uYOff={value:0.0}; impHU=sh.uniforms.uHScale; impYU=sh.uniforms.uYOff;   // live billboard size + vertical offset (sliders)
       sh.vertexShader=('attribute float aDetail;\nuniform vec3 uCam;\nuniform float uHScale;\nuniform float uYOff;\nvarying float vDist;\nvarying float vDet;\n'+sh.vertexShader).replace('#include <project_vertex>', `
@@ -565,12 +574,12 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
         vec3 wp=iC + rgt*(position.x*sX*uHScale) + vec3(0.0,1.0,0.0)*(position.y*sY*uHScale + uYOff*sY);
         vec4 mvPosition=viewMatrix*vec4(wp,1.0);
         gl_Position=projectionMatrix*mvPosition; vDist=length(uCam-iC); vDet=aDetail;`);
-      sh.fragmentShader=('varying float vDist;\nvarying float vDet;\n'+_IGN+'\n'+sh.fragmentShader).replace('void main() {',
-        'void main() {\n  if(vDet>0.5){ float _fd=clamp(('+_F1.toFixed(1)+'-vDist)/'+_BAND+',0.0,1.0); if(_ign(gl_FragCoord.xy)<=_fd) discard; }');   // complement of the detailed dissolve
+      sh.fragmentShader=(lodFragment+'varying float vDist;\nvarying float vDet;\n'+_IGN+'\n'+sh.fragmentShader).replace('void main() {',
+        'void main() {\n  if(vDet>0.5){ float _fd=lodOpacity*clamp((lodEnd-vDist)/30.,0.0,1.0); if(_ign(gl_FragCoord.xy)<=_fd) discard; }');   // complement of the detailed dissolve
     };
     ezImpostor={ mat:impMat };
     if(trees.length) buildTreeMesh();                 // rebuild now that the photoreal pines are ready
-  }catch(e){ console.warn('ez-pines load failed, using fallback pine',e); }
+  }catch(e){ console.warn('ez-pines load failed, using fallback pine',e); }finally{treeAssetsSettled=true;}
 })();
 const _impGeo=new THREE.PlaneGeometry(1,1).translate(0,0.5,0);   // unit billboard: x∈[-.5,.5], y∈[0,1]
 const IMP_ASPECT=0.261;  // impostor image width/height (tightly cropped 73/280) → quad width = height*aspect
@@ -630,8 +639,8 @@ function addInst(geo,mat,list){
 }
 const DRIVE_W=20;          // driveway corridor half-width (m) → bushy pines line the drive
 // ---- dynamic camera-distance LOD: detailed pines swap to billboard impostors past LOD_DIST from the camera ----
-const LOD_DIST=180;        // trees within this many m (3D) of the camera get detailed geometry
-const MAX_DETAIL=340;      // hard cap on detailed trees (perf) — keep the nearest ones
+let LOD_DIST=95;        // trees within this many m (3D) of the camera get detailed geometry
+let MAX_DETAIL=60;      // hard cap on detailed trees (perf) — keep the nearest ones
 let impMesh=null, impDetailAttr=null;   // persistent impostor InstancedMesh over ALL trees (instance i ↔ trees[i]) + per-instance "has detailed twin" flag
 let detMeshes=[], groveMeshes=[];   // detailed pines (rebuilt on camera move) + aspen groves (always detailed)
 let detailSet=new Set();   // impostor instance indices currently cross-fading with a detailed twin
@@ -651,7 +660,8 @@ function buildGroves(){      // aspen groves — small, north-leaning, green; al
     for(let k=0;k<nA;k++){ const a=g()*6.283, rad=g()*6.2, x=cx+Math.cos(a)*rad, z=cz+Math.sin(a)*rad;
       list.push({x,z,gy:heightAt(x,z),h:4.2+g()*3.4,r:g()*6.283,tint:0.85+g()*0.22,lean:-(0.18+g()*0.12)}); } }
   const v=ezPines[iA];
-  groveMeshes.push(mkInstEz(v.bark,v.barkMat,list), mkInstEz(v.leaf,v.leafMat,list));
+  v.groveBark??=v.barkMat.clone();v.groveLeaf??=v.leafMat.clone();
+  groveMeshes.push(mkInstEz(v.bark,v.groveBark,list), mkInstEz(v.leaf,v.groveLeaf,list));
 }
 function buildTreeMesh(){
   for(const {im} of treeMeshes){scene.remove(im); im.dispose();} treeMeshes=[];
@@ -700,7 +710,7 @@ function updateTreeLOD(force){
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
   sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
-  buildTreesFrom(+sl.value);
+  buildTreesFrom(+sl.value);lidarSettled=true;
 })();
 
 // ---- distant low-poly mountains (60 km regional DEM, hole for the detailed scene) ----
@@ -738,6 +748,9 @@ function updateTreeLOD(force){
 let groundMeshes=[];
 function addGround(geo,mat,list){
   if(!list.length) return;
+  // Stable mixed ordering makes every density budget cover the whole route.
+  const rank=t=>{const n=Math.sin(t.x*127.1+t.z*311.7)*43758.5453;return n-Math.floor(n);};
+  list=[...list].sort((a,b)=>rank(a)-rank(b));
   const im=new THREE.InstancedMesh(geo,mat,list.length);
   for(let i=0;i<list.length;i++){const t=list[i];
     _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();
@@ -1065,10 +1078,50 @@ function panCam(dt){                                    // WASD translates the c
   _pm.set(0,0,0).addScaledVector(_pd,f*spd).addScaledVector(_pr,st*spd);
   cam.position.add(_pm); controls.target.add(_pm);
 }
+// ---- adaptive rendering budgets ----------------------------------------
+let qualityTransition=null,qualityLevel=1,qualityLoading=false;
+function applyQuality(level){
+  qualityLevel=level;const q=QUALITY_LEVELS[level];
+  LOD_DIST=q.distance;MAX_DETAIL=q.meshes;lodUniforms.lodEnd.value=q.distance;
+  renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
+  for(const {im,list} of groundMeshes){
+    const isRock=rockGeos.includes(im.geometry);
+    im.count=Math.ceil(list.length*(isRock?Math.max(.65,q.density):q.density));
+    im.computeBoundingSphere();
+  }
+  updateTreeLOD(true);
+  $('qualityStatus').textContent=`${quality.mode==='auto'?'Auto · ':''}${q.name} · ${q.meshes} near trees · ${q.distance} m`;
+}
+const quality=new AdaptiveQuality(level=>{qualityTransition={level,time:0,applied:false};});
+function configureQuality(){
+  quality.configure($('qualityMode').value,+$('targetFPS').value);
+  $('targetFPS').disabled=quality.mode!=='auto';
+  if(!qualityTransition)applyQuality(quality.level);
+  try{localStorage.setItem('montanaQuality',JSON.stringify({mode:quality.mode,target:quality.target}));}catch(e){}
+}
+try{const saved=JSON.parse(localStorage.getItem('montanaQuality'));if(saved&&['auto','0','1','2','3','4'].includes(saved.mode)&&[30,60].includes(saved.target)){$('qualityMode').value=saved.mode;$('targetFPS').value=String(saved.target);}}catch(e){}
+$('qualityMode').onchange=configureQuality;$('targetFPS').onchange=configureQuality;
+applyQuality(1);configureQuality();
+// Loading stalls and returning from a background tab must not lower quality.
+THREE.DefaultLoadingManager.onStart=()=>{qualityLoading=true;quality.reset();};
+THREE.DefaultLoadingManager.onLoad=()=>{qualityLoading=false;quality.reset();};
+document.addEventListener('visibilitychange',()=>quality.reset());
+addEventListener('resize',()=>{renderer.setPixelRatio(Math.min(devicePixelRatio,QUALITY_LEVELS[qualityLevel].pixelRatio));quality.reset();});
+function updateQuality(seconds,dt){
+  if(qualityTransition){
+    const t=qualityTransition;t.time+=dt;
+    if(t.time>=.275&&!t.applied){applyQuality(t.level);t.applied=true;}
+    lodUniforms.lodOpacity.value=t.time<.275?1-t.time/.275:Math.min(1,(t.time-.275)/.275);
+    if(t.time>=.55){qualityTransition=null;lodUniforms.lodOpacity.value=1;quality.reset(3);}
+    return;
+  }
+  quality.sample(seconds,!document.hidden&&!qualityLoading&&treeAssetsSettled&&lidarSettled);
+}
 const AUTO_INTRO=true; if(AUTO_INTRO) playIntro();   // start with the car driving down the road
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
-  const now=performance.now(), dt=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
+  updateQuality(elapsed,dt);
   updateCar(dt); if(!driveMode){ panCam(dt); controls.update(); }
   if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
   updateTreeLOD();                                  // swap detailed↔billboard by distance from the camera
@@ -1076,7 +1129,7 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
   renderer.render(scene,cam);
   frames++; if(now-fpsT>=300){const fps=frames*1000/(now-fpsT);
-    statsEl.innerHTML=`${fps.toFixed(0)} fps · ${(1000/fps).toFixed(1)} ms<br>${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`;
+    statsEl.innerHTML=`${QUALITY_LEVELS[qualityLevel].name}${quality.mode==='auto'?' (auto)':''} · ${fps.toFixed(0)} fps · ${(1000/fps).toFixed(1)} ms<br>${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`;
     frames=0; fpsT=now;}
 })();
 </script>
