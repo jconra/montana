@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {photoToWorld,createRoute,groundZone,isTireTrack,polygonDistance,POND_OUTLINE,CLEARING} from '../assets/property-layout.mjs';
+assert.deepEqual(photoToWorld(1240,823),{x:8,z:-8});
+const cabin=photoToWorld(835,252);assert.ok(Math.hypot(cabin.x+41,cabin.z-31)<.01);
+assert.ok(polygonDistance(12,62)>0);assert.ok(polygonDistance(8,-8)<0);assert.ok(polygonDistance(-41,31)<0);
+for(const p of Object.values(CLEARING))assert.ok(polygonDistance(p.x,p.z)<0);
+const route=createRoute([{x:0,z:0},{x:0,z:100}]);
+assert.equal(groundZone(0,30,route),'median');assert.ok(!isTireTrack(route.nearest(0,30),100));
+assert.ok(isTireTrack(route.nearest(.86,30),100));assert.ok(isTireTrack(route.nearest(-.86,30),100));
+assert.ok(isTireTrack(route.nearest(0,95),100),'turnaround has no grass median');
+assert.equal(groundZone(10,30,route,[{type:'house',x:10,z:30}]),'building');
+assert.equal(groundZone(CLEARING.fire.x,CLEARING.fire.z,route),'clearing');
+assert.equal(groundZone(12,62,route),'water');
+assert.ok(POND_OUTLINE.length>=12);
+console.log('Photo anchors, pond footprint, clearings and tire-track exclusions passed');
