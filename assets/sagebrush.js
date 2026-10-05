@@ -18,11 +18,11 @@ export async function loadSagebrush(){
   geometry.computeBoundingBox();geometry.computeBoundingSphere();
   const material=mesh.material.clone(),foliage=material.transparent||material.alphaTest>0;
   if(foliage){
-   // glTF exports these cards as BLEND. Cutouts keep intersecting, instanced
-   // shrubs depth-correct without per-leaf sorting, including on WebGL1.
+   // Preserve the revised export's roughness and MASK cutoff. Cutouts keep
+   // instanced shrubs depth-correct without per-leaf sorting on WebGL1 too.
    material.transparent=false;material.depthWrite=true;
-   material.alphaTest=.28;material.alphaToCoverage=true;
-   material.side=THREE.DoubleSide;material.roughness=.9;
+   if(material.alphaTest===0)material.alphaTest=.5;
+   material.alphaToCoverage=true;material.side=THREE.DoubleSide;
   }
   material.name=foliage?'sagebrush-leaves':'sagebrush-branches';
   parts.push({geometry,material});
