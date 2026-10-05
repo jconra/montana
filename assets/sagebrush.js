@@ -4,7 +4,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 // Keep the supplied Blender asset intact. Bake its object transforms once so
 // branches and leaf cards can share each shrub's instancing transform.
 export async function loadSagebrush(){
- const {scene}=await new GLTFLoader().loadAsync(new URL('./models/sage.glb',import.meta.url).href);
+ const {scene}=await new GLTFLoader().loadAsync(new URL('./models/sage.glb?v=c4f739d5',import.meta.url).href);
  scene.updateMatrixWorld(true);
  const bounds=new THREE.Box3().setFromObject(scene,true),height=bounds.max.y-bounds.min.y;
  if(!Number.isFinite(height)||height<=0)throw new Error('Sagebrush has no usable bounds');

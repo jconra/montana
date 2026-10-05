@@ -2,12 +2,15 @@
 
 ## Sagebrush
 
-`sage.glb` is the user's revised Blender export (`sage(1).glb`), supplied
-October 2026 and retained unchanged. It has 224 branch triangles and 158
-leaf-card triangles, Uint16 indices, two materials, and one embedded 256×256 RGBA leaf texture (about
-108 KB for the entire asset). It needs no external texture or decoder download.
+`sage.glb` is the user's corrected model (`sage_fixed.glb`), supplied October
+2026 and retained unchanged. It has 698 triangles, Uint16 indices, one mesh and
+material, and one embedded 256×256 RGBA texture (about 120 KB for the entire
+asset). The texture contains leaf cutouts and a brown patch for the branches,
+with filled RGB around transparent leaf edges. It needs no external texture or
+decoder download. The asset URL includes a content revision to refresh cached
+copies of earlier models.
 
-`../sagebrush.js` uses the vendored r158 GLTFLoader, bakes both objects' authored
+`../sagebrush.js` uses the vendored r158 GLTFLoader, bakes the model's authored
 transforms into their geometry, and normalizes the shrub to one metre high with
 its root on the ground. The scene varies height (0.65–1.5 m), canopy proportions,
 rotation and brightness. The revised export uses leaf roughness 1 and glTF
@@ -16,11 +19,17 @@ in Blender. The loader preserves both settings and enables alpha-to-coverage;
 overlapping instanced leaf cards write depth without transparency sorting.
 
 Branches and leaves share each plant's instance transform, visibility, density
-budget and subtle wind phase. There are two instanced draws per visible
-28-metre sagebrush cell, rather than two draws for every shrub. Auto quality
+budget and subtle wind phase. There is one instanced draw per visible
+28-metre sagebrush cell, rather than one draw for every shrub. Auto quality
 reduces count and range; it does not reduce the supplied texture resolution.
 If the model fails to load, the rest of the property still initializes and the
 console reports the missing sagebrush asset.
+
+Visual review: the corrected texture avoids white RGB outside the leaf
+cutouts, but this remains a stylized shrub at close range. Broad, angular
+branch bases and large, spiky leaf sprays are visible from several angles;
+the reference hillside has finer twigs and softer, rounded grey-green crowns.
+The source model is preserved rather than reshaped or recolored by the loader.
 
 ## RAV4
 

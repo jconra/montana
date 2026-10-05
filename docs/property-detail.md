@@ -29,8 +29,9 @@ has shorter plants. Pond plants are restricted to its bank; LiDAR tree roots
 inside the pond are excluded.
 
 Sagebrush uses the local Blender model in `assets/models/sage.glb`, loaded by
-`assets/sagebrush.js`. Its branches and cutout foliage are instanced separately
-with matching transforms, wind, culling and quality budgets. The 382-triangle
+`assets/sagebrush.js`. The corrected `sage_fixed.glb` source combines its
+branches and cutout foliage into one mesh and material, sharing transforms,
+wind, culling and quality budgets. The 698-triangle
 model is scattered in patches along both sides of the full drive, extending
 roughly 37 m from it, with varied heights, proportions and rotations. Spacing
 checks prevent coincident bushes; shrubs stay at least 3.5 m from the route
