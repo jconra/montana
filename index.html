@@ -1080,7 +1080,7 @@ function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
   const padY = sum/n - 0.3;        // average grade, just recessed
   flattenPad(hx,hz,hw,hd,padY,5);
 }
-propertyNature=createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel});
+propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel});
 applyVex(1);
 addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 renderer.setSize(innerWidth,innerHeight);

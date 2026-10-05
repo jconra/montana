@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,smooth} from './property-layout.mjs';
+import {loadSagebrush} from './sagebrush.js';
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.92});
 const wood=mat(0x827053),endWood=mat(0xb39a70),dark=mat(0x302c24),stone=mat(0x777468);
@@ -58,12 +59,6 @@ function flowerGeometry(seed,yellow){
  }return mergeGeometries(geos.map(g=>g.index?g.toNonIndexed():g),false);
 }
 function paint(g,c){const colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3)colors.set(c,i);g.setAttribute('color',new THREE.BufferAttribute(colors,3));}
-function sageGeometry(){const R=rng(701),geos=[];
- for(let i=0;i<25;i++){const a=R()*Math.PI*2,r=Math.sqrt(R())*.5,h=.3+R()*.6,x=Math.cos(a)*r,z=Math.sin(a)*r;
- const stem=new THREE.CylinderGeometry(.009,.017,h,3).translate(x,h/2,z);paint(stem,[.35,.33,.22]);geos.push(stem);
- for(let j=0;j<4;j++){const leaf=new THREE.IcosahedronGeometry(.11+R()*.06,0);leaf.scale(1,.55,1);leaf.translate(x+(R()-.5)*.13,h*(.5+j*.14),z+(R()-.5)*.13);paint(leaf,[.42+R()*.08,.49+R()*.08,.34+R()*.08]);geos.push(leaf);}}
- return mergeGeometries(geos.map(g=>g.index?g.toNonIndexed():g),false);
-}
 export function preparePond(tiles,sample){
  const levels=POND_OUTLINE.map(p=>sample(p.x,p.z)).sort((a,b)=>a-b),level=levels[Math.floor(levels.length/2)]+.06;
  for(const t of tiles){const p=t.pos;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);if(x< -14||x>36||z<48||z>76)continue;const d=polygonDistance(x,z);if(d< -3)continue;
@@ -71,20 +66,27 @@ export function preparePond(tiles,sample){
  const mix=d>=0?1:1-smooth(0,3,-d);t.baseY[i]=t.baseY[i]*(1-mix)+target*mix;
  }}return level;
 }
-export function createPropertyNature({scene,heightAt,driveway,buildings,pondLevel}){
+export async function createPropertyNature({scene,heightAt,driveway,buildings,pondLevel}){
  const route=createRoute(driveway),R=rng(423031),o=new THREE.Object3D(),chunks=new Map(),props=[],wind={value:0},fadeDistance={value:90};let vex=1,quality=1,lastCam=new THREE.Vector3(1e8,0,0),radius=70;
- const geos={grass:grassGeometry(71),reeds:grassGeometry(75,true),white:flowerGeometry(81,false),yellow:flowerGeometry(85,true),sage:sageGeometry()};
+ const geos={grass:grassGeometry(71),reeds:grassGeometry(75,true),white:flowerGeometry(81,false),yellow:flowerGeometry(85,true)};
  const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:1});
+ function plantMaterial(material,sway){
  material.onBeforeCompile=sh=>{sh.uniforms.plantTime=wind;sh.uniforms.plantDistance=fadeDistance;
  sh.vertexShader='uniform float plantTime;varying float plantViewDistance;\n'+sh.vertexShader;
  sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
  vec3 root=(modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.)).xyz;
- transformed.x+=sin(plantTime*.85+root.x*.37+root.z*.2)*position.y*position.y*.08;
+ transformed.x+=sin(plantTime*.85+root.x*.37+root.z*.2)*position.y*position.y*${sway.toFixed(3)};
  plantViewDistance=distance(cameraPosition,root);`);
  sh.fragmentShader='uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
  sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
  };
- function add(kind,x,z,s=1){const cellX=Math.floor(x/28),cellZ=Math.floor(z/28),key=kind+':'+cellX+':'+cellZ;if(!chunks.has(key))chunks.set(key,{kind,x:(cellX+.5)*28,z:(cellZ+.5)*28,list:[]});chunks.get(key).list.push({x,z,y:heightAt(x,z),s,r:R()*Math.PI*2,rank:R()});}
+ material.customProgramCacheKey=()=>`property-plant-${sway}`;
+ }
+ plantMaterial(material,.08);
+ const models=Object.fromEntries(Object.entries(geos).map(([kind,geometry])=>[kind,[{geometry,material}]]));
+ try{models.sage=await loadSagebrush();for(const part of models.sage)plantMaterial(part.material,.018);}
+ catch(error){models.sage=[];console.warn('Sagebrush model unavailable:',error);}
+ function add(kind,x,z,s=1,variation={}){if(!models[kind].length)return;const cellX=Math.floor(x/28),cellZ=Math.floor(z/28),key=kind+':'+cellX+':'+cellZ;if(!chunks.has(key))chunks.set(key,{kind,x:(cellX+.5)*28,z:(cellZ+.5)*28,list:[]});chunks.get(key).list.push({x,z,y:heightAt(x,z),s,r:R()*Math.PI*2,rank:R(),...variation});}
  function candidate(x,z){const zone=groundZone(x,z,route,buildings);if(!['meadow','median'].includes(zone))return;
  const patch=.5+.25*Math.sin(x*.19+Math.sin(z*.09)*2)+.25*Math.cos(z*.14-x*.11);if(zone==='meadow'&&R()>.4+patch*.58)return;
  const mown=Math.hypot(x-CLEARING.fire.x,z-CLEARING.fire.z)<17;
@@ -94,12 +96,32 @@ export function createPropertyNature({scene,heightAt,driveway,buildings,pondLeve
  for(let i=0;i<24000;i++){const p=route.at(R()*route.total,(R()<.5?-1:1)*(2.3+R()*19));candidate(p.x,p.z);}
  for(let i=0;i<24000;i++){const a=R()*Math.PI*2,r=Math.sqrt(R())*78;candidate(-8+Math.cos(a)*r,25+Math.sin(a)*r);}
  for(let d=0;d<route.total-23;d+=.35){const p=route.at(d,(R()-.5)*.42);if(groundZone(p.x,p.z,route,buildings)==='median')add('grass',p.x,p.z,.18+R()*.16);}
- for(let i=0;i<220;i++){const p=route.at(R()*route.total,(R()<.5?-1:1)*(3.2+R()*8));if(groundZone(p.x,p.z,route,buildings)==='meadow')add('sage',p.x,p.z,.65+R()*.75);}
+ // The hillside reference has uneven thickets of open, woody sagebrush.
+ // Keep gaps, the mown camp and the entire road clear; avoid coincident shrubs.
+ const sageR=rng(701),occupied=new Map(),cell=3;
+ for(let i=0;i<6000;i++){
+  const p=route.at(sageR()*route.total,(sageR()<.5?-1:1)*(3.8+sageR()*33));
+  const patch=.5+.25*Math.sin(p.x*.13+Math.sin(p.z*.07)*2)+.25*Math.cos(p.z*.12-p.x*.06);
+  if(sageR()>.03+.88*smooth(.25,.7,patch)||groundZone(p.x,p.z,route,buildings)!=='meadow'||route.nearest(p.x,p.z).distance<3.5||Math.hypot(p.x-CLEARING.fire.x,p.z-CLEARING.fire.z)<17)continue;
+  const s=.65+sageR()*.85,cx=Math.floor(p.x/cell),cz=Math.floor(p.z/cell);let crowded=false;
+  for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)for(const q of occupied.get(`${cx+dx}:${cz+dz}`)||[]){if(Math.hypot(p.x-q.x,p.z-q.z)<.55*(s+q.s))crowded=true;}
+  if(crowded)continue;
+  const key=`${cx}:${cz}`;if(!occupied.has(key))occupied.set(key,[]);occupied.get(key).push({...p,s});
+  add('sage',p.x,p.z,s,{sx:.9+sageR()*.25,sz:.85+sageR()*.3,tint:.88+sageR()*.18});
+ }
  for(let i=0;i<800;i++){const x=-12+R()*47,z=50+R()*24,d=polygonDistance(x,z);if(d<-.1&&d> -2.5)add('reeds',x,z,.7+R()*.5);}
+ function writeTransforms(chunk){
+  for(let i=0;i<chunk.list.length;i++){const t=chunk.list[i];o.position.set(t.x,t.y*vex,t.z);o.rotation.set(0,t.r,0);o.scale.set(t.s*(t.sx||1),t.s,t.s*(t.sz||1));o.updateMatrix();for(const im of chunk.meshes)im.setMatrixAt(i,o.matrix);}
+  for(const im of chunk.meshes){im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();}
+ }
  for(const chunk of chunks.values()){
-  chunk.list.sort((a,b)=>a.rank-b.rank);const im=new THREE.InstancedMesh(geos[chunk.kind],material,chunk.list.length);im.name='property-'+chunk.kind;chunk.im=im;
-  for(let i=0;i<chunk.list.length;i++){const t=chunk.list[i];o.position.set(t.x,t.y,t.z);o.rotation.set(0,t.r,0);o.scale.setScalar(t.s);o.updateMatrix();im.setMatrixAt(i,o.matrix);}
-  im.computeBoundingSphere();scene.add(im);
+  chunk.list.sort((a,b)=>a.rank-b.rank);
+  chunk.meshes=models[chunk.kind].map(({geometry,material})=>{
+   const im=new THREE.InstancedMesh(geometry,material,chunk.list.length);im.name='property-'+chunk.kind;
+   if(chunk.kind==='sage'){const color=new THREE.Color();chunk.list.forEach((t,i)=>im.setColorAt(i,color.setRGB(t.tint,t.tint,t.tint)));}
+   scene.add(im);return im;
+  });
+  chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
  function place(group,p,rotation=0){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y});return group;}
  place(firepit(),CLEARING.fire);place(picnic(),CLEARING.picnic,.1);place(woodpile(),CLEARING.wood,-.3);
@@ -119,8 +141,8 @@ export function createPropertyNature({scene,heightAt,driveway,buildings,pondLeve
  #include <colorspace_fragment>
  }`});
  const water=new THREE.Mesh(waterGeo,waterMat);water.name='property-pond-water';water.position.y=pondLevel;scene.add(water);
- function setQuality(level,density){quality=level;radius=[45,70,95,125,150][level];fadeDistance.value=radius;for(const chunk of chunks.values()){chunk.im.count=Math.max(1,Math.floor(chunk.list.length*(chunk.kind==='sage'?Math.max(.55,density):density)));}lastCam.set(1e8,0,0);}
- function update(time,camera){wind.value=time;if(camera.position.distanceToSquared(lastCam)>36){lastCam.copy(camera.position);for(const c of chunks.values())c.im.visible=Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<radius+21;}}
- function setVerticalScale(value){vex=value;water.position.y=pondLevel*vex;for(const p of props)p.group.position.y=p.baseY*vex;for(const c of chunks.values()){for(let i=0;i<c.list.length;i++){const t=c.list[i];o.position.set(t.x,t.y*vex,t.z);o.rotation.set(0,t.r,0);o.scale.setScalar(t.s);o.updateMatrix();c.im.setMatrixAt(i,o.matrix);}c.im.instanceMatrix.needsUpdate=true;c.im.computeBoundingSphere();}}
+ function setQuality(level,density){quality=level;radius=[45,70,95,125,150][level];fadeDistance.value=radius;for(const chunk of chunks.values())for(const im of chunk.meshes){im.count=Math.max(1,Math.floor(chunk.list.length*(chunk.kind==='sage'?Math.max(.35,density):density)));im.computeBoundingSphere();}lastCam.set(1e8,0,0);}
+ function update(time,camera){wind.value=time;if(camera.position.distanceToSquared(lastCam)>36){lastCam.copy(camera.position);for(const c of chunks.values())for(const im of c.meshes)im.visible=Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<radius+21;}}
+ function setVerticalScale(value){vex=value;water.position.y=pondLevel*vex;for(const p of props)p.group.position.y=p.baseY*vex;for(const c of chunks.values())writeTransforms(c);}
  return {setQuality,update,setVerticalScale,water,props,chunks,pondLevel};
 }

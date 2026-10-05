@@ -8,6 +8,9 @@ The September photo/video references guide this scene layer:
 - July 2025 ground views and the drone video: two worn gravel tire tracks,
   low grass in the median, taller verge grass, white/yellow flowers, grey-green
   shrubs, and short grass around the gathering area.
+- October 2026 hillside reference: irregular, dense patches of woody sagebrush
+  with open branches below the foliage. The user's `sage.glb` replaces the
+  original pale geometric shrub clumps.
 
 `assets/property-layout.mjs` keeps the reference registration and placement
 rules in one place. The overhead image's house centre (1240,823) maps to
@@ -24,6 +27,17 @@ counts and visibility distance (45–150 m), with a dithered distance fade. Road
 plants avoid the two tire tracks and building footprints. The gathering area
 has shorter plants. Pond plants are restricted to its bank; LiDAR tree roots
 inside the pond are excluded.
+
+Sagebrush uses the local Blender model in `assets/models/sage.glb`, loaded by
+`assets/sagebrush.js`. Its branches and cutout foliage are instanced separately
+with matching transforms, wind, culling and quality budgets. The 382-triangle
+model is scattered in patches along both sides of the full drive, extending
+roughly 37 m from it, with varied heights, proportions and rotations. Spacing
+checks prevent coincident bushes; shrubs stay at least 3.5 m from the route
+centre and outside the mown camp, pond and building exclusions. Auto quality
+retains at least 35% of each nearby sagebrush cell and increases coverage and
+range on faster systems. The older broadleaf/evergreen shrubs remain as other
+vegetation types. The supplied model and texture are kept unchanged on disk.
 
 The pond uses one horizontal mesh with animated procedural ripple shading and
 view-dependent sky colour, rather than a reflection render pass. Both terrain
@@ -44,6 +58,10 @@ Validation:
 - `node tests/main-impostors.test.mjs`
 - Browser render checks in WebGL1 and WebGL2; verify camera presets, adaptive
   plant counts, pond/tree exclusions, and vertical-scale alignment.
+- Sagebrush: inspect from multiple angles; check that branches/leaves stay
+  together through quality changes and vertical exaggeration, that increasing
+  quality after exaggeration does not leave stale culling bounds, and that
+  cutout foliage renders without alpha-sorting artifacts in both WebGL paths.
 
 Useful next references are close-ups of the picnic table, fire ring, woodpile,
 rocks and typical plants, plus a low-angle pond shot showing its bank and water

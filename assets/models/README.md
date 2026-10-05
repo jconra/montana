@@ -1,4 +1,27 @@
-# RAV4
+# Scene models
+
+## Sagebrush
+
+`sage.glb` is the user's Blender model, supplied October 2026 and retained
+unchanged. It has 224 branch triangles and 158 leaf-card triangles, Uint16
+indices, two materials, and one embedded 256×256 RGBA leaf texture (about
+108 KB for the entire asset). It needs no external texture or decoder download.
+
+`../sagebrush.js` uses the vendored r158 GLTFLoader, bakes both objects' authored
+transforms into their geometry, and normalizes the shrub to one metre high with
+its root on the ground. The scene varies height (0.65–1.5 m), canopy proportions,
+rotation and brightness. The original GLB's blended leaf material becomes an
+opaque depth-writing cutout with alpha test 0.28 and alpha-to-coverage enabled,
+so overlapping instanced leaf cards do not require transparency sorting.
+
+Branches and leaves share each plant's instance transform, visibility, density
+budget and subtle wind phase. There are two instanced draws per visible
+28-metre sagebrush cell, rather than two draws for every shrub. Auto quality
+reduces count and range; it does not reduce the supplied texture resolution.
+If the model fails to load, the rest of the property still initializes and the
+console reports the missing sagebrush asset.
+
+## RAV4
 
 `rav4.glb` is the user-supplied Tripo model retrieved from the provided S3 link.
 The original GLB is retained unchanged, including its embedded 2048×2048 JPEG.
