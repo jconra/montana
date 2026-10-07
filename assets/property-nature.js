@@ -144,5 +144,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  function setQuality(level,density){quality=level;radius=[45,70,95,125,150][level];fadeDistance.value=radius;for(const chunk of chunks.values())for(const im of chunk.meshes){im.count=Math.max(1,Math.floor(chunk.list.length*(chunk.kind==='sage'?Math.max(.35,density):density)));im.computeBoundingSphere();}lastCam.set(1e8,0,0);}
  function update(time,camera){wind.value=time;if(camera.position.distanceToSquared(lastCam)>36){lastCam.copy(camera.position);for(const c of chunks.values())for(const im of c.meshes)im.visible=Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<radius+21;}}
  function setVerticalScale(value){vex=value;water.position.y=pondLevel*vex;for(const p of props)p.group.position.y=p.baseY*vex;for(const c of chunks.values())writeTransforms(c);}
- return {setQuality,update,setVerticalScale,water,props,chunks,pondLevel};
+ function detachSage(){for(const [key,c] of chunks)if(c.kind==='sage'){for(const im of c.meshes){scene.remove(im);im.dispose();}chunks.delete(key);}}
+ function reanchor(){for(const c of chunks.values()){for(const t of c.list)t.y=heightAt(t.x,t.z)/vex;writeTransforms(c);}for(const p of props){p.baseY=heightAt(p.group.position.x,p.group.position.z)/vex;p.group.position.y=p.baseY*vex;}}
+ return {setQuality,update,setVerticalScale,water,props,chunks,pondLevel,models,detachSage,reanchor};
 }

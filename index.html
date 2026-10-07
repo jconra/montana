@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Terrain — Paradise Valley</title>
+<link rel="stylesheet" href="./assets/landscape-editor.css">
 <style>
   html,body{margin:0;height:100%;background:#0d1117;overflow:hidden;font-family:system-ui,sans-serif;color:#e6edf3}
   #c{display:block;width:100%;height:100%}
@@ -34,6 +35,7 @@
 <div id="panel" class="card">
   <a href="./labs/" style="color:#7ee787">Open labs →</a>
   <label style="justify-content:space-between;margin:0 0 2px"><b style="color:#7ee787">Tools</b> <button id="min">–</button></label>
+  <label><button id="editLandscape" disabled>Loading landscape editor…</button></label>
   <label>inspect coordinates <input id="coordinateMode" type="checkbox"></label>
   <label>vertical scale <input id="vex" type="range" min="0.5" max="3" step="0.1" value="1"><span id="vexv">1.0×</span></label>
   <label><button id="mode">show elevation colors</button></label>
@@ -66,7 +68,7 @@
   <label>billboard size <input id="bbSize" type="range" min="0.5" max="1.8" step="0.02" value="1"><span id="bbSizev">1.00</span></label>
   <label>billboard y <input id="bbY" type="range" min="-0.4" max="0.3" step="0.01" value="0"><span id="bbYv">0.00</span></label>
   <label><button id="reseed">rebuild</button></label>
-  <label><button id="rmtree">remove tree</button> <button id="cptree">copy removed</button></label>
+  <div style="font-size:11px;color:#9aa4af">Use Edit landscape to move, resize, add or remove vegetation.</div>
 
   <div class="sec">vehicle</div>
   <label><button id="drive">drive the RAV4</button></label>
@@ -110,6 +112,8 @@ import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js';
+import { createLandscapeEditor } from './assets/landscape-editor.js';
+import { createLandscapeObjects } from './assets/landscape-objects.js';
 
 const M = await (await fetch('./assets/manifest.json')).json();
 let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
@@ -186,6 +190,9 @@ function buildTile(data,W,H,px,uvRect,pushBack){
 const fu=fHalf/cHalf, uv0=0.5-fu*0.5, uv1=0.5+fu*0.5;
 const coarse=buildTile(cData,M.coarse.W,M.coarse.H,M.coarse.px,[0,0,1,1],true);
 const fine  =buildTile(fData,M.fine.W,  M.fine.H,  M.fine.px,[uv0,uv0,uv1,uv1],false);
+// Remove the coarse underlay inside the fine tile so lowering fine vertices
+// exposes the edited surface, not the original terrain underneath it.
+{const old=coarse.mesh.geometry.index.array,indices=[];for(let i=0;i<old.length;i+=3){let inside=true;for(let j=0;j<3;j++){const n=old[i+j];inside&&=Math.abs(coarse.pos.getX(n))<fHalf&&Math.abs(coarse.pos.getZ(n))<fHalf;}if(!inside)indices.push(old[i],old[i+1],old[i+2]);}coarse.mesh.geometry.setIndex(indices);}
 for(const material of mats)groundDetail.attach(material);
 
 // ---- height sampling ----------------------------------------------------
@@ -206,6 +213,7 @@ function heightAt(x,z){
 
 const pondLevel=preparePond(tiles,heightAt);
 let propertyNature=null;
+let landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 
 // ---- building models ----------------------------------------------------
 const placed=[];
@@ -543,7 +551,7 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
       'void main() {\n  float _fd=lodOpacity*clamp((lodEnd-vDist)/30.,0.0,1.0); if(_ign(gl_FragCoord.xy)>_fd) discard;');
   };
 }
-(async()=>{
+const treeAssetsReady=(async()=>{
   try{
     const man=await (await fetch('./assets/trees/manifest.json?v=7')).json();
     const tl=new THREE.TextureLoader(), texCache={};
@@ -607,16 +615,20 @@ function addDitherFadeOut(mat){   // detailed material: fully solid < F0, dissol
 const _impGeo=new THREE.PlaneGeometry(1,1);   // centered, fully camera-facing multi-view billboard
 const _UP=new THREE.Vector3(0,1,0), _XAX=new THREE.Vector3(1,0,0), _q=new THREE.Quaternion();
 const _zeroMat=new THREE.Matrix4().makeScale(0,0,0);            // collapse a hidden impostor instance
-function impMatrix(t){const h=t.h||10,frame=ezPines[t.variant].impostor;_o.position.set(t.x,t.gy+h*frame.centerY,t.z);_o.quaternion.identity();_o.scale.set(h*frame.span,h*frame.span,1);_o.updateMatrix();return _o.matrix;}
+function impMatrix(t){if(t.id===landscapeHidden)return _zeroMat;const h=t.h||10,frame=ezPines[t.variant].impostor;_o.position.set(t.x,t.gy+h*frame.centerY,t.z);_o.quaternion.identity();_o.scale.set(h*frame.span,h*frame.span,1);_o.updateMatrix();return _o.matrix;}
+function detailTreeMatrix(t){
+  if(t.id===landscapeHidden)return _zeroMat;
+  _o.position.set(t.x,t.gy!=null?t.gy:heightAt(t.x,t.z),t.z);
+  if(t.editorRotation)_o.rotation.set(...t.editorRotation);
+  else{_o.quaternion.setFromAxisAngle(_UP,t.r);if(t.lean){_q.setFromAxisAngle(_XAX,t.lean);_o.quaternion.premultiply(_q);}}
+  if(t.editorScale)_o.scale.set(...t.editorScale);else _o.scale.setScalar(t.h||t.s*6.4);
+  _o.updateMatrix();return _o.matrix;
+}
 // build one detailed InstancedMesh (bark or leaf) over a list; returns {im,list} (does NOT track in treeMeshes)
 function mkInstEz(geo,mat,list){
   const im=new THREE.InstancedMesh(geo,mat,list.length);
   for(let i=0;i<list.length;i++){const t=list[i];
-    _o.position.set(t.x,t.gy!=null?t.gy:heightAt(t.x,t.z),t.z);
-    _o.quaternion.setFromAxisAngle(_UP,t.r);                              // trunk spin
-    if(t.lean){ _q.setFromAxisAngle(_XAX,t.lean); _o.quaternion.premultiply(_q); }  // world-space lean (aspens lean north, -z)
-    _o.scale.setScalar(t.h||t.s*6.4);_o.updateMatrix();                  // ez geo is unit-height → scale = real LiDAR height (m)
-    im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
+    im.setMatrixAt(i,detailTreeMatrix(t)); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
   scene.add(im); return {im,list};
 }
 // pick a pine variant by real height: tall→pine_large, short→bushy (aspens are placed as groves, not here)
@@ -641,6 +653,13 @@ function inBuilding(x,z){                                          // LiDAR read
   return false;
 }
 function buildTreesFrom(n){
+  if(landscapeRecords){
+    const all=landscapeRecords.filter(o=>o.asset.startsWith('tree/')),lidar=all.filter(o=>o.id.startsWith('lidar:'));
+    const count=Math.min(lidar.length,Math.round(lidar.length*n/Math.max(1,realXZ.length/3))),chosen=new Set();
+    for(let i=0;i<count;i++)chosen.add(lidar[Math.floor(i*lidar.length/count)].id);
+    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],tint:o.tint,editorRotation:o.rotation,editorScale:o.scale}));
+    buildTreeMesh();return;
+  }
   const total=realXZ.length/3; n=Math.min(n,total);
   const stride=n>0?total/n:1, R=rng(12345); trees=[];
   for(let k=0;k<n;k++){const idx=Math.floor(k*stride);
@@ -670,12 +689,14 @@ const _lodPrev=new THREE.Vector3(1e9,0,1e9);
 function assignVariants(){   // decide each tree's detailed pine type once (driveway→bushy, near-build mix, else by height)
   const iL=ezPines.findIndex(v=>v.name==='pine_large'), iB=ezPines.findIndex(v=>v.name==='pine_bush');
   for(const t of trees){ const nb=isNearBuild(t.x,t.z), h=t.h||0;
+    if(t.asset){t.variant=ezPines.findIndex(v=>v.name===t.asset);continue;}
     t.variant = (!nb && distDriveway(t.x,t.z)<DRIVE_W) ? (iB>=0?iB:0)
               : nb ? ezVariantFor(t)
               : (h<=9 ? (iB>=0?iB:0) : (iL>=0?iL:0));
     t.lean=0; }
 }
 function buildGroves(){      // aspen groves — small, north-leaning, green; always detailed (few trees, fixed spots)
+  if(landscapeRecords)return; // edited groves use the same matching tree/impostor path
   const iA=ezPines.findIndex(v=>v.name==='aspen'); if(iA<0) return;
   const list=[], g=rng(9001);
   for(const [cx,cz] of ASPEN_GROVES){ const nA=6+((g()*4)|0);
@@ -689,7 +710,7 @@ function buildTreeMesh(){
   for(const {im} of treeMeshes){scene.remove(im); im.dispose();} treeMeshes=[];
   for(const m of detMeshes){scene.remove(m.im); m.im.dispose();} detMeshes=[];
   for(const m of groveMeshes){scene.remove(m.im); m.im.dispose();} groveMeshes=[];
-  if(impMesh){ scene.remove(impMesh); impMesh.dispose(); impMesh=null; } detailSet=new Set();
+  if(impMesh){ scene.remove(impMesh);impMesh.geometry.dispose(); impMesh.dispose(); impMesh=null; } detailSet=new Set();
   const S=STYLES[treeStyle];
   if(!(ezPines && ezPines.length && ezImpostor)){                   // fallback: old near/far split with the hand-made pine
     const near=[], far=[];
@@ -731,7 +752,7 @@ function updateTreeLOD(force){
   for(const i of near){ const t=trees[i]; buckets[t.variant].push(t); }
   ezPines.forEach((v,idx)=>{ if(buckets[idx].length){ detMeshes.push(mkInstEz(v.bark,v.barkMat,buckets[idx])); detMeshes.push(mkInstEz(v.leaf,v.leafMat,buckets[idx])); } });
 }
-(async()=>{
+const lidarReady=(async()=>{
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
   sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
@@ -823,8 +844,8 @@ function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.le
 function applyVex(v){
   VEX=v;
   propertyNature?.setVerticalScale(v);
-  for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();}
-  for(const o of placed) o.group.position.y=heightAt(o.x,o.z);
+  for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();t.mesh.geometry.computeBoundingBox();t.mesh.geometry.computeBoundingSphere();}
+  for(const o of placed) o.group.position.y=o.foundationY!=null?o.foundationY*v:heightAt(o.x,o.z);
   for(const {im,list} of treeMeshes){for(let i=0;i<list.length;i++){const t=list[i];
     _o.position.set(t.x,heightAt(t.x,t.z),t.z);_o.rotation.set(0,t.r,0);_o.scale.setScalar(t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
     im.instanceMatrix.needsUpdate=true;}
@@ -832,6 +853,7 @@ function applyVex(v){
     _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
     im.instanceMatrix.needsUpdate=true;}
   if(marker) marker.position.y=heightAt(marker.position.x,marker.position.z)+2;
+  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);landscape?.refresh();}
 }
 
 // ---- tap to inspect + move marker --------------------------------------
@@ -849,11 +871,12 @@ function selectRec(rec){ sel=rec; const g=rec.group, deg=Math.round(((THREE.Math
   document.getElementById('head').value=deg; document.getElementById('headv').textContent=deg+'°';
   document.getElementById('size').value=+g.scale.x.toFixed(2); document.getElementById('sizev').textContent=g.scale.x.toFixed(2)+'×';
   updateSelInfo(); }
-function nudge(de,dn){ if(!sel)return; sel.x+=de; sel.z-=dn; sel.group.position.set(sel.x,heightAt(sel.x,sel.z),sel.z); updateSelInfo(); }
+function nudge(de,dn){ if(!sel)return; sel.x+=de; sel.z-=dn; sel.group.position.set(sel.x,heightAt(sel.x,sel.z),sel.z);sel.foundationY=sel.group.position.y/VEX; updateSelInfo(); }
 function dumpLayout(){ return placed.map(o=>({type:o.type, E:+o.x.toFixed(1), N:+(-o.z).toFixed(1),
   heading:Math.round(((THREE.MathUtils.radToDeg(o.group.rotation.y))%360+360)%360), scale:+o.group.scale.x.toFixed(2)})); }
 
 renderer.domElement.addEventListener('pointerdown',ev=>{
+  if(landscape?.active)return;
   evNdc(ev);
   if(routeAdd){const h=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(h) addWaypoint(h.point.x,h.point.z); return;}
   if(driveMode) return;                                            // no building editing while driving
@@ -874,11 +897,12 @@ renderer.domElement.addEventListener('pointerdown',ev=>{
   info.innerHTML=`marker<br>E ${east.toFixed(1)} m · N ${north.toFixed(1)} m<br>elev ${elev.toFixed(0)} m (${(elev*3.28084).toFixed(0)} ft)<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
 });
 renderer.domElement.addEventListener('pointermove',ev=>{
+  if(landscape?.active)return;
   if(!dragging) return;
   evNdc(ev);
   const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
   dragging.x=hit.point.x; dragging.z=hit.point.z;
-  dragging.group.position.set(dragging.x,heightAt(dragging.x,dragging.z),dragging.z); updateSelInfo();
+  dragging.group.position.set(dragging.x,heightAt(dragging.x,dragging.z),dragging.z);dragging.foundationY=dragging.group.position.y/VEX; updateSelInfo();
 });
 addEventListener('pointerup',()=>{ if(dragging){dragging=null; controls.enabled=true;} });
 
@@ -919,13 +943,13 @@ car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=
 
 let driveMode=false, carMode='idle';        // carMode: idle | manual | route
 const KEY={};
-addEventListener('keydown',e=>{const k=e.key.toLowerCase(); KEY[k]=true; if(driveMode&&k.startsWith('arrow'))e.preventDefault();});
+addEventListener('keydown',e=>{if(e.defaultPrevented||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;const k=e.key.toLowerCase(); KEY[k]=true; if(driveMode&&k.startsWith('arrow'))e.preventDefault();});
 addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;});
 
 // ---- route waypoints ----
 let routePts=DRIVEWAY.map(p=>({...p})), routeIdx=0, routeAdd=false, routeObj=null;
 function drawRoute(){
-  if(routeObj) scene.remove(routeObj);
+  if(routeObj){scene.remove(routeObj);routeObj.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});}
   routeObj=new THREE.Group();
   if(routePts.length){
     const pts=routePts.map(p=>new THREE.Vector3(p.x,heightAt(p.x,p.z)+1.2,p.z));
@@ -954,6 +978,7 @@ renderer.domElement.addEventListener('wheel',e=>{ if(driveMode){e.preventDefault
 // ---- drive + intro cinematic ----
 let introT=0, introActive=false; const introDur=4.5;
 function beginDrive(mode){
+  if(landscape?.active)landscape.setActive(false);
   document.getElementById('coordinateMode').checked=false;marker.visible=false;routeAdd=false;
   document.getElementById('radd').textContent='add waypoints';routeObj.visible=document.getElementById('routeGuides').checked;
   driveMode=true; carMode=mode; controls.enabled=false; introActive=false;
@@ -1032,8 +1057,6 @@ $('bbSize').oninput=e=>{const v=+e.target.value; $('bbSizev').textContent=v.toFi
 $('bbY').oninput=e=>{const v=+e.target.value; $('bbYv').textContent=v.toFixed(2); if(impYU)impYU.value=v;};
 $('treeStyle').onchange=e=>setTreeStyle(e.target.value);
 $('reseed').onclick=()=>buildTreesFrom(+$('treeN').value);
-$('rmtree').onclick=()=>{ if(selTree){const id=selTree.id; removedTrees.add(id); selTree=null; buildTreesFrom(+$('treeN').value); info.innerHTML='removed tree #'+id;} else info.innerHTML='click a tree first'; };
-$('cptree').onclick=()=>{ $('dump').value=JSON.stringify([...removedTrees]); try{navigator.clipboard.writeText($('dump').value);}catch(e){} info.innerHTML=removedTrees.size+' removed ids copied'; };
 $('drive').onclick=()=> driveMode?endDrive():beginDrive('manual');
 $('routeGuides').onchange=()=>{routeObj.visible=$('routeGuides').checked||routeAdd;};
 $('radd').onclick=()=>{routeAdd=!routeAdd;if(routeAdd){endDrive();$('coordinateMode').checked=false;marker.visible=false;}routeObj.visible=$('routeGuides').checked||routeAdd; $('radd').textContent=routeAdd?'tap terrain… (done)':'add waypoints';};
@@ -1101,6 +1124,7 @@ let qualityTransition=null,qualityLevel=1,qualityLoading=false;
 function applyQuality(level){
   qualityLevel=level;const q=QUALITY_LEVELS[level];
   propertyNature.setQuality(level,q.density);
+  landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;lodUniforms.lodEnd.value=q.distance;
   renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
   for(const {im,list} of groundMeshes){
@@ -1127,6 +1151,7 @@ THREE.DefaultLoadingManager.onLoad=()=>{qualityLoading=false;quality.reset();};
 document.addEventListener('visibilitychange',()=>quality.reset());
 addEventListener('resize',()=>{renderer.setPixelRatio(Math.min(devicePixelRatio,QUALITY_LEVELS[qualityLevel].pixelRatio));quality.reset();});
 function updateQuality(seconds,dt){
+  if(landscape?.active)return;
   if(qualityTransition){
     const t=qualityTransition;t.time+=dt;
     if(t.time>=.275&&!t.applied){applyQuality(t.level);t.applied=true;}
@@ -1136,7 +1161,54 @@ function updateQuality(seconds,dt){
   }
   quality.sample(seconds,!document.hidden&&!qualityLoading&&treeAssetsSettled&&lidarSettled);
 }
-const AUTO_INTRO=true; if(AUTO_INTRO) playIntro();   // start with the car driving down the road
+const landscapeReady=(async()=>{
+  await Promise.all([treeAssetsReady,lidarReady]);
+  if(!ezPines||!ezImpostor||!realXZ.length)throw Error('Tree models or placement data could not load.');
+  buildTreesFrom(realXZ.length/3); // stable full baseline, even if the density slider changed during loading
+  const catalog=new Map(),base=[];
+  function asset(key,label,parts,scale){catalog.set(key,{label,parts,defaults:{asset:key,x:0,z:0,offset:0,rotation:[0,0,0],scale,tint:1}});}
+  for(const v of ezPines){const h=v.name==='pine_large'?14:v.name==='aspen'?8:7;asset('tree/'+v.name,{pine_large:'Tall pine',pine_bush:'Bushy pine',aspen:'Aspen'}[v.name]||v.name,[{geometry:v.bark,material:v.barkMat},{geometry:v.leaf,material:v.leafMat}],[h,h,h]);}
+  rockGeos.forEach((geometry,i)=>asset('rock/'+[11,27,43,61][i],'Rock '+(i+1),[{geometry,material:rockMat}],[.8,.68,.8]));
+  shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
+  if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
+  if(propertyNature.models.sage.length)asset('bush/sage','Sagebrush',propertyNature.models.sage,[1,1,1]);
+  const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
+  for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+ezPines[t.variant].name,t,[t.h,t.h,t.h]));
+  const seenGroves=new Set();let groveId=0;
+  for(const entry of groveMeshes)for(const t of entry.list)if(!seenGroves.has(t)){seenGroves.add(t);base.push(row('grove:'+groveId++,'tree/aspen',t,[t.h,t.h,t.h],[t.lean||0,t.r,0]));}
+  const seenGround=new Set();
+  for(const entry of groundMeshes){const type=[...catalog].find(([key,a])=>!key.startsWith('tree/')&&a.parts.some(p=>p.geometry===entry.im.geometry))?.[0];if(!type)continue;
+    for(const t of entry.list){const id=type+':'+t.x.toFixed(5)+':'+t.z.toFixed(5);if(seenGround.has(id))continue;seenGround.add(id);base.push(row(id,type,t,[t.s,t.s*(t.sy||1),t.s],[t.rx||0,t.r,0],t.dy||0));}
+  }
+  for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
+  const reference={center:M.center,globalMin:gmin,grid:{W:fine.W,H:fine.H,px:fine.px}};
+  for(const o of placed)o.foundationY=o.group.position.y/VEX;
+  let detached=false;
+  const bridge={heightAt,
+    apply(records,authored){
+      if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
+      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);buildTreesFrom(+$('treeN').value);
+    },
+    hide(id){
+      if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
+      for(const key of [old,id]){if(key==null)continue;const i=trees.findIndex(t=>t.id===key);if(i>=0&&impMesh){impMesh.setMatrixAt(i,impMatrix(trees[i]));impMesh.instanceMatrix.needsUpdate=true;}
+        for(const entry of detMeshes){const j=entry.list.findIndex(t=>t.id===key);if(j>=0){entry.im.setMatrixAt(j,detailTreeMatrix(entry.list[j]));entry.im.instanceMatrix.needsUpdate=true;entry.im.computeBoundingSphere();}}
+      }
+    },
+    terrainChanged(){propertyNature.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
+    groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
+    hideBuildings(hide){for(const o of placed)o.group.visible=!hide;},
+    visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
+  };
+  const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,
+    enter(){const target=controls.target.clone();endDrive();controls.target.copy(target);dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;lodUniforms.lodOpacity.value=1;quality.reset();setPanel(false);},
+    leave(){quality.reset(3);setPanel(true);},
+  });
+  landscape=result;$('editLandscape').disabled=false;$('editLandscape').textContent='Edit landscape';$('editLandscape').onclick=()=>landscape.setActive(true);
+  if(new URLSearchParams(location.search).has('edit')){landscape.setActive(true);document.getElementById('leHouse').click();}
+  return result;
+})().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
+const AUTO_INTRO=!new URLSearchParams(location.search).has('edit'); if(AUTO_INTRO) playIntro();   // start with the car driving down the road
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
@@ -1144,6 +1216,7 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   updateCar(dt); if(!driveMode){ panCam(dt); controls.update(); }
   if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
   propertyNature.update(now/1000,cam);
+  landscapeLayer?.update(cam);
   updateTreeLOD();                                  // swap detailed↔billboard by distance from the camera
   const v=new THREE.Vector3(0,0,-1).project(cam);
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';

@@ -1,0 +1,25 @@
+{
+  "format": "montana-landscape",
+  "version": 1,
+  "revision": "property-20261006",
+  "reference": {
+    "center": {
+      "lat": 45.20698129486063,
+      "lon": -110.93290865837672
+    },
+    "globalMin": 1666.4581298828125,
+    "grid": {
+      "W": 512,
+      "H": 512,
+      "px": 0.9786283004524421
+    }
+  },
+  "objects": {
+    "overrides": [],
+    "added": [],
+    "removed": []
+  },
+  "terrain": {
+    "heights": []
+  }
+}
