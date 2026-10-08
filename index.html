@@ -114,6 +114,7 @@ import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
+import { RouteDriver,dampFactor } from './assets/route-driving.mjs';
 
 const M = await (await fetch('./assets/manifest.json')).json();
 let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
@@ -947,7 +948,7 @@ addEventListener('keydown',e=>{if(e.defaultPrevented||/INPUT|TEXTAREA|SELECT/.te
 addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;});
 
 // ---- route waypoints ----
-let routePts=DRIVEWAY.map(p=>({...p})), routeIdx=0, routeAdd=false, routeObj=null;
+let routePts=DRIVEWAY.map(p=>({...p})), routeDriver=null, routeAdd=false, routeObj=null;
 function drawRoute(){
   if(routeObj){scene.remove(routeObj);routeObj.traverse(o=>{o.geometry?.dispose();if(o.material)o.material.dispose();});}
   routeObj=new THREE.Group();
@@ -960,69 +961,59 @@ function drawRoute(){
   scene.add(routeObj);
 }
 function addWaypoint(x,z){ routePts.push({x,z}); drawRoute(); }
-function clearRoute(){ routePts=[]; routeIdx=0; drawRoute(); }
+function clearRoute(){if(carMode==='route')endDrive();routePts=[];routeDriver=null;drawRoute();}
 drawRoute();   // show the baked default route
 
 // ---- chase camera (lines up behind the car) ----
 const _fwd=new THREE.Vector3(),_des=new THREE.Vector3(),_look=new THREE.Vector3();
 let chaseDist=12, chaseHi=5;
-function chaseCam(blend){
+function chaseCam(blend,lookBlend=blend){
   _fwd.set(Math.sin(car.heading),0,Math.cos(car.heading));
   const y=heightAt(car.x,car.z);
   _des.set(car.x-_fwd.x*chaseDist, y+chaseHi, car.z-_fwd.z*chaseDist);
   _look.set(car.x+_fwd.x*3, y+1.3, car.z+_fwd.z*3);
-  cam.position.lerp(_des,blend); cam.lookAt(_look); controls.target.copy(_look);
+  cam.position.lerp(_des,blend);controls.target.lerp(_look,lookBlend);cam.lookAt(controls.target);
 }
 renderer.domElement.addEventListener('wheel',e=>{ if(driveMode){e.preventDefault(); chaseDist=Math.max(5,Math.min(45,chaseDist+e.deltaY*0.02));}},{passive:false});
 
 // ---- drive + intro cinematic ----
 let introT=0, introActive=false; const introDur=4.5;
 function beginDrive(mode){
+  if(mode==='route'){routeDriver=new RouteDriver(routePts);if(routeDriver.done){info.textContent='Need two distinct waypoints to drive a route.';return false;}}
   if(landscape?.active)landscape.setActive(false);
   document.getElementById('coordinateMode').checked=false;marker.visible=false;routeAdd=false;
   document.getElementById('radd').textContent='add waypoints';routeObj.visible=document.getElementById('routeGuides').checked;
   driveMode=true; carMode=mode; controls.enabled=false; introActive=false;
   document.getElementById('drive').textContent='exit drive';
-  if(mode==='route'&&routePts.length){ car.x=routePts[0].x; car.z=routePts[0].z; routeIdx=1;
-    if(routePts[1]) car.heading=Math.atan2(routePts[1].x-car.x,routePts[1].z-car.z); car.speed=5; }
-  if(mode==='manual') chaseCam(1);
+  if(mode==='route'){for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=0;}
+  chaseCam(1);return true;
 }
 function endDrive(){ driveMode=false; carMode='idle'; introActive=false; controls.enabled=true;
   controls.target.set(0,heightAt(0,0),0); controls.update();
   document.getElementById('drive').textContent='drive the RAV4'; }
 function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypoints first';return;}
-  beginDrive('route'); const y=heightAt(car.x,car.z); cam.position.set(car.x+35,y+55,car.z+35); introActive=true; introT=0; }
+  if(!beginDrive('route'))return;const y=heightAt(car.x,car.z);cam.position.set(car.x+35,y+55,car.z+35);introActive=true;introT=0; }
 
 function updateCar(dt){
   if(!driveMode) return;
-  let steerTarget=0;
+  let travel=0;
   if(carMode==='manual'){
     const f=(KEY['arrowup']||KEY['w']?1:0)-(KEY['arrowdown']||KEY['s']?1:0);
     car.speed+=f*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
     const s=(KEY['arrowleft']||KEY['a']?1:0)-(KEY['arrowright']||KEY['d']?1:0);
-    steerTarget=s*.48;
-    car.heading+=s*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
+    carSteering+=(s*.48-carSteering)*dampFactor(5,dt);
+    car.heading+=carSteering/.48*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
+    travel=car.speed*dt;car.x+=Math.sin(car.heading)*travel;car.z+=Math.cos(car.heading)*travel;
   } else if(carMode==='route'){
-    let tgt=routePts[Math.min(routeIdx,routePts.length-1)];
-    let dx=tgt.x-car.x, dz=tgt.z-car.z, dist=Math.hypot(dx,dz);
-    const passed=(dx*Math.sin(car.heading)+dz*Math.cos(car.heading))<0;   // waypoint is behind us
-    if(dist<6 || (passed && dist<12)){                                   // hug the waypoint before advancing
-      if(routeIdx<routePts.length-1){ routeIdx++; tgt=routePts[routeIdx]; dx=tgt.x-car.x; dz=tgt.z-car.z; dist=Math.hypot(dx,dz); }
-      else { carMode='manual'; introActive=false; }                       // end of road → you take over
-    }
-    let dh=Math.atan2(dx,dz)-car.heading; dh=Math.atan2(Math.sin(dh),Math.cos(dh));
-    steerTarget=Math.max(-.48,Math.min(.48,Math.atan(2.7*THREE.MathUtils.clamp(dh,-1.3,1.3)/Math.max(1,Math.abs(car.speed)))));
-    car.heading+=Math.max(-1.3*dt,Math.min(1.3*dt,dh));                   // slower, smoother turns
-    car.speed+=((Math.abs(dh)>0.8?5:9)-car.speed)*1.6*dt;                 // ease off for sharp turns
+    travel=routeDriver.update(dt);for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=routeDriver.steering;
+    if(routeDriver.done){carMode='manual';introActive=false;}
   }
-  car.x+=Math.sin(car.heading)*car.speed*dt; car.z+=Math.cos(car.heading)*car.speed*dt;
   const y=heightAt(car.x,car.z);
   car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
-  carSteering=THREE.MathUtils.lerp(carSteering,steerTarget,1-Math.exp(-10*dt));
-  if(rav4Rig)rav4Rig.update(carSteering,car.speed*dt);
-  else {const spin=car.speed*dt/0.36;for(const w of wheels)w.rotation.x+=spin;}
-  if(introActive){ introT+=dt; chaseCam(Math.min(0.15,0.02+0.13*(introT/introDur))); if(introT>=introDur) introActive=false; }
-  else chaseCam(0.12);
+  if(rav4Rig)rav4Rig.update(carSteering,travel);
+  else {const spin=travel/0.36;for(const w of wheels)w.rotation.x+=spin;}
+  if(introActive){introT+=dt;chaseCam(dampFactor(1.2+3.8*Math.min(1,introT/introDur),dt),dampFactor(7,dt));if(introT>=introDur)introActive=false;}
+  else chaseCam(dampFactor(5,dt),dampFactor(7,dt));
 }
 
 // ---- photo-match camera -------------------------------------------------
@@ -1213,7 +1204,7 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
   updateQuality(elapsed,dt);
-  updateCar(dt); if(!driveMode){ panCam(dt); controls.update(); }
+  updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
   if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
   propertyNature.update(now/1000,cam);
   landscapeLayer?.update(cam);

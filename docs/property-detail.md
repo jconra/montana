@@ -52,11 +52,25 @@ are hidden during normal viewing; the route editor can show them. The large
 coordinate cone is also hidden until **inspect coordinates** is enabled.
 Starting a drive exits coordinate inspection and waypoint editing.
 
+Route driving follows a moving look-ahead point along the driveway. Steering
+eases in and out, speed reduces before bends, and the car stops at the final
+waypoint before handing over to manual controls. Front wheels follow the same
+steering used to turn the car. Chase-camera position and aim use time-based
+damping, so the view stays smooth across different frame rates. Clearing an
+active route stops the drive safely.
+
+The October 8 landscape defaults apply the supplied export verbatim: seven
+tree/rock/sage placements and 861 terrain vertices around the house. An existing
+browser draft still takes precedence; use **Reset to published defaults** in the
+landscape editor to see the published version without that draft.
+
 Validation:
 
 - `node tests/property-layout.test.mjs`
 - `node tests/adaptive-quality.test.mjs`
 - `node tests/main-impostors.test.mjs`
+- `node tests/route-driving.test.mjs` (full driveway tracking, steering bounds,
+  10/30/60 fps trajectories, endpoint stop, and empty/duplicate waypoints)
 - Browser render checks in WebGL1 and WebGL2; verify camera presets, adaptive
   plant counts, pond/tree exclusions, and vertical-scale alignment.
 - Sagebrush: inspect from multiple angles; check that branches/leaves stay
