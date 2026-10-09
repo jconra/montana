@@ -1,0 +1,128 @@
+[
+  {
+    "id": "house-drone",
+    "label": "House front \u00b7 drone",
+    "file": "./assets/reference/Photo_6553709_DJI_109_jpg_4376199_0_2021627181058_photo_original.jpg",
+    "original": "Photo_6553709_DJI_109_jpg_4376199_0_2021627181058_photo_original.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": "house-drone"
+  },
+  {
+    "id": "overhead",
+    "label": "Property layout \u00b7 straight down",
+    "file": "./assets/reference/Photo_6553721_DJI_121_jpg_4333389_0_2021628133624_photo_original.jpg",
+    "original": "Photo_6553721_DJI_121_jpg_4333389_0_2021628133624_photo_original.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "garage-front",
+    "label": "Garage front \u00b7 July 2025",
+    "file": "./assets/reference/20250705_120430.jpg",
+    "original": "20250705_120430.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "buildings-green",
+    "label": "House and garage \u00b7 green season",
+    "file": "./assets/reference/20250705_153226.jpg",
+    "original": "20250705_153226.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "east",
+    "label": "Clearing facing east",
+    "file": "./assets/reference/montanaFacingEast.jpg",
+    "original": "montanaFacingEast.jpg",
+    "width": 1657,
+    "height": 1243,
+    "view": null
+  },
+  {
+    "id": "campfire",
+    "label": "Fire pit close view",
+    "file": "./assets/reference/montanaCampfire.jpg",
+    "original": "montanaCampfire.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "bottom-drive",
+    "label": "Bottom driveway \u00b7 sagebrush",
+    "file": "./assets/reference/montanaBottomDriveway.jpg",
+    "original": "montanaBottomDriveway.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "house-cabin",
+    "label": "House facing cabin",
+    "file": "./assets/reference/montanaHouseFacingCabin.jpg",
+    "original": "montanaHouseFacingCabin.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": "house-cabin"
+  },
+  {
+    "id": "garage-camp",
+    "label": "Garage facing southeast \u00b7 approach",
+    "file": "./assets/reference/montanaGarageFaceSouthEast.jpg",
+    "original": "montanaGarageFaceSouthEast.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": "garage-camp"
+  },
+  {
+    "id": "garage-back",
+    "label": "Behind garage",
+    "file": "./assets/reference/montanaBehindGarage.jpg",
+    "original": "montanaBehindGarage.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "above-house",
+    "label": "Above house facing south",
+    "file": "./assets/reference/montanaAboveHouseFacingSouth.jpg",
+    "original": "montanaAboveHouseFacingSouth.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "cabin-southwest",
+    "label": "Facing cabin southwest",
+    "file": "./assets/reference/montanaFacingCabinLookingSouthWest.jpg",
+    "original": "montanaFacingCabinLookingSouthWest.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "firepit-northeast",
+    "label": "Fire pit toward Emigrant Peak",
+    "file": "./assets/reference/montanaAtFirepitFacingNorthEastTowardsEmigrantPeak.jpg",
+    "original": "montanaAtFirepitFacingNorthEastTowardsEmigrantPeak.jpg",
+    "width": 2048,
+    "height": 1536,
+    "view": null
+  },
+  {
+    "id": "house-east",
+    "label": "House, propane tank and clearing \u00b7 drone",
+    "file": "./assets/reference/montanaHouseAndClearingDrone.png",
+    "original": "image(2).png",
+    "width": 1781,
+    "height": 1002,
+    "view": "house-east"
+  }
+]

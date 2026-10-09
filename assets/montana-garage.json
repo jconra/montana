@@ -1,0 +1,245 @@
+{
+  "floors": [
+    {
+      "outline": [
+        [
+          -13,
+          -15
+        ],
+        [
+          13,
+          -15
+        ],
+        [
+          13,
+          15
+        ],
+        [
+          -13,
+          15
+        ]
+      ],
+      "h": 10,
+      "walls": [],
+      "openings": [
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 0.8,
+          "w": 17.5,
+          "y0": 0,
+          "y1": 8.5,
+          "type": "garage",
+          "mat": 3
+        },
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 20.7,
+          "w": 3,
+          "y0": 0,
+          "y1": 7,
+          "type": "door",
+          "closed": true,
+          "mat": 1
+        },
+        {
+          "on": "outline",
+          "edge": 0,
+          "off": 3.5,
+          "w": 4,
+          "y0": 3,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 1,
+          "off": 9,
+          "w": 4,
+          "y0": 3,
+          "y1": 6.5,
+          "type": "window"
+        }
+      ],
+      "mats": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0
+      },
+      "matsIn": {},
+      "voids": [],
+      "floorMat": 3
+    },
+    {
+      "outline": [
+        [
+          -13,
+          -15
+        ],
+        [
+          13,
+          -15
+        ],
+        [
+          13,
+          15
+        ],
+        [
+          -13,
+          15
+        ]
+      ],
+      "h": 9,
+      "walls": [],
+      "openings": [
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 4,
+          "w": 4,
+          "y0": 2.5,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 11.5,
+          "w": 3,
+          "y0": 0.2,
+          "y1": 7,
+          "type": "door",
+          "closed": true,
+          "mat": 1
+        },
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 18,
+          "w": 4,
+          "y0": 2.5,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 0,
+          "off": 3,
+          "w": 5.5,
+          "y0": 2.5,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 0,
+          "off": 18,
+          "w": 3,
+          "y0": 4,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 1,
+          "off": 9,
+          "w": 4,
+          "y0": 2.5,
+          "y1": 6.5,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 3,
+          "off": 9,
+          "w": 4,
+          "y0": 2.5,
+          "y1": 6.5,
+          "type": "window"
+        }
+      ],
+      "mats": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0
+      },
+      "matsIn": {},
+      "voids": [],
+      "floorMat": 3
+    }
+  ],
+  "roof": null,
+  "roofPieces": [
+    {
+      "x": 0,
+      "z": 0,
+      "w": 26,
+      "d": 30,
+      "base": 19,
+      "style": "gable",
+      "pitch": 0.7,
+      "mat": 2,
+      "gableMat": 0,
+      "flipRidge": false,
+      "raiseWalls": false
+    }
+  ],
+  "stairs": [],
+  "palette": [
+    "#827a63",
+    "#e3e4db",
+    "#747781",
+    "#76746e",
+    "#bf995e",
+    "#282c2e"
+  ],
+  "palTex": [
+    "wood",
+    "",
+    "metal",
+    "",
+    "wood",
+    ""
+  ],
+  "colors": {
+    "wall": "#827a63",
+    "roof": "#515563",
+    "trim": "#e3e4db"
+  },
+  "windowFrames": true,
+  "details": [
+    {
+      "type": "balcony",
+      "name": "Front balcony",
+      "x": 0,
+      "y": 10,
+      "z": 18,
+      "w": 26.5,
+      "h": 3.2,
+      "d": 6,
+      "mat": 4,
+      "railMat": 5,
+      "floor": 0
+    },
+    {
+      "type": "skylight",
+      "name": "Garage skylight",
+      "x": 7,
+      "y": 24.1,
+      "z": 0,
+      "w": 2.8,
+      "h": 0.25,
+      "d": 4,
+      "rotation": [
+        0,
+        0,
+        -31.3
+      ],
+      "mat": 1,
+      "floor": 1
+    }
+  ]
+}

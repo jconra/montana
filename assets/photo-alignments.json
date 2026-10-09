@@ -1,0 +1,74 @@
+{
+  "format": "montana-photo-alignments",
+  "version": 1,
+  "alignments": [
+    {
+      "photo": "house-drone",
+      "label": "House · front drone",
+      "position": [
+        15.5437,
+        150.3768,
+        48.1141
+      ],
+      "target": [
+        12.2452,
+        136.162,
+        10.8708
+      ],
+      "fov": 33.062,
+      "aspect": 1.7777777777777777,
+      "roll": 0
+    },
+    {
+      "photo": "garage-camp",
+      "label": "Garage → fire pit",
+      "position": [
+        -24,
+        126.5,
+        -4
+      ],
+      "target": [
+        -24,
+        124.5,
+        32
+      ],
+      "fov": 65,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "photo": "house-cabin",
+      "label": "House → cabin",
+      "position": [
+        -3,
+        127.6,
+        -2
+      ],
+      "target": [
+        -32,
+        126.5,
+        19
+      ],
+      "fov": 65,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "photo": "house-east",
+      "label": "House, tank & clearing",
+      "position": [
+        70,
+        149,
+        17
+      ],
+      "target": [
+        -4,
+        127,
+        12
+      ],
+      "fov": 52,
+      "aspect": 1.7777777777777777,
+      "roll": 0
+    }
+  ]
+}

@@ -15,7 +15,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  panel.innerHTML=`<div class="le-title"><h2>Landscape editor</h2><button id="leClose" title="Close editor">Done</button></div>
  <div class="le-row"><button id="leObjects" aria-pressed="true">Objects</button><button id="leTerrain" aria-pressed="false">Terrain</button></div>
  <div class="le-row"><button id="leHouse">House view</button><button id="leTop">Top view</button></div>
- <div id="leObjectTools"><label>Select type<select id="leFilter"><option value="">All objects</option><option value="tree/">Trees</option><option value="rock/">Rocks</option><option value="bush/">Bushes</option></select></label>
+ <div id="leObjectTools"><label>Select type<select id="leFilter"><option value="">All objects</option><option value="tree/">Trees</option><option value="rock/">Rocks</option><option value="bush/">Bushes</option><option value="prop/">Property props</option></select></label>
  <p class="le-help">Click an object to select it. Drag the selected object to move it along the ground. Right-drag to pan; drag empty space to orbit.</p>
  <div id="leSelection">Nothing selected</div>
  <fieldset id="leTransform" disabled style="border:0;padding:0;margin:0"><div class="le-row"><label>East X (m)<input id="leX" type="number" step="0.1" min="-749" max="749"></label><label>North (m)<input id="leNorth" type="number" step="0.1" min="-749" max="749"></label></div>

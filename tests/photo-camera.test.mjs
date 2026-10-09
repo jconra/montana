@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {parseAlignments,validCamera} from '../assets/photo-camera.mjs';
+import {campSurface,HORSESHOES} from '../assets/camp-approach.mjs';
+const view={photo:'house-drone',position:[15,150,48],target:[12,136,11],fov:33,aspect:16/9,roll:3};
+const known=new Set(['house-drone','garage-camp']);
+const bundle={format:'montana-photo-alignments',version:1,alignments:[view,{...view,photo:'garage-camp',aspect:4/3}]};
+assert.deepEqual(parseAlignments(bundle,known),bundle.alignments);
+assert.ok(validCamera(view));
+for(const change of [{position:[null,0,0]},{position:[NaN,0,0]},{target:view.position},{fov:0},{aspect:0},{roll:Infinity}])assert.ok(!validCamera({...view,...change}));
+assert.throws(()=>parseAlignments({...bundle,alignments:[view,{...view,photo:'unknown'}]},known));
+assert.throws(()=>parseAlignments({...bundle,alignments:[view,view]},known));
+assert.ok(campSurface(-18,-1).gravel>.9,'garage apron is worn');
+assert.ok(campSurface(-23,29).gravel<.13,'gravel fades into the camp lawn');
+assert.equal(campSurface(-23,29).lawn,1);
+assert.equal(campSurface(50,-80).lawn,0,'the approach does not mow distant hills');
+for(const p of HORSESHOES)assert.equal(campSurface(p.x,p.z).lawn,1,'pits sit in short lawn');
+console.log('Camera validation, per-photo imports and garage-to-camp surface transitions passed');

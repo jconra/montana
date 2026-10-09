@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,smooth} from './property-layout.mjs';
 import {loadSagebrush} from './sagebrush.js';
+import {campSurface,HORSESHOES} from './camp-approach.mjs';
+import {rockGeometry} from './ground-detail.js';
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.92});
 const wood=mat(0x827053),endWood=mat(0xb39a70),dark=mat(0x302c24),stone=mat(0x777468);
@@ -24,17 +26,33 @@ function mergeGroup(group){
 function picnic(){const g=new THREE.Group();
  for(let i=0;i<5;i++)box(g,[2.25,.065,.145],[0,.77,(i-2)*.16],wood);
  for(const side of [-1,1])for(let p=0;p<2;p++)box(g,[2.3,.06,.16],[0,.43,side*(.69+p*.17)],wood);
- for(const x of [-.78,.78]){for(const side of [-1,1])box(g,[.095,.85,.095],[x,.38,side*.38],wood,[side*.48,0,0]);box(g,[.12,.1,1.95],[x,.36,0],wood);}
- box(g,[1.6,.07,.07],[0,.52,0],wood);mergeGroup(g);return g;}
+ const frame=mat(0x252a28);
+ for(const x of [-.78,.78]){
+  const points=[[-.85,.05],[-.9,.1],[-.74,.39],[-.46,.48],[-.27,.73],[.27,.73],[.46,.48],[.74,.39],[.9,.1],[.85,.05]].map(([z,y])=>new THREE.Vector3(x,y,z));
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),28,.024,6,false),frame));
+  box(g,[.06,.045,1.65],[x,.405,0],frame);
+ }
+ box(g,[1.6,.045,.045],[0,.52,0],frame);mergeGroup(g);return g;}
 function chair(color){const g=new THREE.Group(),m=mat(color);
  for(let i=0;i<5;i++){box(g,[.09,.05,.48],[(i-2)*.1,.36,.05],m);box(g,[.095,.63,.045],[(i-2)*.1,.67,-.2],m,[-.22,0,0]);}
  for(const x of [-.29,.29]){box(g,[.05,.48,.055],[x,.23,.2],m);box(g,[.05,.51,.055],[x,.23,-.2],m,[-.16,0,0]);box(g,[.095,.045,.62],[x,.56,.03],m);}
  mergeGroup(g);return g;}
 function firepit(){const g=new THREE.Group(),R=rng(501);
  const ash=new THREE.Mesh(new THREE.CircleGeometry(1.03,24),mat(0x49443b));ash.rotation.x=-Math.PI/2;ash.position.y=.015;g.add(ash);
- for(let i=0;i<15;i++){const a=i/15*Math.PI*2,m=new THREE.Mesh(new THREE.DodecahedronGeometry(.24+R()*.07,0),stone);m.scale.set(1.2,.62,.9);m.position.set(Math.cos(a)*1.06,.14,Math.sin(a)*1.06);m.rotation.set(R(),R(),R());g.add(m);}
+ for(let row=0;row<2;row++)for(let i=0;i<14;i++){
+  const a=(i+.45*row)/14*Math.PI*2,r=1.08+(R()-.5)*.09,m=new THREE.Mesh(rockGeometry(11+i%4*16),stone),s=.24+R()*.1;
+  m.scale.set(s*1.5,s*.8,s);m.position.set(Math.cos(a)*r,.12+row*.19,Math.sin(a)*r);m.rotation.set((R()-.5)*.3,-a,(R()-.5)*.25);g.add(m);
+ }
  for(let i=0;i<4;i++){const m=log(g,1.1,.09,[(i-1.5)*.17,.1+i*.04,0],[Math.PI/2,0,(i%2)*1.3]);m.material=dark;}
  mergeGroup(g);return g;}
+function horseshoePit(){
+ const g=new THREE.Group(),border=mat(0x8a8270),sand=mat(0x908976),stake=mat(0x626965);
+ box(g,[1.15,.025,1.45],[0,.018,0],sand);
+ for(const x of [-.65,.65])log(g,1.6,.055,[x,.065,0],[Math.PI/2,0,0]).material=border;
+ log(g,1.4,.055,[0,.065,-.77],[0,0,Math.PI/2]).material=border;
+ const pin=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.43,8),stake);pin.position.set(0,.2,-.14);pin.rotation.x=-.12;g.add(pin);
+ mergeGroup(g);g.name='horseshoe-pit';return g;
+}
 function woodpile(){const g=new THREE.Group(),R=rng(916);
  for(const x of [-1.3,1.3])box(g,[.12,1.15,.12],[x,.56,0],dark);box(g,[2.75,.12,.8],[0,.1,0],wood);
  for(let row=0;row<4;row++)for(let i=0;i<10-row;i++)log(g,.68+R()*.16,.105+R()*.025,[(i-(9-row)/2)*.25,.24+row*.2,(R()-.5)*.09],[Math.PI/2,(R()-.5)*.06,0]);
@@ -42,8 +60,8 @@ function woodpile(){const g=new THREE.Group(),R=rng(916);
 function grassGeometry(seed,reed=false){
  const R=rng(seed),positions=[],colors=[],indices=[];
  const add=(x,y,z,c)=>{positions.push(x,y,z);colors.push(...c);};
- for(let i=0;i<(reed?12:18);i++){
-  const angle=R()*Math.PI*2,rad=Math.sqrt(R())*.22,x=Math.cos(angle)*rad,z=Math.sin(angle)*rad,h=(reed?.85:.24)+R()*(reed?.55:.43),w=.012+R()*.017,lean=.12+R()*.23,dx=Math.cos(angle),dz=Math.sin(angle),base=positions.length/3;
+ for(let i=0;i<(reed?12:24);i++){
+  const angle=R()*Math.PI*2,rad=Math.sqrt(R())*.22,x=Math.cos(angle)*rad,z=Math.sin(angle)*rad,h=(reed?.85:.24)+R()*(reed?.55:.43),w=reed?.014+R()*.012:.004+R()*.006,lean=.12+R()*.23,dx=Math.cos(angle),dz=Math.sin(angle),base=positions.length/3;
   const color=reed?[.37,.43,.19]:[.20+R()*.09,.35+R()*.13,.08+R()*.055];
   add(x-dz*w,0,z+dx*w,color.map(c=>c*.65));add(x+dz*w,0,z-dx*w,color.map(c=>c*.65));
   add(x+dx*lean*.4-dz*w*.65,h*.55,z+dz*lean*.4+dx*w*.65,color);add(x+dx*lean*.4+dz*w*.65,h*.55,z+dz*lean*.4-dx*w*.65,color);
@@ -115,6 +133,14 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   for(const im of chunk.meshes){im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();}
  }
  for(const chunk of chunks.values()){
+  // Trim after generating the stable scatter: changing this footprint must not
+  // renumber the sagebrush objects in existing exported landscape edits.
+  if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
+    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(s.gravel>.45||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
+      if(chunk.kind!=='grass')return s.lawn<.3;
+      t.s*=1-s.lawn*.83;return true;});
+  }
+  if(!chunk.list.length){chunk.meshes=[];continue;}
   chunk.list.sort((a,b)=>a.rank-b.rank);
   chunk.meshes=models[chunk.kind].map(({geometry,material})=>{
    const im=new THREE.InstancedMesh(geometry,material,chunk.list.length);im.name='property-'+chunk.kind;
@@ -125,6 +151,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  }
  function place(group,p,rotation=0){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y});return group;}
  place(firepit(),CLEARING.fire);place(picnic(),CLEARING.picnic,.1);place(woodpile(),CLEARING.wood,-.3);
+ HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z));});
  const chairColors=[0x2b9798,0xce5669,0x40a6a1,0xc85871,0x3f91a0];
  chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CLEARING.fire.x+Math.sin(a)*2.35,z:CLEARING.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI);});
  // Horizontal water surface with animated ripple normals and sky tint, no reflection render pass.
@@ -141,7 +168,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  #include <colorspace_fragment>
  }`});
  const water=new THREE.Mesh(waterGeo,waterMat);water.name='property-pond-water';water.position.y=pondLevel;scene.add(water);
- function setQuality(level,density){quality=level;radius=[45,70,95,125,150][level];fadeDistance.value=radius;for(const chunk of chunks.values())for(const im of chunk.meshes){im.count=Math.max(1,Math.floor(chunk.list.length*(chunk.kind==='sage'?Math.max(.35,density):density)));im.computeBoundingSphere();}lastCam.set(1e8,0,0);}
+ function setQuality(level,density){quality=level;radius=[45,70,95,125,150][level];fadeDistance.value=radius;for(const chunk of chunks.values())for(const im of chunk.meshes||[]){im.count=Math.max(1,Math.floor(chunk.list.length*(chunk.kind==='sage'?Math.max(.35,density):density)));im.computeBoundingSphere();}lastCam.set(1e8,0,0);}
  function update(time,camera){wind.value=time;if(camera.position.distanceToSquared(lastCam)>36){lastCam.copy(camera.position);for(const c of chunks.values())for(const im of c.meshes)im.visible=Math.hypot(camera.position.x-c.x,camera.position.z-c.z)<radius+21;}}
  function setVerticalScale(value){vex=value;water.position.y=pondLevel*vex;for(const p of props)p.group.position.y=p.baseY*vex;for(const c of chunks.values())writeTransforms(c);}
  function detachSage(){for(const [key,c] of chunks)if(c.kind==='sage'){for(const im of c.meshes){scene.remove(im);im.dispose();}chunks.delete(key);}}

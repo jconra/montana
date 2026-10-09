@@ -50,7 +50,7 @@
   <div id="qualityStatus" style="font-size:11px;color:#9aa4af" aria-live="polite"></div>
 
   <div class="sec">structures</div>
-  <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
+  <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option><option value="shed">Shed</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
 
   <div class="sec">selected — tap a building, drag to move</div>
   <label>heading <input id="head" type="range" min="0" max="360" step="1" value="0"><span id="headv">0°</span></label>
@@ -83,9 +83,19 @@
   <textarea id="rdump" rows="2" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333" readonly></textarea>
 
   <div class="sec">photo match</div>
+  <label>reference <select id="photoReference"><option value="">Choose property photo…</option></select></label>
+  <a id="photoSource" href="#" target="_blank" rel="noopener" hidden style="color:#7ee787">Open full photo ↗</a>
+  <label>view <select id="photoView"><option value="">Choose viewpoint…</option></select></label>
   <label>photo <input id="photo" type="file" accept="image/*" style="width:150px"></label>
+  <label><input id="photoAspect" type="checkbox" checked> match photo proportions</label>
   <label>fade <input id="ovop" type="range" min="0" max="1" step="0.05" value="0.5"> <button id="ovtog">hide</button></label>
-  <label>lens FOV <input id="fov" type="range" min="35" max="95" step="1" value="55"><span id="fovv">55°</span></label>
+  <label>lens FOV <input id="fov" type="range" min="15" max="110" step="0.1" value="55"><span id="fovv">55°</span></label>
+  <label>roll <input id="photoRoll" type="range" min="-180" max="180" step="0.1" value="0"><span id="photoRollValue">0.0°</span></label>
+  <label><button id="photoSave">Save alignment</button><button id="photoExport">Export camera</button></label>
+  <label><button id="photoExportAll">Export saved alignments</button></label>
+  <label>restore <input id="photoCamera" type="file" accept=".json,application/json" style="width:150px"></label>
+  <div style="font-size:11px;color:#9aa4af;max-width:255px">Drag to orbit, right-drag to pan, wheel to move closer. Match fixed building corners before plants. Save each photo, then export your alignments.</div>
+  <div id="photoStatus" role="status" style="font-size:11px;color:#9aa4af;max-width:255px">Viewpoints are approximate. Load a matching photo and use fade to compare.</div>
   <label><button id="stand">stand at marker</button> <button id="dropcam">drop camera</button></label>
 </div>
 <button id="fab" class="card">＋</button>
@@ -109,15 +119,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
 import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
-import { polygonDistance,CLEARING } from './assets/property-layout.mjs';
+import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
-import { buildHouse } from './assets/house-model.js';
+import { buildHouse } from './assets/house-model.js?v=39';
 import { createLandscapeEditor } from './assets/landscape-editor.js';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
 import { RouteDriver,dampFactor } from './assets/route-driving.mjs';
+import {propaneTank} from './assets/property-props.js';
+import {createPhotoMatch,PHOTO_VIEWS} from './assets/photo-match.js';
 
 const M = await (await fetch('./assets/manifest.json')).json();
 let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
+let garageSchema=null;try{garageSchema=await (await fetch('./assets/montana-garage.json')).json();}catch(e){}
+let shedSchema=null;try{shedSchema=await (await fetch('./assets/montana-shed.json')).json();}catch(e){}
 const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
 const loadBin = async u => new Float32Array(await (await fetch(u)).arrayBuffer());
 const [cData, fData] = await Promise.all([loadBin('./assets/'+M.coarse.bin), loadBin('./assets/'+M.fine.bin)]);
@@ -292,7 +306,7 @@ function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
     const mat=Array.isArray(o.material)?o.material[0]:o.material;   // two-tone walls carry a material array; collapse to the exterior one for the distant terrain view
     out.add(new THREE.Mesh(g2,mat)); } });
   // centre on the footprint (X/Z) so it lands where the old origin-centred model did; keep the base on the ground (Y)
-  const bb=new THREE.Box3().setFromObject(out), cx=(bb.min.x+bb.max.x)/2, cz=(bb.min.z+bb.max.z)/2;
+  const bb=new THREE.Box3().setFromObject(out),cx=src.userData.origin?src.userData.origin[0]*FT:(bb.min.x+bb.max.x)/2,cz=src.userData.origin?src.userData.origin[1]*FT:(bb.min.z+bb.max.z)/2;
   out.children.forEach(m=>m.geometry.translate(-cx,0,-cz));
   return out; }
 function makeHouse(){
@@ -327,6 +341,7 @@ function makeHouse(){
 }
 
 function makeGarageApt(){                    // tall garage w/ apartment above, steep gable
+  for(const source of [localStorage.getItem('montanaGarage'),garageSchema])if(source){try{const h=buildHouse(THREE,typeof source==='string'?JSON.parse(source):source);if(h.children.length)return bakedFt(h);}catch(e){console.warn('Garage design could not load:',e);}}
   const g=new THREE.Group(), w=8,d=9,wh=6.2,rh=5.4,eave=0.6,fh=0.5;
   const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
         stone=MAT(COL.stone),wood=MAT(COL.wood),gdoor=MAT(COL.garage,.7);
@@ -410,9 +425,10 @@ function makeCabin(){
   return g;
 }
 
-const BUILD={house:makeHouse, garage:makeGarageApt, cabin:makeCabin};
+function makeShed(){let spec=shedSchema;try{const saved=localStorage.getItem('montanaShed');if(saved)spec=JSON.parse(saved);}catch(e){}return bakedFt(buildHouse(THREE,spec));}
+const BUILD={house:makeHouse, garage:makeGarageApt, cabin:makeCabin,shed:makeShed};
 // collapse a building's ~100s of little box meshes into one merged mesh per material → far fewer draw calls
-function matKey(m){ if(Array.isArray(m)) m=m[0]; if(!m||!m.color) return 'x'; return (m.map?'t':'')+m.color.getHexString()+'_'+m.roughness+'_'+m.metalness+(m.flatShading?'f':'');}
+function matKey(m){if(Array.isArray(m))m=m[0];return m?.uuid||'x';} // do not merge glass or differently mapped surfaces by color alone
 function optimizeGroup(g){
   const groups=new Map();
   for(const o of [...g.children]){
@@ -423,10 +439,13 @@ function optimizeGroup(g){
     groups.get(k).geos.push(geo); g.remove(o);
   }
   for(const {mat,geos} of groups.values()){
-    // Keep the existing individual-mesh fallback for mixed boxes/extrusions.
+    // Boxes are indexed, extruded gables are not. Normalize that difference
+    // before merging, so additional editable details do not add hundreds of draws.
     const mixedIndices=geos.some(geo=>Boolean(geo.index)!==Boolean(geos[0].index));
-    const merged=mixedIndices ? null : mergeGeometries(geos,false);
-    if(merged) g.add(new THREE.Mesh(merged,mat)); else geos.forEach(ge=>g.add(new THREE.Mesh(ge,mat)));
+    const prepared=mixedIndices?geos.map(geo=>geo.index?geo.toNonIndexed():geo):geos;
+    const merged=mergeGeometries(prepared,false);
+    if(merged){g.add(new THREE.Mesh(merged,mat));for(const geo of new Set([...geos,...prepared]))geo.dispose();}
+    else {geos.forEach(ge=>g.add(new THREE.Mesh(ge,mat)));for(const geo of prepared)if(!geos.includes(geo))geo.dispose();}
   }
 }
 let sel=null;   // last-placed structure, driven live by heading/size sliders
@@ -1054,17 +1073,14 @@ $('radd').onclick=()=>{routeAdd=!routeAdd;if(routeAdd){endDrive();$('coordinateM
 $('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='add waypoints';};
 $('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
 $('rintro').onclick=playIntro;
-$('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value);}catch(e){}};
+$('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value).catch(()=>{});}catch(e){}};
 function setPanel(open){$('panel').style.display=open?'block':'none'; $('fab').style.display=open?'none':'block';}
 $('min').onclick=()=>setPanel(false); $('fab').onclick=()=>setPanel(true);
 setPanel(false);   // start collapsed — just the ＋ button
 const bindHold=(id,key)=>{const b=$(id); b.addEventListener('pointerdown',e=>{e.preventDefault();KEY[key]=true;});
   ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>KEY[key]=false));};
 bindHold('dU','arrowup'); bindHold('dD','arrowdown'); bindHold('dL','arrowleft'); bindHold('dR','arrowright');
-const ov=$('ov');
-$('photo').onchange=e=>{const f=e.target.files[0];if(!f)return;ov.src=URL.createObjectURL(f);ov.style.display='block';$('ovtog').textContent='hide';};
-$('ovop').oninput=e=>ov.style.opacity=e.target.value;
-$('ovtog').onclick=()=>{const on=ov.style.display!=='none';ov.style.display=on?'none':'block';$('ovtog').textContent=on?'show':'hide';};
+const photoMatch=createPhotoMatch({camera:cam,controls,renderer,stopDrive(){if(landscape?.active)landscape.setActive(false);endDrive();},onLens(fov){$('fov').value=fov;$('fovv').textContent=fov.toFixed(1)+'°';}});
 $('fov').oninput=e=>{$('fovv').textContent=e.target.value+'°';cam.fov=+e.target.value;cam.updateProjectionMatrix();};
 $('stand').onclick=()=>{                    // put the eye at the marker (photographer spot), look at the buildings
   let tx=0,tz=0; if(placed.length){for(const o of placed){tx+=o.x;tz+=o.z;}tx/=placed.length;tz/=placed.length;}
@@ -1096,7 +1112,7 @@ function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
 }
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel});
 applyVex(1);
-addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+// Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
 const cmp=document.querySelector('#compass span');
 controls.target.set(0,heightAt(0,0),0); controls.update();   // pivot on the ground, not underground
@@ -1163,6 +1179,7 @@ const landscapeReady=(async()=>{
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
   if(propertyNature.models.sage.length)asset('bush/sage','Sagebrush',propertyNature.models.sage,[1,1,1]);
+  asset('prop/propane','Propane tank',propaneTank(),[1,1,1]);
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+ezPines[t.variant].name,t,[t.h,t.h,t.h]));
   const seenGroves=new Set();let groveId=0;
@@ -1196,15 +1213,21 @@ const landscapeReady=(async()=>{
     leave(){quality.reset(3);setPanel(true);},
   });
   landscape=result;$('editLandscape').disabled=false;$('editLandscape').textContent='Edit landscape';$('editLandscape').onclick=()=>landscape.setActive(true);
+  // Add this building after capturing the existing scatter baseline: old
+  // landscape exports must keep exactly the same deterministic object IDs.
+  const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   if(new URLSearchParams(location.search).has('edit')){landscape.setActive(true);document.getElementById('leHouse').click();}
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
-const AUTO_INTRO=!new URLSearchParams(location.search).has('edit'); if(AUTO_INTRO) playIntro();   // start with the car driving down the road
+const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
+const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);$('photoView').value=requestedView;});
+const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);setPanel(true);$('panel').scrollTop=$('panel').scrollHeight;});
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
   updateQuality(elapsed,dt);
   updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
+  photoMatch.applyRoll();
   if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
   propertyNature.update(now/1000,cam);
   landscapeLayer?.update(cam);

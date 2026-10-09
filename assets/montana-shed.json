@@ -1,0 +1,84 @@
+{
+  "floors": [
+    {
+      "outline": [
+        [
+          -5,
+          -4
+        ],
+        [
+          5,
+          -4
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          -5,
+          4
+        ]
+      ],
+      "h": 7,
+      "walls": [],
+      "openings": [
+        {
+          "on": "outline",
+          "edge": 2,
+          "off": 3.5,
+          "w": 3,
+          "y0": 0,
+          "y1": 6.5,
+          "type": "door",
+          "closed": true,
+          "mat": 0
+        }
+      ],
+      "mats": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0
+      },
+      "matsIn": {},
+      "voids": [],
+      "floorMat": 2
+    }
+  ],
+  "roof": null,
+  "roofPieces": [
+    {
+      "x": 0,
+      "z": 0,
+      "w": 10,
+      "d": 8,
+      "base": 7,
+      "style": "gable",
+      "pitch": 0.55,
+      "mat": 1,
+      "gableMat": 0,
+      "flipRidge": true,
+      "raiseWalls": false
+    }
+  ],
+  "details": [],
+  "stairs": [],
+  "palette": [
+    "#81755c",
+    "#4a4d51",
+    "#858275",
+    "#d5d1c4"
+  ],
+  "palTex": [
+    "wood",
+    "metal",
+    "",
+    ""
+  ],
+  "colors": {
+    "wall": "#81755c",
+    "roof": "#4a4d51",
+    "trim": "#d5d1c4"
+  },
+  "windowFrames": true
+}
