@@ -1276,6 +1276,15 @@ const landscapeReady=(async()=>{
   // Add this building after capturing the existing scatter baseline: old
   // landscape exports must keep exactly the same deterministic object IDs.
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
+  // Apply authored transforms after the scatter baseline to preserve existing
+  // landscape object IDs. Keep per-axis scale and the full Euler rotation.
+  const buildingDefaults=[{"id":"house:0","position":[4.13263319651841,124.92765808105469,-8.940941824145192],"rotation":[0,0.12217304763960307,0],"scale":[0.7995056758805658,0.9606137426061343,0.9606137426061343]},{"id":"garage:1","position":[-38.54402094202973,125.85724853871736,-14.578173182251525],"rotation":[0,1.1344640137963142,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-43.79666181467535,127.17378292217555,32.18953905471358],"rotation":[-3.141592653589793,1.516013570944256,-3.141592653589793],"scale":[1,1,1]},{"id":"shed:3","position":[-47.114386192850965,127.9685088349623,40.70839926343269],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
+  for(const [i,rec] of placed.entries()){
+    const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
+    rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];
+    rec.group.position.set(rec.x,rec.foundationY*VEX,rec.z);
+    rec.group.rotation.set(...saved.rotation);rec.group.scale.fromArray(saved.scale);
+  }
   // Keep the cabin selected after the late shed insertion so its transform
   // controls are immediately useful for the bird's-eye alignment pass.
   selectRec(placed.find(o=>o.type==='cabin'));
