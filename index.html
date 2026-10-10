@@ -1062,8 +1062,9 @@ function beginDrive(mode){
   if(mode==='route'){for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=0;}
   chaseCam(1);return true;
 }
-function endDrive(){ driveMode=false; carMode='idle'; introActive=false; controls.enabled=true;
-  controls.target.set(0,heightAt(0,0),0); controls.update();
+function endDrive({preserveView=false}={}){ driveMode=false; carMode='idle'; introActive=false; controls.enabled=true;
+  // Editor tools must not disturb a carefully aligned photo camera.
+  if(!preserveView){controls.target.set(0,heightAt(0,0),0); controls.update();}
   document.getElementById('drive').textContent='drive the RAV4'; }
 function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypoints first';return;}
   if(!beginDrive('route'))return;const y=heightAt(car.x,car.z);cam.position.set(car.x+35,y+55,car.z+35);introActive=true;introT=0; }
@@ -1270,7 +1271,7 @@ const landscapeReady=(async()=>{
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
   };
   const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,
-    enter(){const target=controls.target.clone();endDrive();controls.target.copy(target);dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;lodUniforms.lodOpacity.value=1;quality.reset();setPanel(false);},
+    enter(){endDrive({preserveView:true});dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;lodUniforms.lodOpacity.value=1;quality.reset();setPanel(false);},
     leave(){quality.reset(3);setPanel(true);},
   });
   landscape=result;$('editLandscape').disabled=false;$('editLandscape').textContent='Edit landscape';$('editLandscape').onclick=()=>landscape.setActive(true);
@@ -1280,7 +1281,7 @@ const landscapeReady=(async()=>{
   // Keep the cabin selected after the late shed insertion so its transform
   // controls are immediately useful for the bird's-eye alignment pass.
   selectRec(placed.find(o=>o.type==='cabin'));
-  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,onBuilding:selectRec,stopDrive:endDrive});
+  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,onBuilding:selectRec,stopDrive:()=>endDrive({preserveView:true})});
   if(new URLSearchParams(location.search).has('edit')){landscape.setActive(true);document.getElementById('leHouse').click();}
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
