@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {applyReferenceEdits} from './reference-edits.mjs';
 import {LandscapeState,EditHistory,brushVertices} from './landscape-state.mjs';
 
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -11,6 +12,16 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  published=state.validate(await response.json());state.load(published);
  let restored=false,saveWarning='';
  try{const draft=localStorage.getItem(DRAFT_KEY);if(draft){state.load(JSON.parse(draft));restored=true;}}catch(e){saveWarning='Saved draft was not loaded: '+e.message;}
+ // Merge this photo pass into older drafts without discarding newer user edits.
+ try{
+  const res=await fetch(new URL('./property-refinement-edits.json',import.meta.url));
+  if(res.ok){const edits=await res.json(),key='montanaReferenceEdits:v1';
+   if(localStorage.getItem(key)!==edits.version){
+    if(restored&&applyReferenceEdits(state,edits.changes))localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));
+    localStorage.setItem(key,edits.version);
+   }
+  }
+ }catch(e){console.warn('Photo refinement draft update unavailable:',e);}
  const panel=document.createElement('section');panel.id='landscapeEditor';panel.hidden=true;panel.setAttribute('aria-label','Landscape editor');
  panel.innerHTML=`<div class="le-title"><h2>Landscape editor</h2><button id="leClose" title="Close editor">Done</button></div>
  <label><input id="leLockGeometry" type="checkbox"> lock geometry while adjusting the camera</label>

@@ -31,11 +31,11 @@ export function createGroundDetail(half,driveway){
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
   const pixels=g.getImageData(0,0,c.width,c.height),data=pixels.data;
-  const left=Math.floor((-44-maskMin.x)/maskSize.x*c.width),right=Math.ceil((-3-maskMin.x)/maskSize.x*c.width);
+  const left=Math.floor((-55-maskMin.x)/maskSize.x*c.width),right=Math.ceil((20-maskMin.x)/maskSize.x*c.width);
   const top=Math.floor((-16-maskMin.y)/maskSize.y*c.height),bottom=Math.ceil((48-maskMin.y)/maskSize.y*c.height);
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
-    data[i]=Math.max(data[i],Math.round(s.gravel*255));data[i+1]=Math.max(data[i+1],Math.round(s.lawn*255));data[i+2]=Math.round(s.lawn*255);
+    data[i]=Math.max(data[i],Math.round(s.gravel*255));data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));data[i+2]=Math.round(s.lawn*255);
   }
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;

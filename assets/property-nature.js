@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,smooth} from './property-layout.mjs';
 import {loadSagebrush} from './sagebrush.js';
+import {TALL_GRASS_PATCHES,tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
 import {campSurface,HORSESHOES} from './camp-approach.mjs';
 import {rockGeometry} from './ground-detail.js';
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -96,7 +97,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
  vec3 root=(modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.)).xyz;
  transformed.x+=sin(plantTime*.85+root.x*.37+root.z*.2)*position.y*position.y*${sway.toFixed(3)};
- plantViewDistance=distance(cameraPosition,root);`);
+ plantViewDistance=length(cameraPosition.xz-root.xz)+abs(cameraPosition.y-root.y)*.2;`);
  sh.fragmentShader='uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
  sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
  };
@@ -130,6 +131,18 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   add('sage',p.x,p.z,s,{sx:.9+sageR()*.25,sz:.85+sageR()*.3,tint:.88+sageR()*.18});
  }
  for(let i=0;i<800;i++){const x=-12+R()*47,z=50+R()*24,d=polygonDistance(x,z);if(d<-.1&&d> -2.5)add('reeds',x,z,.7+R()*.5);}
+ // Add denser grass only after the stable sage scatter has been generated.
+ // This keeps saved landscape IDs unchanged. Tufts remain instanced and culled.
+ const meadowR=rng(20261010);
+ for(const patch of TALL_GRASS_PATCHES){
+  const xs=patch.outline.map(p=>p.x),zs=patch.outline.map(p=>p.z),xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs);
+  for(let i=0;i<(xmax-xmin)*(zmax-zmin)*3;i++){
+   const x=xmin+meadowR()*(xmax-xmin),z=zmin+meadowR()*(zmax-zmin),cover=tallGrassCoverage(x,z);
+   if(meadowR()>cover||frontDoorGravel(x,z)>.2)continue;
+   add('grass',x,z,1.15+meadowR()*.65,{tallPatch:true});
+   if(meadowR()<.06)add(meadowR()<.7?'yellow':'white',x,z,.9+meadowR()*.4,{tallPatch:true});
+  }
+ }
  function writeTransforms(chunk){
   for(let i=0;i<chunk.list.length;i++){const t=chunk.list[i];o.position.set(t.x,t.y*vex,t.z);o.rotation.set(0,t.r,0);o.scale.set(t.s*(t.sx||1),t.s,t.s*(t.sz||1));o.updateMatrix();for(const im of chunk.meshes)im.setMatrixAt(i,o.matrix);}
   for(const im of chunk.meshes){im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();}
@@ -140,6 +153,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
     chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(s.gravel>.45||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
       if(chunk.kind!=='grass')return s.lawn<.3;
+      if(s.tallGrass>.1&&!t.tallPatch)t.s=Math.max(t.s,1.05+s.tallGrass*.5);
       t.s*=1-s.lawn*.83;return true;});
   }
   if(!chunk.list.length){chunk.meshes=[];continue;}
