@@ -14,7 +14,16 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  const buildingKey='montanaBuildingTransforms:v1';
  const buildingRows=()=>placed.map((r,i)=>({id:`${r.type}:${i}`,position:r.group.position.toArray(),rotation:r.group.rotation.toArray().slice(0,3),scale:r.group.scale.toArray(),...(r.deleted?{deleted:true}:{})}));
  function applyBuildings(rows){for(const [i,r] of placed.entries()){const row=rows.find(v=>v.id===`${r.type}:${i}`);if(!row)continue;r.deleted=row.deleted===true;r.group.visible=!r.deleted;if(r.deleted)scene.remove(r.group);else if(!r.group.parent)scene.add(r.group);if(![row.position,row.rotation,row.scale].every(a=>Array.isArray(a)&&a.length===3&&a.every(Number.isFinite))||row.scale.some(v=>v<.01||v>100))continue;r.group.position.fromArray(row.position);r.group.rotation.set(...row.rotation);r.group.scale.fromArray(row.scale);r.x=row.position[0];r.z=row.position[2];r.foundationY=row.position[1]/getVex();}}
- try{applyBuildings(JSON.parse(localStorage.getItem(buildingKey)||'[]'));if(placed.some(r=>r.deleted))onBuilding(null);}catch(e){status.textContent='Building draft could not load';}
+ try{
+  const draft=JSON.parse(localStorage.getItem(buildingKey)||'[]');
+  // Correct only the known accidental airborne cabin draft; preserve newer edits.
+  const cabin=draft.find(r=>r.id==='cabin:2');
+  if(cabin&&!cabin.deleted&&JSON.stringify(cabin.position)===JSON.stringify([-36.79682418136607,138.43845608991865,32.93287983164568])){
+   cabin.position[1]=heightAt(cabin.position[0],cabin.position[2]);
+   localStorage.setItem(buildingKey,JSON.stringify(draft));
+  }
+  applyBuildings(draft);if(placed.some(r=>r.deleted))onBuilding(null);
+ }catch(e){status.textContent='Building draft could not load';}
  function saveBuildings(){try{localStorage.setItem(buildingKey,JSON.stringify(buildingRows()));}catch(e){status.textContent='Export edits to save: browser storage is full';}}
  const undoStack=[],redoStack=[],copy=v=>v==null?null:JSON.parse(JSON.stringify(v));
  function selectionState(){return building?{kind:'building',id:`${building.type}:${placed.indexOf(building)}`,record:buildingRows()[placed.indexOf(building)]}:{kind:'landscape',id:target.userData.id,record:copy(landscape.state.get(target.userData.id))};}
