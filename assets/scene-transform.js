@@ -12,9 +12,9 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  const status=bar.querySelector('#stStatus'),lock=document.getElementById('lockGeometry'),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
  let active=false,target=null,building=null,gesture=null;
  const buildingKey='montanaBuildingTransforms:v1';
- const buildingRows=()=>placed.map((r,i)=>({id:`${r.type}:${i}`,position:r.group.position.toArray(),rotation:r.group.rotation.toArray().slice(0,3),scale:r.group.scale.toArray()}));
- function applyBuildings(rows){for(const [i,r] of placed.entries()){const row=rows.find(v=>v.id===`${r.type}:${i}`);if(!row)continue;if(![row.position,row.rotation,row.scale].every(a=>Array.isArray(a)&&a.length===3&&a.every(Number.isFinite))||row.scale.some(v=>v<.01||v>100))continue;r.group.position.fromArray(row.position);r.group.rotation.set(...row.rotation);r.group.scale.fromArray(row.scale);r.x=row.position[0];r.z=row.position[2];r.foundationY=row.position[1]/getVex();}}
- try{applyBuildings(JSON.parse(localStorage.getItem(buildingKey)||'[]'));}catch(e){status.textContent='Building draft could not load';}
+ const buildingRows=()=>placed.map((r,i)=>({id:`${r.type}:${i}`,position:r.group.position.toArray(),rotation:r.group.rotation.toArray().slice(0,3),scale:r.group.scale.toArray(),...(r.deleted?{deleted:true}:{})}));
+ function applyBuildings(rows){for(const [i,r] of placed.entries()){const row=rows.find(v=>v.id===`${r.type}:${i}`);if(!row)continue;if(row.deleted===true){r.deleted=true;r.group.visible=false;scene.remove(r.group);}if(![row.position,row.rotation,row.scale].every(a=>Array.isArray(a)&&a.length===3&&a.every(Number.isFinite))||row.scale.some(v=>v<.01||v>100))continue;r.group.position.fromArray(row.position);r.group.rotation.set(...row.rotation);r.group.scale.fromArray(row.scale);r.x=row.position[0];r.z=row.position[2];r.foundationY=row.position[1]/getVex();}}
+ try{applyBuildings(JSON.parse(localStorage.getItem(buildingKey)||'[]'));if(placed.some(r=>r.deleted))onBuilding(null);}catch(e){status.textContent='Building draft could not load';}
  function saveBuildings(){try{localStorage.setItem(buildingKey,JSON.stringify(buildingRows()));}catch(e){status.textContent='Export edits to save: browser storage is full';}}
  function pointerAt(e){const r=canvas.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);camera.updateMatrixWorld();ray.setFromCamera(pointer,camera);return {x:pointer.x,y:pointer.y,button:e.button};}
  function ground(){return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-target.position.y),new THREE.Vector3());}
@@ -29,7 +29,7 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  canvas.addEventListener('pointerdown',e=>{
   if(!active||lock.checked||e.button!==0)return;const p=pointerAt(e);scene.updateMatrixWorld(true);gizmo.pointerHover(p);
   if(target&&gizmo.axis){consume(e);gesture={before:landscape.beginTransform(),position:target.position.clone(),quaternion:target.quaternion.clone(),scale:target.scale.clone(),axis:gizmo.axis,ground:ground(),offset:target.position.y-heightAt(target.position.x,target.position.z)};controls.enabled=false;gizmo.pointerDown(p);canvas.setPointerCapture(e.pointerId);return;}
-  const bh=ray.intersectObjects(placed.filter(r=>r.group.visible).map(r=>r.group),true)[0],lh=landscape.pick(e);
+  const bh=ray.intersectObjects(placed.filter(r=>!r.deleted&&r.group.visible).map(r=>r.group),true)[0],lh=landscape.pick(e);
   if(bh&&(!lh||bh.distance<lh.distance)){let g=bh.object;while(g&&!placed.some(r=>r.group===g))g=g.parent;building=placed.find(r=>r.group===g);landscape.clearGizmoSelection();target=g;onBuilding(building);}
   else if(lh){building=null;target=landscape.selectForGizmo(lh.id);}else {gizmo.detach();target=null;return;}
   consume(e);gizmo.attach(target);status.textContent=building?`Selected ${building.type}`:'Selected landscape object';
@@ -46,7 +46,15 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  },true);
  function finish(e){if(!gesture)return;consume(e);gizmo.pointerUp({button:0});if(building){building.x=target.position.x;building.z=target.position.z;building.foundationY=target.position.y/getVex();onBuilding(building);saveBuildings();}else{landscape.finishTransform(gesture.before);target=landscape.selectForGizmo(target.userData.id);gizmo.attach(target);}gesture=null;controls.enabled=true;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);}
  canvas.addEventListener('pointerup',finish,true);canvas.addEventListener('pointercancel',cancel,true);canvas.addEventListener('lostpointercapture',cancel,true);
- addEventListener('keydown',e=>{if(e.key==='Escape'&&active&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){cancel();gizmo.detach();target=null;landscape.clearGizmoSelection();}});
+ addEventListener('keydown',e=>{
+  if(!active||e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  if(e.key==='Delete'&&!e.repeat&&target&&!lock.checked){
+   consume(e);cancel();gizmo.detach();
+   if(building){building.deleted=true;building.group.visible=false;scene.remove(building.group);onBuilding(null);saveBuildings();}
+   else landscape.removeSelected();
+   target=null;building=null;status.textContent='Object removed. Export edits to share the deletion.';
+  }else if(e.key==='Escape'){cancel();gizmo.detach();target=null;building=null;landscape.clearGizmoSelection();}
+ },true);
  bar.querySelector('#stExport').onclick=()=>{const data={format:'montana-scene-edits',version:1,buildings:buildingRows(),landscape:landscape.state.export()},url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)+'\n'],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='montana-scene-edits.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);};
  document.getElementById('editLandscape').addEventListener('click',()=>{if(active){disable();landscape.setActive(true);}});
  return {disable,get active(){return active;}};

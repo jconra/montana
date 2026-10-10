@@ -939,7 +939,7 @@ function structureLabel(rec){return rec.type==='garage'?'Garage + apartment':rec
 function syncStructureSelect(){
   const menu=document.getElementById('structureSelect');if(!menu)return;
   const current=sel?placed.indexOf(sel):-1;menu.replaceChildren(new Option('select a building…',''));
-  placed.forEach((rec,i)=>menu.add(new Option(structureLabel(rec),String(i))));
+  placed.forEach((rec,i)=>{if(!rec.deleted)menu.add(new Option(structureLabel(rec),String(i)));});
   menu.value=current>=0?String(current):'';
 }
 function updateSelInfo(){ if(!sel)return; const g=sel.group, deg=((THREE.MathUtils.radToDeg(g.rotation.y))%360+360)%360;
@@ -961,7 +961,7 @@ renderer.domElement.addEventListener('pointerdown',ev=>{
   if(driveMode) return;                                            // no building editing while driving
   const locked=document.getElementById('lockGeometry').checked;
   if(!locked){
-    const sh=ray.intersectObjects(placed.map(o=>o.group),true)[0];   // grab a building → select + start drag
+    const sh=ray.intersectObjects(placed.filter(o=>!o.deleted).map(o=>o.group),true)[0];   // grab a building → select + start drag
     if(sh){let g=sh.object; while(g.parent&&!placed.some(o=>o.group===g)) g=g.parent;
       const rec=placed.find(o=>o.group===g);
       if(rec){selectRec(rec); dragging=rec; controls.enabled=false; return;}}
@@ -1281,7 +1281,7 @@ const landscapeReady=(async()=>{
     },
     terrainChanged(){propertyNature.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
-    hideBuildings(hide){for(const o of placed)o.group.visible=!hide;},
+    hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
   };
   const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,
@@ -1300,6 +1300,7 @@ const landscapeReady=(async()=>{
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];
     rec.group.position.set(rec.x,rec.foundationY*VEX,rec.z);
     rec.group.rotation.set(...saved.rotation);rec.group.scale.fromArray(saved.scale);
+    if(saved.deleted){rec.deleted=true;rec.group.visible=false;scene.remove(rec.group);}
   }
   // Keep the cabin selected after the late shed insertion so its transform
   // controls are immediately useful for the bird's-eye alignment pass.
