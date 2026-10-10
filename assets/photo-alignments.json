@@ -3,19 +3,21 @@
   "version": 1,
   "alignments": [
     {
+      "format": "montana-photo-camera",
+      "version": 1,
       "photo": "house-drone",
-      "label": "House \u00b7 front drone",
+      "filename": "Photo_6553709_DJI_109_jpg_4376199_0_2021627181058_photo_original.jpg",
       "position": [
-        15.5437,
-        150.3768,
-        48.1141
+        13.300663768991559,
+        137.33321531275195,
+        34.39744881092399
       ],
       "target": [
-        12.2452,
-        136.162,
-        10.8708
+        10.397251759777216,
+        131.41159651575055,
+        8.69318698917542
       ],
-      "fov": 33.062,
+      "fov": 34.7,
       "aspect": 1.7777777777777777,
       "roll": 0
     },
