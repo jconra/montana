@@ -399,10 +399,8 @@ function railSeg(g,mat,x1,z1,x2,z2,y,h){
   for(let i=0;i<=n;i++){const t=i/n; box(g,0.04,h,0.04,x1+dx*t,y+h/2,z1+dz*t,mat);}  // balusters
   box(g,0.09,h+0.1,0.09,x1,y+(h+0.1)/2,z1,mat); box(g,0.09,h+0.1,0.09,x2,y+(h+0.1)/2,z2,mat); // corner posts
 }
-// Exterior stair flight. `dir` chooses which way the flight leaves the landing;
-// the cabin stairs run toward the shed (local -X), rather than wrapping around
-// the side as another deck. The rise is fitted to the landing height so the
-// bottom tread meets the ground instead of disappearing below it.
+// Exterior stair flight along local X; a rotated group can run it along a wall.
+// Concrete is optional: only the garage-facing flight has a concrete pad.
 function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps,dir=1){
   steps=Math.max(2,Math.round(steps));
   const rise=topY/steps, sign=dir<0?-1:1;
@@ -414,7 +412,7 @@ function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps,dir=1){
     const rl=Math.hypot(run*steps,rise*steps);
     box(g,rl,0.06,0.06,(x0+endX)/2,(topY+endY)/2+0.85,cz,railM).rotation.z=Math.atan2(endY-topY,endX-x0);
   }
-  box(g,1.6,0.12,1.8,endX+sign*0.9,endY-0.06,z0,concM);
+  if(concM)box(g,1.6,0.12,1.8,endX+sign*0.9,endY-0.06,z0,concM);
 }
 function makeCabin(){
   const g=new THREE.Group();
@@ -452,10 +450,28 @@ function makeCabin(){
   }                                                               // peeled-log porch posts
   {const b=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,porchW+0.4,7),logM);b.rotation.z=Math.PI/2;b.position.set(porchX,porchRoofY-0.15,porchFrontZ);g.add(b);}  // log header
   railSeg(g,railM,-w/2,d/2+dExt, w/2,d/2+dExt, DY,1.0);               // front rail
-  railSeg(g,railM,-w/2,d/2, -w/2,d/2+dExt, DY,1.0);                  // left front return
-  railSeg(g,railM,w/2,d/2, w/2,d/2+dExt, DY,1.0);                   // right front return
+  // Gates in both side rails keep the deck connected to both stairways.
+  const stairZ=d/2+dExt-0.62, stairWidth=.9;
+  railSeg(g,railM,-w/2,d/2+1.1, -w/2,d/2+dExt, DY,1.0);
+  railSeg(g,railM,w/2,d/2, w/2,stairZ-stairWidth/2, DY,1.0);
+  railSeg(g,railM,w/2,stairZ+stairWidth/2, w/2,d/2+dExt, DY,1.0);
 
-  stairFlight(g,deckM,railM,conc, -w/2-0.02, d/2+dExt-0.62, DY, 0.9, 0.38, 8, -1); // uncovered stairs at the left edge, toward the shed
+  // Local +X points toward the garage. This is the concrete-pad flight.
+  const garageStairs=new THREE.Group();garageStairs.name='cabin-garage-stairs';g.add(garageStairs);
+  stairFlight(garageStairs,deckM,railM,conc,w/2,stairZ,DY,stairWidth,.38,8,1);
+  // Opposite side: turn off the porch, then descend back along the cabin wall.
+  // The side landing is covered, but the wooden stairs have no roof or pad.
+  const landingX=-w/2-.55, landingZ=d/2+.55;
+  box(g,1.1,.18,1.1,landingX,DY-.09,landingZ,deckM);
+  railSeg(g,railM,-w/2-1.1,d/2,-w/2-1.1,d/2+1.1,DY,1);
+  railSeg(g,railM,-w/2-1.1,d/2+1.1,-w/2,d/2+1.1,DY,1);
+  const sideRoof=box(g,1.35,.14,1.25,landingX,DY+2.65,landingZ,roof);
+  sideRoof.rotation.z=.12;
+  for(const x of [-w/2-1.05,-w/2-.05])box(g,.1,2.65,.1,x,DY+1.325,d/2+1.05,railM);
+  const shedStairs=new THREE.Group();shedStairs.name='cabin-shed-stairs';
+  shedStairs.position.set(landingX,0,d/2);shedStairs.rotation.y=Math.PI/2;g.add(shedStairs);
+  stairFlight(shedStairs,deckM,railM,null,0,0,DY,stairWidth,.38,8,1);
+  optimizeGroup(garageStairs);optimizeGroup(shedStairs);
   return g;
 }
 
@@ -1278,7 +1294,7 @@ const landscapeReady=(async()=>{
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   // Apply authored transforms after the scatter baseline to preserve existing
   // landscape object IDs. Keep per-axis scale and the full Euler rotation.
-  const buildingDefaults=[{"id":"house:0","position":[4.13263319651841,124.92765808105469,-8.940941824145192],"rotation":[0,0.12217304763960307,0],"scale":[0.7995056758805658,0.9606137426061343,0.9606137426061343]},{"id":"garage:1","position":[-38.54402094202973,125.85724853871736,-14.578173182251525],"rotation":[0,1.1344640137963142,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-43.79666181467535,127.17378292217555,32.18953905471358],"rotation":[-3.141592653589793,1.516013570944256,-3.141592653589793],"scale":[1,1,1]},{"id":"shed:3","position":[-47.114386192850965,127.9685088349623,40.70839926343269],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
+  const buildingDefaults=[{"id":"house:0","position":[4.506977629754446,124.92765808105469,-7.506045074405396],"rotation":[0,0.12217304763960307,0],"scale":[0.7995056758805658,0.9606137426061343,0.9606137426061343]},{"id":"garage:1","position":[-34.05880489361462,126.99958375802053,-10.691819174788241],"rotation":[0,1.1344640137963142,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-41.27311389903389,126.81454732689694,32.660552013602924],"rotation":[-3.141592653589793,1.516013570944256,-3.141592653589793],"scale":[1,1,1]},{"id":"shed:3","position":[-44.69129509728012,128.7547115769828,42.79514069532575],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
   for(const [i,rec] of placed.entries()){
     const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];
