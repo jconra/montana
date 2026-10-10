@@ -32,6 +32,11 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  function ground(){return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-target.position.y),new THREE.Vector3());}
  function cancel(){if(!gesture)return;target.position.copy(gesture.position);target.quaternion.copy(gesture.quaternion);target.scale.copy(gesture.scale);gizmo.pointerUp({button:0});gesture=null;controls.enabled=true;}
  function disable(){cancel();active=false;gizmo.detach();target=null;building=null;landscape.setGizmoMode(false);for(const b of bar.querySelectorAll('[data-mode]'))b.setAttribute('aria-pressed','false');}
+ landscape.onDeactivate(()=>{if(active)disable();});
+ function attachTarget(){
+  if(!target?.isObject3D||!target.parent){gizmo.detach();target=null;building=null;status.textContent='Selection cleared. Choose an object again.';return false;}
+  gizmo.attach(target);return true;
+ }
  function setMode(mode){if(lock.checked){status.textContent='Unlock geometry to edit';return;}if(active&&gizmo.mode===mode){disable();return;}if(!active){stopDrive();landscape.setGizmoMode(true);}active=true;gizmo.setMode(mode);for(const b of bar.querySelectorAll('[data-mode]'))b.setAttribute('aria-pressed',b.dataset.mode===mode);status.textContent=target?'Drag a colored axis or the center handle':'Click a building, tree, bush, rock, or property prop';}
  for(const b of bar.querySelectorAll('[data-mode]'))b.onclick=()=>setMode(b.dataset.mode);
  function syncLock(){if(lock.checked)disable();bar.querySelector('#stLock').setAttribute('aria-pressed',lock.checked);bar.querySelector('#stLock').textContent=lock.checked?'Unlock':'Lock';syncHistory();}
@@ -44,7 +49,7 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
   const bh=ray.intersectObjects(placed.filter(r=>!r.deleted&&r.group.visible).map(r=>r.group),true)[0],lh=landscape.pick(e);
   if(bh&&(!lh||bh.distance<lh.distance)){let g=bh.object;while(g&&!placed.some(r=>r.group===g))g=g.parent;building=placed.find(r=>r.group===g);landscape.clearGizmoSelection();target=g;onBuilding(building);}
   else if(lh){building=null;target=landscape.selectForGizmo(lh.id);}else {gizmo.detach();target=null;return;}
-  consume(e);gizmo.attach(target);status.textContent=building?`Selected ${building.type}`:'Selected landscape object';
+  consume(e);if(!attachTarget())return;status.textContent=building?`Selected ${building.type}`:'Selected landscape object';
  },true);
  canvas.addEventListener('pointermove',e=>{
   if(!active)return;const p=pointerAt(e);p.button=-1;if(!gesture){gizmo.pointerHover(p);return;}consume(e);if(Math.hypot(e.clientX-gesture.px,e.clientY-gesture.py)<4)return;
@@ -57,7 +62,7 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
   }else {gizmo.pointerMove(p);if(gizmo.mode==='translate'&&gesture.axis==='XZ')target.position.y=heightAt(target.position.x,target.position.z)+gesture.offset;}
   target.scale.clampScalar(.01,100);target.updateMatrixWorld(true);
  },true);
- function finish(e){if(!gesture)return;consume(e);gizmo.pointerUp({button:0});if(building){building.x=target.position.x;building.z=target.position.z;building.foundationY=target.position.y/getVex();onBuilding(building);saveBuildings();}else{landscape.finishTransform(gesture.before);target=landscape.selectForGizmo(target.userData.id);gizmo.attach(target);}remember(gesture.history,selectionState());gesture=null;controls.enabled=true;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);}
+ function finish(e){if(!gesture)return;consume(e);gizmo.pointerUp({button:0});if(building){building.x=target.position.x;building.z=target.position.z;building.foundationY=target.position.y/getVex();onBuilding(building);saveBuildings();}else{const id=target.userData.id;gizmo.detach();landscape.finishTransform(gesture.before);target=landscape.selectForGizmo(id);attachTarget();}const after=target?selectionState():{...gesture.history,record:copy(landscape.state.get(gesture.history.id))};remember(gesture.history,after);gesture=null;controls.enabled=true;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId);}
  canvas.addEventListener('pointerup',finish,true);canvas.addEventListener('pointercancel',cancel,true);canvas.addEventListener('lostpointercapture',cancel,true);
  addEventListener('keydown',e=>{
   if(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
