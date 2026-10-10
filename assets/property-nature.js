@@ -46,10 +46,12 @@ function firepit(){const g=new THREE.Group(),R=rng(501);
  for(let i=0;i<4;i++){const m=log(g,1.1,.09,[(i-1.5)*.17,.1+i*.04,0],[Math.PI/2,0,(i%2)*1.3]);m.material=dark;}
  mergeGroup(g);return g;}
 function horseshoePit(){
- const g=new THREE.Group(),border=mat(0x8a8270),sand=mat(0x908976),stake=mat(0x626965);
+ const g=new THREE.Group(),sand=mat(0x908976),stake=mat(0x626965);
  box(g,[1.15,.025,1.45],[0,.018,0],sand);
- for(const x of [-.65,.65])log(g,1.6,.055,[x,.065,0],[Math.PI/2,0,0]).material=border;
- log(g,1.4,.055,[0,.065,-.77],[0,0,Math.PI/2]).material=border;
+ // Three substantial logs per pit: two sides and a back, open toward the
+ // opposing stake (+Z). Retain separate bark and cut-end wood materials.
+ for(const x of [-.72,.72])log(g,1.65,.14,[x,.13,0],[Math.PI/2,0,0]);
+ log(g,1.7,.14,[0,.13,-.92],[0,0,Math.PI/2]);
  const pin=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.43,8),stake);pin.position.set(0,.2,-.14);pin.rotation.x=-.12;g.add(pin);
  mergeGroup(g);g.name='horseshoe-pit';return g;
 }
