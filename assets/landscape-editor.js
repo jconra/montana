@@ -161,6 +161,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  addEventListener('keydown',e=>{if(!active||gizmoMode||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();e.key.toLowerCase()==='y'||e.shiftKey?redo():undo();}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.stopImmediatePropagation();if(mode==='objects')remove();}else if(e.key==='Escape'){e.preventDefault();if(gesture)cancelGesture();else if(adding)setAdding(false);else{selected=null;showSelection();clearPreview();}}},true);
  applyDocument();status(saveWarning||(restored?'Restored your saved browser draft.':'Ready. Changes are saved as a browser draft until you export them.'));
  return {state,setActive,removeSelected:remove,
+  restoreGizmoObject(id,record){if(!requireGeometryUnlocked())return;const before=state.export();clearPreview();selected=null;if(record)state.set(record);else state.remove(id);commit(before);},
   setGizmoMode(on){gizmoMode=on;if(on){if(!active)setActive(true);setMode('objects');panel.hidden=true;}else if(active)setActive(false);},
   pick(ev){eventRay(ev);const id=pickObject();if(!id)return null;const rec=state.get(id);const bounds=catalog.get(rec.asset).bounds.clone().applyMatrix4(worldMatrix(rec));const p=ray.ray.intersectBox(bounds,new THREE.Vector3());return {id,distance:p?ray.ray.origin.distanceTo(p):Infinity};},
   selectForGizmo(id){select(id);return preview;},
