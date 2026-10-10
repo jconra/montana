@@ -19,15 +19,19 @@
   #panel label{display:flex;align-items:center;gap:8px;margin-top:4px}
   input[type=range]{width:120px}
   select,button{cursor:pointer;background:#21262d;color:#e6edf3;border:1px solid #444;border-radius:6px;padding:4px 8px}
-  #photoBar{position:fixed;z-index:11;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100vw - 24px);padding:7px 9px;background:rgba(13,17,23,.9);border:1px solid #39414b;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35);font-size:11px;white-space:nowrap}
+  #photoBar{position:fixed;z-index:11;left:54px;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:4px 6px;background:rgba(13,17,23,.9);border:1px solid #39414b;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35);font-size:11px;white-space:nowrap}
   #photoBar[hidden]{display:none}
   #photoBar label{display:flex;align-items:center;gap:4px;color:#c9d1d9}
   #photoBar input[type=range]{width:92px}
   #photoBar .photoValue{display:inline-block;min-width:34px;color:#7ee787;font-variant-numeric:tabular-nums}
-  #photoBarTools{display:flex;align-items:center;gap:8px}
+  #photoBarTools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+  #photoReference{max-width:230px}
+  #photoStatus{font-size:10px;color:#9aa4af;white-space:normal}
+  #photoBar.collapsed{right:auto}
+  :root{--photo-bar-height:32px}
   #photoBar.collapsed #photoBarTools{display:none}
   #photoBarToggle{color:#7ee787}
-  @media(max-width:760px){#photoBar{left:8px;right:8px;bottom:8px;transform:none;white-space:normal;flex-wrap:wrap;justify-content:center}#photoBarTools{flex-wrap:wrap;justify-content:center}}
+  @media(max-width:760px){#photoBar{left:0;right:0;bottom:0;white-space:normal;flex-wrap:wrap;justify-content:center}#photoBarTools{flex-wrap:wrap;justify-content:center}}
   #info{top:10px;right:10px;max-width:210px;color:#ffd479}
   #compass{position:fixed;z-index:10;top:120px;right:10px;width:52px;height:52px;background:rgba(13,17,23,.75);border-radius:50%;font-size:11px}
   #compass span{position:absolute;left:50%;transform:translateX(-50%);top:4px;color:#ff7b72;font-weight:bold}
@@ -95,28 +99,22 @@
   <label><button id="rcopy">copy route</button></label>
   <textarea id="rdump" rows="2" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333" readonly></textarea>
 
-  <div class="sec">photo match</div>
-  <label>reference <select id="photoReference"><option value="">Choose property photo…</option></select></label>
-  <a id="photoSource" href="#" target="_blank" rel="noopener" hidden style="color:#7ee787">Open full photo ↗</a>
-  <label>view <select id="photoView"><option value="">Choose viewpoint…</option></select></label>
-  <label>photo <input id="photo" type="file" accept="image/*" style="width:150px"></label>
-  <label><input id="photoAspect" type="checkbox" checked> match photo proportions</label>
-  <label><button id="photoSave">Save alignment</button><button id="photoExport">Export camera</button></label>
-  <label><button id="photoExportAll">Export saved alignments</button></label>
-  <label>restore <input id="photoCamera" type="file" accept=".json,application/json" style="width:150px"></label>
-  <div style="font-size:11px;color:#9aa4af;max-width:255px">Photo tuning is in the bottom bar. Drag to orbit, right-drag to pan, wheel to move closer. WASD pans; Space/C move straight up/down. Hold Shift for fine camera movement. Match fixed building corners before plants. Save each photo, then export your alignments.</div>
-  <div id="photoStatus" role="status" style="font-size:11px;color:#9aa4af;max-width:255px">Viewpoints are approximate. Load a matching photo and use fade to compare.</div>
   <label><button id="stand">stand at marker</button> <button id="dropcam">drop camera</button></label>
 </div>
-<div id="photoBar" hidden aria-label="Photo match controls">
-  <button id="photoBarToggle" type="button" aria-expanded="true">photo controls</button>
+<div id="photoBar" class="collapsed" aria-label="Photo match controls">
+  <button id="photoBarToggle" type="button" aria-expanded="false">photo controls ▸</button>
   <div id="photoBarTools">
+    <label>reference <select id="photoReference"><option value="">Choose property photo…</option></select></label>
+    <button id="photoSave">Save alignment</button>
+    <button id="photoExportAll" title="Export all saved photo alignments, including the current view">Export alignments</button>
+    <label title="Match the viewport to the reference photo proportions"><input id="photoAspect" type="checkbox" checked> fit photo</label>
     <label>rotate <input id="photoRotateSpeed" type="range" min="0.1" max="1" step="0.05" value="0.35"><span id="photoRotateValue" class="photoValue">0.35×</span></label>
     <label>FOV <input id="fov" type="range" min="15" max="110" step="0.1" value="55"><span id="fovv" class="photoValue">55.0°</span></label>
     <label>roll <input id="photoRoll" type="range" min="-180" max="180" step="0.1" value="0"><span id="photoRollValue" class="photoValue">0.0°</span></label>
     <label>fade <input id="ovop" type="range" min="0" max="1" step="0.01" value="0.5"><span id="ovopv" class="photoValue">50%</span></label>
     <label><input id="photoAutoFade" type="checkbox"> auto fade</label>
     <button id="ovtog" type="button">hide photo</button>
+    <span id="photoStatus" role="status" aria-live="polite">Choose a reference, then save and export your alignment.</span>
   </div>
 </div>
 <button id="fab" class="card">＋</button>
@@ -1286,7 +1284,7 @@ const landscapeReady=(async()=>{
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
 const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
-const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);$('photoView').value=requestedView;});
+const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);});
 const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);setPanel(true);$('panel').scrollTop=$('panel').scrollHeight;});
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
