@@ -20,38 +20,42 @@
       "roll": 0
     },
     {
+      "format": "montana-photo-camera",
+      "version": 1,
       "photo": "garage-camp",
-      "label": "Garage → fire pit",
+      "filename": "montanaGarageFaceSouthEast.jpg",
       "position": [
-        -24,
-        126.5,
-        -4
+        -22.36099264016245,
+        129.07755725886284,
+        -4.828226262915109
       ],
       "target": [
-        -24,
-        124.5,
-        32
+        -18.596245775609756,
+        124.50000000000023,
+        1.3687702792020788
       ],
-      "fov": 65,
+      "fov": 106,
       "aspect": 1.3333333333333333,
       "roll": 0
     },
     {
+      "format": "montana-photo-camera",
+      "version": 1,
       "photo": "house-cabin",
-      "label": "House → cabin",
+      "filename": "montanaHouseFacingCabin.jpg",
       "position": [
-        -3,
-        127.6,
-        -2
+        -3.05787122846216,
+        127.67913171865067,
+        2.9638334156283173
       ],
       "target": [
-        -32,
-        126.5,
-        19
+        -9.880929702657967,
+        126.49999999999999,
+        5.289520109255239
       ],
-      "fov": 65,
+      "fov": 68.5,
       "aspect": 1.3333333333333333,
-      "roll": 0
+      "roll": -3.5
     },
     {
       "photo": "house-east",
@@ -68,6 +72,139 @@
       ],
       "fov": 52,
       "aspect": 1.7777777777777777,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "overhead",
+      "filename": "Photo_6553721_DJI_121_jpg_4333389_0_2021628133624_photo_original.jpg",
+      "position": [
+        -4.8201775837978005,
+        294.8699736086253,
+        12.387754606646222
+      ],
+      "target": [
+        -12.215075503075902,
+        124.03223419189459,
+        13.192791677580054
+      ],
+      "fov": 33.062,
+      "aspect": 1.7777777777777777,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "garage-front",
+      "filename": "20250705_120430.jpg",
+      "position": [
+        -7.303477902938063,
+        133.6006548531787,
+        -6.5326038438164415
+      ],
+      "target": [
+        -48.46435177879185,
+        124.03223419189473,
+        -13.898510011974903
+      ],
+      "fov": 66.7,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "buildings-green",
+      "filename": "20250705_153226.jpg",
+      "position": [
+        -30.15432683986588,
+        128.4502977525575,
+        27.605941620810974
+      ],
+      "target": [
+        -6.260920730245445,
+        124.0322341918947,
+        -35.01095395677371
+      ],
+      "fov": 78.6,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "east",
+      "filename": "montanaFacingEast.jpg",
+      "position": [
+        -22.351255524859624,
+        124.77027369948084,
+        26.957492802704685
+      ],
+      "target": [
+        -19.88484586129475,
+        124.03223419189439,
+        27.074119262933248
+      ],
+      "fov": 55.7,
+      "aspect": 1.333065164923572,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "campfire",
+      "filename": "montanaCampfire.jpg",
+      "position": [
+        -25.239303526938116,
+        127.06221477592858,
+        28.98338098166583
+      ],
+      "target": [
+        -18.736043772967232,
+        124.03223419189445,
+        34.790391579768325
+      ],
+      "fov": 55.7,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "bottom-drive",
+      "filename": "montanaBottomDriveway.jpg",
+      "position": [
+        153.37187505496087,
+        124.35332845165668,
+        -51.144863916473916
+      ],
+      "target": [
+        152.9866526575357,
+        124.03223419189487,
+        -50.86434782790526
+      ],
+      "fov": 55.7,
+      "aspect": 1.3333333333333333,
+      "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "garage-back",
+      "filename": "montanaBehindGarage.jpg",
+      "position": [
+        -41.68925782900908,
+        131.30201877470674,
+        -26.066934891661795
+      ],
+      "target": [
+        -23.288683822004266,
+        124.03223419189415,
+        5.3996074417751485
+      ],
+      "fov": 88.6,
+      "aspect": 1.3333333333333333,
       "roll": 0
     }
   ]

@@ -124,5 +124,131 @@
     "width": 1781,
     "height": 1002,
     "view": "house-east"
+  },
+  {
+    "id": "drone-01",
+    "label": "DJI 01 \u00b7 House, garage and driveway junction",
+    "file": "./assets/reference/montanaDJI1.jpg",
+    "original": "montanaDJI1.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-02",
+    "label": "DJI 02 \u00b7 Driveway curve and rock borders",
+    "file": "./assets/reference/montanaDJI2.jpg",
+    "original": "montanaDJI2.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-03",
+    "label": "DJI 03 \u00b7 Cabin, shed and fire-pit lawn",
+    "file": "./assets/reference/montanaDJI3.jpg",
+    "original": "montanaDJI3.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-04",
+    "label": "DJI 04 \u00b7 House and horseshoe lawn overview",
+    "file": "./assets/reference/montanaDJI4.jpg",
+    "original": "montanaDJI4.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-05",
+    "label": "DJI 05 \u00b7 Gravel-to-lawn approach and horseshoe pits",
+    "file": "./assets/reference/montanaDJI5.jpg",
+    "original": "montanaDJI5.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-06",
+    "label": "DJI 06 \u00b7 Garage rear windows and roof",
+    "file": "./assets/reference/montanaDJI6.jpg",
+    "original": "montanaDJI6.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-07",
+    "label": "DJI 07 \u00b7 House side entry and grass between tracks",
+    "file": "./assets/reference/montanaDJI7.jpg",
+    "original": "montanaDJI7.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-08",
+    "label": "DJI 08 \u00b7 House dormers and garage frontage",
+    "file": "./assets/reference/montanaDJI8.jpg",
+    "original": "montanaDJI8.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-09",
+    "label": "DJI 09 \u00b7 Three buildings and aspen grove",
+    "file": "./assets/reference/montanaDJI9.jpg",
+    "original": "montanaDJI9.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-10",
+    "label": "DJI 10 \u00b7 Clearing, fire pit and scattered conifers",
+    "file": "./assets/reference/montanaDJ10.jpg",
+    "original": "montanaDJ10.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-11",
+    "label": "DJI 11 \u00b7 Cabin, picnic area and garage",
+    "file": "./assets/reference/montanaDJI11.jpg",
+    "original": "montanaDJI11.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-12",
+    "label": "DJI 12 \u00b7 Whole clearing and surrounding tree groups",
+    "file": "./assets/reference/montanaDJI12.jpg",
+    "original": "montanaDJI12.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "drone-13",
+    "label": "DJI 13 \u00b7 Garage balcony and doors close view",
+    "file": "./assets/reference/montanaDJI13.jpg",
+    "original": "montanaDJI13.jpg",
+    "width": 2048,
+    "height": 1152,
+    "view": null
+  },
+  {
+    "id": "cabin-deck-drone",
+    "label": "Cabin deck and stairs \u00b7 drone",
+    "file": "./assets/reference/montanaCabinDeckDrone.png",
+    "original": "image(3).png",
+    "width": 1781,
+    "height": 1002,
+    "view": null
   }
 ]

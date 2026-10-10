@@ -13,6 +13,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  try{const draft=localStorage.getItem(DRAFT_KEY);if(draft){state.load(JSON.parse(draft));restored=true;}}catch(e){saveWarning='Saved draft was not loaded: '+e.message;}
  const panel=document.createElement('section');panel.id='landscapeEditor';panel.hidden=true;panel.setAttribute('aria-label','Landscape editor');
  panel.innerHTML=`<div class="le-title"><h2>Landscape editor</h2><button id="leClose" title="Close editor">Done</button></div>
+ <label><input id="leLockGeometry" type="checkbox"> lock geometry while adjusting the camera</label>
  <div class="le-row"><button id="leObjects" aria-pressed="true">Objects</button><button id="leTerrain" aria-pressed="false">Terrain</button></div>
  <div class="le-row"><button id="leHouse">House view</button><button id="leTop">Top view</button></div>
  <div id="leObjectTools"><label>Select type<select id="leFilter"><option value="">All objects</option><option value="tree/">Trees</option><option value="rock/">Rocks</option><option value="bush/">Bushes</option><option value="prop/">Property props</option></select></label>
@@ -34,7 +35,12 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  <details open><summary>Save &amp; share</summary><p class="le-help">A draft is saved in this browser. Export the JSON and send it to me to make these changes the published defaults.</p><div class="le-row"><button id="leExport">Export JSON</button><button id="leImport">Import JSON</button></div><input id="leFile" type="file" accept=".json,application/json" hidden><button id="leReset">Reset to published defaults</button></details>
  <p id="leStatus" role="status" aria-live="polite"></p>`;
  document.body.append(panel);const $=id=>panel.querySelector('#'+id);
+ const mainLock=document.getElementById('lockGeometry');
+ $('leLockGeometry').checked=!!mainLock?.checked;
+ $('leLockGeometry').onchange=()=>{if(mainLock)mainLock.checked=$('leLockGeometry').checked;};
+ mainLock?.addEventListener('change',()=>{$('leLockGeometry').checked=mainLock.checked;});
  for(const [key,asset] of catalog){const option=document.createElement('option');option.value=key;option.textContent=asset.label;$('leAsset').append(option);}
+ let gizmoMode=false;
  let active=false,mode='objects',selected=null,vertex=null,adding=false,gesture=null,preview=null,lastGrid=null,dirtyTerrain=false;
  $('leFlatten').value=(bridge.heightAt(8,-8)/getVex()).toFixed(3);
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),object=new THREE.Object3D(),box=new THREE.Box3(),localRay=new THREE.Ray(),inverse=new THREE.Matrix4(),hitPoint=new THREE.Vector3();
@@ -47,6 +53,8 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  for(const asset of catalog.values()){asset.bounds=new THREE.Box3();for(const part of asset.parts){part.geometry.computeBoundingBox();asset.bounds.union(part.geometry.boundingBox);}}
  let previousHeights=new Map();
  function status(text){$('leStatus').textContent=text;}
+ function geometryLocked(){return Boolean(mainLock?.checked||$('leLockGeometry')?.checked);}
+ function requireGeometryUnlocked(){if(!geometryLocked())return true;status('Geometry is locked. Uncheck the lock control before editing.');return false;}
  function save(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));saveWarning='';}catch(e){saveWarning='Browser draft could not be saved. Export JSON to keep your work.';}const count=state.overrides.size+state.added.size+state.removed.size;status(saveWarning||`Draft saved · ${count} object edits · ${state.heights.size} terrain vertices`);}
  function syncHistory(){$('leUndo').disabled=!history.undoStack.length;$('leRedo').disabled=!history.redoStack.length;}
  function applyHeights(){
@@ -100,7 +108,8 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  function cancelGesture(){if(!gesture)return;const before=gesture.before;gesture=null;controls.enabled=true;restore(before);}
  function finishGesture(ev){if(!gesture)return;const g=gesture;gesture=null;controls.enabled=true;if(canvas.hasPointerCapture(ev.pointerId))canvas.releasePointerCapture(ev.pointerId);commit(g.before);}
  canvas.addEventListener('pointerdown',ev=>{
-  if(!active||ev.button!==0)return;
+  if(!active||gizmoMode||ev.button!==0)return;
+  if(!requireGeometryUnlocked())return;
   // Captured pointer gestures prevent the browser's normal focus change.
   // Commit the old field before selecting a different object or vertex.
   if(panel.contains(document.activeElement))document.activeElement.blur();
@@ -126,30 +135,37 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  canvas.addEventListener('pointerup',ev=>{if(!gesture)return;ev.preventDefault();ev.stopImmediatePropagation();finishGesture(ev);},true);
  canvas.addEventListener('pointercancel',cancelGesture,true);
  canvas.addEventListener('lostpointercapture',()=>{if(gesture)cancelGesture();});
- function changeObject(id){const rec=clone(state.get(selected));if(!rec)return;const before=state.export(),original=state.base.get(rec.id)||catalog.get(rec.asset).defaults,value=+$(id).value;
+ function changeObject(id){if(!requireGeometryUnlocked())return;const rec=clone(state.get(selected));if(!rec)return;const before=state.export(),original=state.base.get(rec.id)||catalog.get(rec.asset).defaults,value=+$(id).value;
   if(id==='leX')rec.x=value;else if(id==='leNorth')rec.z=-value;else if(id==='leOffset')rec.offset=value;else if(id==='leHeading')rec.rotation[1]=THREE.MathUtils.degToRad(value);else if(id==='leSize')rec.scale=original.scale.map(n=>n*value);
   const candidate=clone(before),list=state.base.has(rec.id)?candidate.objects.overrides:candidate.objects.added;const index=list.findIndex(o=>o.id===rec.id);if(index<0)list.push(rec);else list[index]=rec;
   try{state.load(candidate);commit(before);}catch(e){status(e.message);showSelection();}
  }
  for(const id of ['leX','leNorth','leOffset','leHeading','leSize']){let dirty=false;$(id).addEventListener('input',()=>{dirty=true;});$(id).addEventListener('change',()=>{if(dirty){dirty=false;changeObject(id);}});}
- function remove(){if(!selected)return;const before=state.export();state.remove(selected);selected=null;clearPreview();commit(before);}
- $('leDelete').onclick=remove;$('leDuplicate').onclick=()=>{const rec=state.get(selected);if(rec)addAt({x:Math.min(748,rec.x+2),z:rec.z},rec);};
- $('leAdd').onclick=()=>setAdding(!adding);$('leCancelAdd').onclick=()=>setAdding(false);
+ function remove(){if(!requireGeometryUnlocked()||!selected)return;const before=state.export();state.remove(selected);selected=null;clearPreview();commit(before);}
+ $('leDelete').onclick=remove;$('leDuplicate').onclick=()=>{if(!requireGeometryUnlocked())return;const rec=state.get(selected);if(rec)addAt({x:Math.min(748,rec.x+2),z:rec.z},rec);};
+ $('leAdd').onclick=()=>{if(requireGeometryUnlocked())setAdding(!adding);};$('leCancelAdd').onclick=()=>setAdding(false);
  function setMode(value){mode=value;setAdding(false);clearPreview();$('leObjectTools').hidden=mode!=='objects';$('leTerrainTools').hidden=mode!=='terrain';$('leObjects').setAttribute('aria-pressed',mode==='objects');$('leTerrain').setAttribute('aria-pressed',mode==='terrain');points.visible=mode==='terrain'&&$('leGrid').checked;brush.visible=false;showVertex();if(mode==='objects')showPreview();else{const p=controls.target;showGrid(p.x,p.z);}}
  $('leObjects').onclick=()=>setMode('objects');$('leTerrain').onclick=()=>setMode('terrain');
  $('leGrid').onchange=()=>{points.visible=active&&mode==='terrain'&&$('leGrid').checked;};$('leHideBuildings').onchange=()=>bridge.hideBuildings($('leHideBuildings').checked);
- function vertexChange(y){if(vertex==null)return;const before=state.export();try{writeHeight(vertex,y);commit(before);}catch(e){status(e.message);showVertex();}}
+ function vertexChange(y){if(!requireGeometryUnlocked()||vertex==null)return;const before=state.export();try{writeHeight(vertex,y);commit(before);}catch(e){status(e.message);showVertex();}}
  let vertexDirty=false;$('leVertexY').oninput=()=>{vertexDirty=true;};$('leVertexY').onchange=()=>{if(vertexDirty){vertexDirty=false;vertexChange(+$('leVertexY').value);}};$('leDown').onclick=()=>vertexChange(fine.baseY[vertex]-(+$('leStep').value||.25));$('leUp').onclick=()=>vertexChange(fine.baseY[vertex]+(+$('leStep').value||.25));$('leSample').onclick=()=>{$('leFlatten').value=fine.baseY[vertex].toFixed(3);};
- function undo(){const data=history.undo();if(data)restore(data);}function redo(){const data=history.redo();if(data)restore(data);}
+ function undo(){if(!requireGeometryUnlocked())return;const data=history.undo();if(data)restore(data);}function redo(){if(!requireGeometryUnlocked())return;const data=history.redo();if(data)restore(data);}
  $('leUndo').onclick=undo;$('leRedo').onclick=redo;
  $('leHouse').onclick=()=>{const y=bridge.heightAt(8,-8);camera.position.set(40,y+34,38);controls.target.set(8,y,-8);controls.update();if(mode==='terrain')showGrid(8,-8);};
  $('leTop').onclick=()=>{const p=controls.target,y=bridge.heightAt(p.x,p.z);camera.position.set(p.x,y+70,p.z+.01);controls.target.set(p.x,y,p.z);controls.update();};
  $('leExport').onclick=()=>{const blob=new Blob([JSON.stringify(state.export(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='montana-landscape-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status('Export downloaded. Send that JSON file to publish this layout.');};
  $('leImport').onclick=()=>$('leFile').click();$('leFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>12e6)throw Error('Import is limited to 12 MB.');const before=state.export(),data=JSON.parse(await file.text());state.load(data);history.push(before,state.export());selected=null;applyDocument();save();status('Imported landscape. '+(saveWarning||'Draft saved in this browser.'));}catch(error){status('Import failed: '+error.message);}e.target.value='';};
- $('leReset').onclick=()=>{const before=state.export();state.load(published);history.push(before,state.export());selected=null;applyDocument();save();};
+ $('leReset').onclick=()=>{if(!requireGeometryUnlocked())return;const before=state.export();state.load(published);history.push(before,state.export());selected=null;applyDocument();save();};
  function setActive(value){if(gesture)cancelGesture();active=value;panel.hidden=!value;setAdding(false);if(value){enter();showSelection();if(mode==='objects')showPreview();else{showGrid(controls.target.x,controls.target.z);showVertex();}bridge.hideBuildings($('leHideBuildings').checked);}else{clearPreview();points.visible=brush.visible=vertexMarker.visible=false;bridge.hideBuildings(false);controls.enabled=true;leave();}}
  $('leClose').onclick=()=>setActive(false);
- addEventListener('keydown',e=>{if(!active||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();e.key.toLowerCase()==='y'||e.shiftKey?redo():undo();}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.stopImmediatePropagation();if(mode==='objects')remove();}else if(e.key==='Escape'){e.preventDefault();if(gesture)cancelGesture();else if(adding)setAdding(false);else{selected=null;showSelection();clearPreview();}}},true);
+ addEventListener('keydown',e=>{if(!active||gizmoMode||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();e.key.toLowerCase()==='y'||e.shiftKey?redo():undo();}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.stopImmediatePropagation();if(mode==='objects')remove();}else if(e.key==='Escape'){e.preventDefault();if(gesture)cancelGesture();else if(adding)setAdding(false);else{selected=null;showSelection();clearPreview();}}},true);
  applyDocument();status(saveWarning||(restored?'Restored your saved browser draft.':'Ready. Changes are saved as a browser draft until you export them.'));
- return {state,setActive,get active(){return active;},refresh(){if(active){showPreview();showVertex();if(lastGrid)showGrid(lastGrid.x,lastGrid.z);}},setQuality:bridge.setQuality,update:bridge.update};
+ return {state,setActive,
+  setGizmoMode(on){gizmoMode=on;if(on){if(!active)setActive(true);setMode('objects');panel.hidden=true;}else if(active)setActive(false);},
+  pick(ev){eventRay(ev);const id=pickObject();if(!id)return null;const rec=state.get(id);const bounds=catalog.get(rec.asset).bounds.clone().applyMatrix4(worldMatrix(rec));const p=ray.ray.intersectBox(bounds,new THREE.Vector3());return {id,distance:p?ray.ray.origin.distanceTo(p):Infinity};},
+  selectForGizmo(id){select(id);return preview;},
+  beginTransform(){return state.export();},
+  finishTransform(before){const rec=state.get(selected);if(!rec||!preview)return;const next=clone(rec);next.x=preview.position.x;next.z=preview.position.z;next.offset=preview.position.y-bridge.heightAt(next.x,next.z);next.rotation=preview.rotation.toArray().slice(0,3);next.scale=preview.scale.toArray();state.set(next);try{state.validate(state.export());commit(before);}catch(e){restore(before);status(e.message);}},
+  clearGizmoSelection(){select(null);},
+  get active(){return active;},refresh(){if(active){showPreview();showVertex();if(lastGrid)showGrid(lastGrid.x,lastGrid.z);}},setQuality:bridge.setQuality,update:bridge.update};
 }
