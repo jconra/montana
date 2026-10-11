@@ -1,3 +1,5 @@
+import {clipRoofPolygon,roofOpeningPolygon,roofPanelGeometry} from './roof-panels.mjs';
+
 // Shared house builder — used by the designer's live preview and by the terrain scene.
 // Polygon-footprint spec (no more rectangular "shell"):
 //   spec = {
@@ -10,7 +12,7 @@
 // mats/mat are indices into palette. Wall groups & roof carry userData.surf for face-painting.
 // Legacy {blocks:[...]} and older {floors:[{shell}]} specs are auto-converted.
 
-export const VERSION = '39';   // shared with building-designer
+export const VERSION = '40';   // shared with building-designer
 
 // ---------- procedural surface textures ----------------------------------------------------------
 // Each pattern is a tileable GRAYSCALE luminance map; the swatch colour tints it (material.color
@@ -72,7 +74,7 @@ const _texCache={};
 function makeMap(THREE,id,mode){ const key=id+'|'+(mode||'face'); if(_texCache[key]) return _texCache[key];
   const S=256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
   const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=4; if('SRGBColorSpace'in THREE) t.colorSpace=THREE.SRGBColorSpace;
-  if(mode==='world'){ const ft=TEX_FEET[id]||6; t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
+  if(mode==='world'||mode==='roof'){ const ft=mode==='roof'&&id==='metal'?8:(TEX_FEET[id]||6); t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
   _texCache[key]=t; return t; }
 // rewrite a BoxGeometry's UVs into world feet, so a world-mode texture tiles evenly no matter the face size
 function worldUVBox(geo, w,h,d){ const uv=geo.attributes.uv; if(!uv) return;
@@ -104,6 +106,7 @@ export function buildHouse(THREE, spec, opts){
     const metal=(tex==='metal');
     const m=new THREE.MeshStandardMaterial({color:hex,roughness:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
     m.map=makeMap(THREE,tex,mode||'face'); matCache[key]=m; return m; };
+  const dormerCuts=[];
   const M=(v)=> (v&&v.isMaterial)?v:solid(v);                        // accept a material OR a hex colour
   const WALL_T=0.5;                                                  // wall thickness (~6", units = feet)
   const winFrames = !!spec.windowFrames;                            // optional trim frame around each window
@@ -136,6 +139,8 @@ export function buildHouse(THREE, spec, opts){
     const ext = butt ? -t/2 : t/2;
     const seg=(a,b,y0,y1,mat)=>{ const l=b-a; if(l<=0.002||y1-y0<=0.002) return;
       const geo=new THREE.BoxGeometry(l,y1-y0,t); worldUVBox(geo,l,y1-y0,t);   // world-feet UVs -> texture tiles evenly regardless of wall size
+      // Keep horizontal siding courses aligned across window fragments and floors.
+      for(const face of [0,1,4,5])for(let i=0;i<4;i++){const k=face*4+i;geo.attributes.uv.setY(k,geo.attributes.uv.getY(k)+baseY+y0);}
       const m=new THREE.Mesh(geo,mat); m.position.set((a+b)/2,(y0+y1)/2,0); wg.add(m); };
     const frame=(a,b,y0,y1)=>{ const fw=0.35, d=t+0.3, fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
       const cx=(a+b)/2, cy=(y0+y1)/2, w=b-a, hh=y1-y0;   // trim frame + centre mullion, proud of the wall
@@ -200,12 +205,35 @@ export function buildHouse(THREE, spec, opts){
     wallSeg(x0,z0,x1,z1, baseY, dH, ops, color, surf);          // front (with window)
     wallSeg(FL[0],FL[1],BL[0],BL[1], baseY, dH, [], color, null);
     wallSeg(FR[0],FR[1],BR[0],BR[1], baseY, dH, [], color, null);
-    triM(P(FL,eave),P(FR,eave),P(midF,peak), wm);               // front gable
-    const RF=P(midF,peak), RB=P([midF[0]+ix*depth,midF[1]+iz*depth],peak);
-    if(!opts.noRoof){
-      const rm=swatchMat(w.roofMat??spec.roofPieces?.[0]?.mat,defRoof);
-      quad(RF, RB, P(BL,eave), P(FL,eave), rm);                // left slope
-      quad(RF, P(FR,eave), P(BR,eave), RB, rm);                // right slope
+    const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute([...P(FL,eave),...P(FR,eave),...P(midF,peak)],3));
+    fg.setAttribute('uv',new THREE.Float32BufferAttribute([0,eave,L,eave,L/2,peak],2));fg.computeVertexNormals();g.add(new THREE.Mesh(fg,wm));
+    // A wall dormer joins the main roof along its two valleys, not along a
+    // rectangular patch laid on top of an uncut roof.
+    const roofIndex=w.roofPiece??0, main=spec.roofPieces?.[roofIndex];
+    const flush=outline.some((a,i)=>{const b=outline[(i+1)%outline.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz);return length>.01&&Math.abs((mx-a[0])*dz-(mz-a[1])*dx)/length<.05&&(mx-a[0])*(mx-b[0])+(mz-a[1])*(mz-b[1])<=0;});
+    const local=p=>[(p[0]-mx)*ux+(p[1]-mz)*uz,(p[0]-mx)*ix+(p[1]-mz)*iz];
+    const plan=(a,b)=>[mx+ux*a+ix*b,mz+uz*a+iz*b];
+    const ceiling=p=>peak-Math.abs(local(p)[0])*(peak-eave)/(L/2);
+    let mainHeight=null;
+    if(main&&(main.style||'gable')==='gable'){
+      let along=main.w>=main.d;if(main.flipRidge)along=!along;
+      const span=along?main.d:main.w,rise=span/2*(main.pitch??.5);
+      mainHeight=p=>(main.base||0)+rise*(1-Math.abs(along?p[1]-main.z:p[0]-main.x)/(span/2+2));
+    }
+    for(const side of [-1,1]){
+      const a=side<0?-(L/2+WALL_T/2):0,b=side<0?0:L/2+WALL_T/2;
+      // Extend the opening through the eave for a flush wall dormer.
+      dormerCuts.push({roofIndex,poly:[plan(a,flush?-4:0),plan(b,flush?-4:0),plan(b,depth),plan(a,depth)],ceiling,baseY});
+      if(!opts.noRoof){
+        const ra=side<0?-(L/2+.6):0,rb=side<0?0:L/2+.6;
+        let poly=[plan(ra,-.6),plan(rb,-.6),plan(rb,depth),plan(ra,depth)];
+        if(mainHeight)poly=clipRoofPolygon(poly,p=>ceiling(p)-mainHeight(p));
+        if(poly.length>=3){
+          const slant=Math.hypot(1,(peak-eave)/(L/2));
+          const geo=roofPanelGeometry(THREE,poly,[],ceiling,p=>[p[0]*ix+p[1]*iz,(p[0]*ux+p[1]*uz)*slant]);
+          const m=new THREE.Mesh(geo,swatchMat(w.roofMat??main?.mat,defRoof,'roof'));m.userData.surf=surf;g.add(m);
+        }
+      }
     }
   }
 
@@ -223,9 +251,9 @@ export function buildHouse(THREE, spec, opts){
   function roof(outline, topY, rs, sm){                        // sm = {pi} identifies which roof piece, for painting
     const pi = sm ? sm.pi : undefined;
     const pitch=rs.pitch??0.5, eave=2, style=rs.style||'gable', h=topY;
-    const rmat = rs.mat!=null ? swatchMat(rs.mat,defRoof) : roofMat;
+    const rmat = rs.mat!=null ? swatchMat(rs.mat,defRoof,'roof') : roofMat;
     if(style==='flat'){
-      slabPoly(outline, topY, [], rmat, 0.6);
+      slabPoly(outline, topY, (rs.holes||[]).map(h=>({poly:roofOpeningPolygon(h)})), rmat, 0.6);
       for(let e=0;e<outline.length;e++){ const a=outline[e], b=outline[(e+1)%outline.length];
         wallSeg(a[0],a[1],b[0],b[1], topY, 1.5, [], defTrim, null); }
       return;
@@ -238,24 +266,36 @@ export function buildHouse(THREE, spec, opts){
     const sub=new THREE.Group(); sub.rotation.y=along?0:Math.PI/2; rg.add(sub);
     // one roof panel spanning eave -> ridge. s=+1 is the +z side, -1 the -z side.
     // ext extends the panel a touch PAST the ridge so the two sides cross and meet cleanly (no gap / no notch).
-    const slope=(s,ext)=>{ ext=ext||0;
-      const uz=-s*(span/2+eave)/sln, uy=rise/sln;             // unit vector, eave -> ridge
-      const eaveZ=s*(span/2+eave), topZ=uz*ext, topY=(h+rise)+uy*ext;
-      const cz=(eaveZ+topZ)/2, cy=(h+topY)/2;
-      const m=new THREE.Mesh(new THREE.BoxGeometry(len+2*eave,0.4,sln+ext),rmat);
-      m.position.set(0,cy,cz); m.rotation.x=s*ang; sub.add(m); };
+    const toLocal=p=>along?[p[0]-x,p[1]-z]:[-(p[1]-z),p[0]-x];
+    const toWorld=p=>along?[p[0]+x,p[1]+z]:[p[1]+x,z-p[0]];
+    const manual=(rs.holes||[]).map(roofOpeningPolygon).map(poly=>poly.map(toLocal));
+    function panel(poly,height,uv,thickness=.4){
+      const cuts=manual.slice();
+      for(const cut of dormerCuts){
+        if(cut.roofIndex!==pi)continue;
+        let hole=cut.poly.map(toLocal);
+        hole=clipRoofPolygon(hole,p=>cut.ceiling(toWorld(p))-height(p));
+        hole=clipRoofPolygon(hole,p=>height(p)-cut.baseY+.25);
+        if(hole.length>=3)cuts.push(hole);
+      }
+      const m=new THREE.Mesh(roofPanelGeometry(THREE,poly,cuts,height,uv,thickness),rmat);m.userData.roofPanel=true;sub.add(m);
+    }
+    const slope=s=>{
+      const a=-len/2-eave,b=len/2+eave,z0=s<0?-(span/2+eave):0,z1=s<0?0:span/2+eave;
+      panel([[a,z0],[b,z0],[b,z1],[a,z1]],p=>h+rise*(1-s*p[1]/(span/2+eave)),p=>[p[0],p[1]*sln/(span/2+eave)]);
+    };
     const gableEnd=(sx)=>{const eH=rise*eave/(span/2+eave); const shp=new THREE.Shape();   // top follows the roof rake (slope over span/2+eave) so it meets the roof with no gap
       shp.moveTo(-span/2,0); shp.lineTo(span/2,0); shp.lineTo(span/2,eH); shp.lineTo(0,rise); shp.lineTo(-span/2,eH); shp.closePath();  // paintable via roof.gableMat
       const m=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:0.5,bevelEnabled:false}),swatchMat(rs.gableMat,defWall,"world"));m.rotation.y=Math.PI/2;m.position.set(sx*len/2,h,-0.25);m.userData.surf={kind:'gable',pi};sub.add(m);};
     if(style==='shed'){
       const rise2=span*pitch*0.6, ang2=Math.atan2(rise2,span+eave), sll=Math.hypot(span+eave,rise2);
-      const m=new THREE.Mesh(new THREE.BoxGeometry(len+2*eave,0.5,sll),rmat);m.position.set(0,h+rise2/2,0);m.rotation.x=ang2;sub.add(m);
+      const half=(span+eave)/2;panel([[-len/2-eave,-half],[len/2+eave,-half],[len/2+eave,half],[-len/2-eave,half]],p=>h+rise2/2-p[1]*rise2/(span+eave),p=>[p[0],p[1]*sll/(span+eave)]);
       for(const sx of [-1,1]){const shp=new THREE.Shape();shp.moveTo(-span/2,0);shp.lineTo(span/2,0);shp.lineTo(span/2,rise2);shp.lineTo(-span/2,0);
         const t=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:0.5,bevelEnabled:false}),swatchMat(rs.gableMat,defWall,"world"));t.rotation.y=Math.PI/2;t.position.set(sx*len/2,h,-0.25);t.userData.surf={kind:'gable'};sub.add(t);}
       return;
     }
     slope(1,0); slope(-1,0);                                   // panels now meet exactly along the ridge line
-    if(style!=='hip'){ const cap=new THREE.Mesh(new THREE.BoxGeometry(len+2*eave,0.2,0.55),rmat); cap.position.set(0,h+rise-0.03,0); sub.add(cap); }   // ridge cap hides the seam between panels
+    if(style!=='hip')panel([[-len/2-eave,-.275],[len/2+eave,-.275],[len/2+eave,.275],[-len/2-eave,.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
     if(style==='hip'){
       const rl=Math.max(0.01,len-span), y0=h, y1=h+rise, Lx=len/2+eave, W=span/2+eave, R=rl/2;
       const Q=[[-Lx,y0,-W],[Lx,y0,-W],[Lx,y0,W],[-Lx,y0,W],[-R,y1,0],[R,y1,0]];
@@ -319,7 +359,7 @@ export function buildHouse(THREE, spec, opts){
   if(!opts.noRoof){ if(spec.roof && spec.roof.style && spec.roof.style!=='none') roof(F[F.length-1].outline, acc, spec.roof);   // legacy whole-house roof (new designs use a roof piece instead)
     const okPiece=rp=> rp.w>0.5&&rp.d>0.5&&isFinite(rp.x)&&isFinite(rp.z)&&isFinite(rp.base||0)&&isFinite(rp.pitch??0.5);
     (spec.roofPieces||[]).forEach((rp,pi)=>{ if(okPiece(rp))   // every roof (incl. the main house) is one of these
-      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls}, {pi}); });
+      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:rp.holes}, {pi}); });
     // raise the walls sitting under a roof piece up into its underside (opt-in, gable pieces)
     (spec.roofPieces||[]).forEach(rp=>{ if(!rp.raiseWalls||!okPiece(rp)||(rp.style||'gable')!=='gable') return;
       const rw=rp.w, rd=rp.d; let along=rw>=rd; if(rp.flipRidge) along=!along; const span=(along?rd:rw)||1, rise=(span/2)*(rp.pitch??0.5), base=rp.base||0, reave=2;

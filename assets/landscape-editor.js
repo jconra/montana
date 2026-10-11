@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {applyReferenceEdits} from './reference-edits.mjs';
+import {applyReferenceEdits,applyReferenceHeights} from './reference-edits.mjs?v=terrain-20261011';
 import {LandscapeState,EditHistory,brushVertices} from './landscape-state.mjs';
 
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -17,7 +17,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
   const res=await fetch(new URL('./property-refinement-edits.json',import.meta.url));
   if(res.ok){const edits=await res.json(),key='montanaReferenceEdits:v1';
    if(localStorage.getItem(key)!==edits.version){
-    if(restored&&applyReferenceEdits(state,edits.changes))localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));
+    if(restored){const objects=applyReferenceEdits(state,edits.changes),heights=applyReferenceHeights(state,edits.heights);if(objects||heights)localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));}
     localStorage.setItem(key,edits.version);
    }
   }

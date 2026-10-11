@@ -324,27 +324,29 @@
         },
         {
           "x0": -24.5,
-          "z0": 16.7,
+          "z0": 15,
           "x1": -15.5,
-          "z1": 16.7,
+          "z1": 15,
           "dormer": true,
           "mat": 3,
           "dormerBase": 7,
           "dormerHeight": 5.7,
-          "dormerDepth": 11,
-          "dormerRise": 2.5
+          "dormerDepth": 15,
+          "dormerRise": 2.5,
+          "roofPiece": 0
         },
         {
           "x0": 15.5,
-          "z0": 16.7,
+          "z0": 15,
           "x1": 24.5,
-          "z1": 16.7,
+          "z1": 15,
           "dormer": true,
           "mat": 3,
           "dormerBase": 7,
           "dormerHeight": 5.7,
-          "dormerDepth": 11,
-          "dormerRise": 2.5
+          "dormerDepth": 15,
+          "dormerRise": 2.5,
+          "roofPiece": 0
         }
       ],
       "openings": [

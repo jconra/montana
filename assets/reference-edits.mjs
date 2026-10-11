@@ -12,3 +12,15 @@ export function applyReferenceEdits(state,changes){
  }
  return count;
 }
+
+// Apply published terrain adjustments only where a browser draft still has
+// the old height; preserve independently edited vertices.
+export function applyReferenceHeights(state,changes=[]){
+ let count=0;
+ for(const {index,before,after} of changes){
+  if((state.heights.get(index)??null)!==before)continue;
+  if(after==null)state.heights.delete(index);else state.heights.set(index,after);
+  count++;
+ }
+ return count;
+}

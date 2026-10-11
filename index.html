@@ -144,11 +144,11 @@ import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
-import { buildHouse } from './assets/house-model.js?v=39';
+import { buildHouse } from './assets/house-model.js?v=40';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-1';
 import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
-import { createLandscapeEditor } from './assets/landscape-editor.js';
+import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
 import { RouteDriver,dampFactor } from './assets/route-driving.mjs';
 import {propaneTank} from './assets/property-props.js';
@@ -1056,13 +1056,20 @@ car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=
 let driveMode=false, carMode='idle';        // carMode: idle | manual | route
 const KEY={};
 addEventListener('keydown',e=>{
-  if(e.defaultPrevented||/INPUT|TEXTAREA|SELECT|BUTTON|A/.test(e.target.tagName))return;
+  if(e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
+  // Toolbar buttons keep focus after a click. WASD still navigates, while
+  // Space/Enter retain native button and link activation.
+  if(/^(BUTTON|A)$/.test(e.target.tagName)&&(e.code==='Space'||e.key==='Enter'))return;
   const k=e.key.toLowerCase(); KEY[k]=true;
   if(e.code==='Space')KEY.space=true;
   if(!driveMode&&e.code==='Space')e.preventDefault();
   if(driveMode&&k.startsWith('arrow'))e.preventDefault();
 });
 addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;if(e.code==='Space')KEY.space=false;});
+const clearCameraKeys=()=>{for(const key of Object.keys(KEY))KEY[key]=false;};
+addEventListener('blur',clearCameraKeys);
+addEventListener('focusin',e=>{if(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))clearCameraKeys();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearCameraKeys();});
 
 // ---- route waypoints ----
 let routePts=correctedDriveway(DRIVEWAY).map(p=>({...p})), routeDriver=null, routeAdd=false, routeObj=null;

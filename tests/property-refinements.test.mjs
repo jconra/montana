@@ -15,3 +15,8 @@ const state={get:id=>records.get(id),set:r=>records.set(r.id,r),remove:id=>recor
 assert.equal(applyReferenceEdits(state,[{id:'unchanged',before:{x:1,id:'unchanged'},after:{id:'unchanged',x:2}},{id:'edited',before:{id:'edited',x:1},after:{id:'edited',x:2}},{id:'deleted',before:{id:'deleted',x:1},after:{id:'deleted',x:2}},{id:'new',before:null,after:{id:'new',x:3}}]),2);
 assert.equal(records.get('edited').x,9);assert.ok(!records.has('deleted'));assert.equal(records.get('unchanged').x,2);
 console.log('Marked meadow/gravel zones, pit placement and draft-preserving reference corrections passed');
+const {applyReferenceHeights}=await import('../assets/reference-edits.mjs');
+const terrain={heights:new Map([[1,10],[2,99],[3,20]])};
+assert.equal(applyReferenceHeights(terrain,[{index:1,before:10,after:11},{index:2,before:10,after:11},{index:3,before:20,after:null},{index:4,before:null,after:30}]),3);
+assert.deepEqual([...terrain.heights],[[1,11],[2,99],[4,30]]);
+assert.equal(applyReferenceHeights(terrain,[{index:1,before:10,after:11}]),0,'Terrain migration is idempotent');
