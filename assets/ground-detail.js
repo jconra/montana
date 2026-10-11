@@ -1,3 +1,4 @@
+import {createTerrainPaint} from './terrain-paint.js';
 import * as THREE from 'three';
 import {createRoute,POND_OUTLINE} from './property-layout.mjs';
 import {grassReclaim} from './driveway-refinements.mjs';
@@ -39,6 +40,11 @@ export function createGroundDetail(half,driveway){
     data[i]=Math.max(data[i],Math.round(s.gravel*255));data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));data[i+2]=Math.round(s.lawn*255);
     const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));data[i+1]=Math.max(data[i+1],Math.round(reclaim*255));data[i+2]=Math.max(data[i+2],Math.round(reclaim*255));
   }
+  // Feather only moisture, preserving the narrow gravel wheel tracks.
+  const green=document.createElement('canvas');green.width=green.height=c.width;const gg=green.getContext('2d'),gp=gg.createImageData(c.width,c.height);
+  for(let i=0;i<data.length;i+=4){gp.data[i]=gp.data[i+1]=gp.data[i+2]=data[i+1];gp.data[i+3]=255;}gg.putImageData(gp,0,0);
+  const soft=document.createElement('canvas');soft.width=soft.height=c.width;const sg=soft.getContext('2d');sg.filter='blur(18px)';sg.drawImage(green,0,0);const sm=sg.getImageData(0,0,c.width,c.height).data;
+  for(let i=0;i<data.length;i+=4)data[i+1]=sm[i];
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;
   const uniforms={detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},greenness:{value:.85},grassDetail:{value:surface(3)},soilDetail:{value:surface(0)},gravelDetail:{value:surface(1)},stoneDetail:{value:surface(2)}};
@@ -56,11 +62,12 @@ export function createGroundDetail(half,driveway){
       g.fillStyle=gradient;g.fillRect(t.x-radius,t.z-radius,radius*2,radius*2);
     }shadeTexture.needsUpdate=true;
   }
-  return {uniforms,setTrees,attach(material){material.onBeforeCompile=sh=>{
+  const paint=createTerrainPaint(half);Object.assign(uniforms,paint.uniforms);
+  return {uniforms,paint,setTrees,attach(material){material.onBeforeCompile=sh=>{
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader='uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
       #ifdef USE_MAP
       vec2 landUV=detailWorld.xz;vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 maskUV=vec2(localMask.x,1.-localMask.y);
@@ -78,6 +85,13 @@ export function createGroundDetail(half,driveway){
       // rather than flattening the clearing to one color or baking dry-season tan.
       grass=mix(grass,grass*vec3(1.03,1.15,.98),coverage.b*.75);
       float grassWeight=clamp(greenness*(.48+patches*.5+coverage.g*.48),0.,1.)*(1.-steep*.85);
+      vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
+      vec4 moisture=texture2D(paintMoisture,paintUV),surfacePaint=texture2D(paintSurface,paintUV);
+      vec3 dryGrass=texture2D(grassDetail,landUV*.65).rgb*vec3(2.25,1.25,1.4);
+      grass=mix(grass,mix(dryGrass,grass*vec3(.92,1.18,.96),moisture.r),moisture.a);
+      grassWeight=mix(grassWeight,.93,moisture.a);
+      road=mix(road,surfacePaint.r,surfacePaint.a);
+      grassWeight=mix(grassWeight,.95,surfacePaint.a*(1.-surfacePaint.r));
       vec3 land=mix(soil,grass,grassWeight);
       land*=.88+patches*.24;
       vec3 detailed=mix(land,stone,steep*.7);
@@ -90,7 +104,7 @@ export function createGroundDetail(half,driveway){
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
       diffuseColor.rgb*=1.-canopy*.75;`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v5';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v6';}};
 }
 export function rockGeometry(seed){
   const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);

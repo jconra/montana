@@ -145,6 +145,7 @@ import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=39';
+import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
@@ -258,7 +259,7 @@ function heightAt(x,z){
 
 const pondLevel=preparePond(tiles,heightAt);
 let propertyNature=null;
-let sceneTransform=null;
+let sceneTransform=null,toolDock=null;
 let landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 
 // ---- building models ----------------------------------------------------
@@ -999,18 +1000,6 @@ renderer.domElement.addEventListener('pointerdown',ev=>{
   evNdc(ev);
   if(routeAdd){const h=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(h) addWaypoint(h.point.x,h.point.z); return;}
   if(driveMode) return;                                            // no building editing while driving
-  const locked=document.getElementById('lockGeometry').checked;
-  if(!locked){
-    const sh=ray.intersectObjects(placed.filter(o=>!o.deleted).map(o=>o.group),true)[0];   // grab a building → select + start drag
-    if(sh){let g=sh.object; while(g.parent&&!placed.some(o=>o.group===g)) g=g.parent;
-      const rec=placed.find(o=>o.group===g);
-      if(rec){selectRec(rec); dragging=rec; controls.enabled=false; return;}}
-    const th=ray.intersectObjects(treeMeshes.map(m=>m.im))[0];       // click a tree → get its id
-    if(th && th.instanceId!=null){
-      const entry=treeMeshes.find(m=>m.im===th.object), t=entry&&entry.list[th.instanceId];
-      if(t){ selTree=t; info.innerHTML=`🌲 tree #${t.id}<br>E ${t.x.toFixed(1)} · N ${(-t.z).toFixed(1)}<br>use "remove tree" to delete it`; return; }
-    }
-  }
   if(!document.getElementById('coordinateMode').checked)return;
   const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
   const p=hit.point; marker.position.set(p.x,p.y+2,p.z);
@@ -1185,7 +1174,7 @@ $('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='ad
 $('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
 $('rintro').onclick=playIntro;
 $('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value).catch(()=>{});}catch(e){}};
-function setPanel(open){$('panel').style.display=open?'block':'none'; $('fab').style.display=open?'none':'block';}
+function setPanel(open){if(toolDock)return;$('panel').style.display=open?'block':'none'; $('fab').style.display=open?'none':'block';}
 $('min').onclick=()=>setPanel(false); $('fab').onclick=()=>setPanel(true);
 setPanel(false);   // start collapsed — just the ＋ button
 const bindHold=(id,key)=>{const b=$(id); b.addEventListener('pointerdown',e=>{e.preventDefault();KEY[key]=true;});
@@ -1221,7 +1210,7 @@ function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
   const padY = sum/n - 0.3;        // average grade, just recessed
   flattenPad(hx,hz,hw,hd,padY,5);
 }
-propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel});
+propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
 applyVex(1);
 // Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
@@ -1325,12 +1314,20 @@ const landscapeReady=(async()=>{
     for(const t of entry.list){const id=type+':'+t.x.toFixed(5)+':'+t.z.toFixed(5);if(seenGround.has(id))continue;seenGround.add(id);base.push(row(id,type,t,[t.s,t.s*(t.sy||1),t.s],[t.rx||0,t.r,0],t.dy||0));}
   }
   for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
+  // Bake each prop in its own local coordinates, then register it with the
+  // same persistent object IDs and instanced editor used for vegetation.
+  for(const p of propertyNature.props){
+    const g=p.group,parts=[];optimizeGroup(g);g.updateMatrixWorld(true);const inverse=g.matrixWorld.clone().invert();
+    g.traverse(o=>{if(o.isMesh)parts.push({geometry:o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inverse,o.matrixWorld)),material:o.material});});
+    const key=p.id.replaceAll(':','/');asset(key,p.label,parts,[1,1,1]);
+    base.push(row(p.id,key,{x:g.position.x,z:g.position.z},g.scale.toArray(),g.rotation.toArray().slice(0,3),g.position.y-heightAt(g.position.x,g.position.z)));
+  }
   const reference={center:M.center,globalMin:gmin,grid:{W:fine.W,H:fine.H,px:fine.px}};
   for(const o of placed)o.foundationY=o.group.position.y/VEX;
   let detached=false;
   const bridge={heightAt,
     apply(records,authored){
-      if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
+      if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();propertyNature.detachProps();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
       landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);buildTreesFrom(+$('treeN').value);
     },
     hide(id){
@@ -1366,13 +1363,15 @@ const landscapeReady=(async()=>{
   // Keep the cabin selected after the late shed insertion so its transform
   // controls are immediately useful for the bird's-eye alignment pass.
   selectRec(placed.find(o=>o.type==='cabin'));
-  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,onBuilding:selectRec,stopDrive:()=>endDrive({preserveView:true})});
-  if(new URLSearchParams(location.search).has('edit')){landscape.setActive(true);document.getElementById('leHouse').click();}
+  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,onBuilding:selectRec,stopDrive:()=>endDrive({preserveView:true}),paint:groundDetail.paint});
+  await groundDetail.paint.ready;
+  toolDock=createToolDock({landscape,sceneTransform,paint:groundDetail.paint,canvas:renderer.domElement,camera:cam,controls,scene,heightAt,groundHit:bridge.groundHit,stopDrive:()=>endDrive({preserveView:true}),stopRoute(){routeAdd=false;$('radd').textContent='add waypoints';}});
+  if(new URLSearchParams(location.search).has('edit')){toolDock.open('objects');}
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
 const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
 const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);});
-const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);setPanel(true);$('panel').scrollTop=$('panel').scrollHeight;});
+const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);toolDock?.open('photo');});
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;

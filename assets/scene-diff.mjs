@@ -3,7 +3,7 @@ const copy=v=>JSON.parse(JSON.stringify(v));
 const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
 const equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 const keyed=rows=>Object.fromEntries(rows.map(({id,...fields})=>[id,fields]));
-export function normalizeScene(scene){const l=scene.landscape;return {buildings:keyed(scene.buildings),landscape:{overrides:keyed(l.objects.overrides),added:keyed(l.objects.added),removed:Object.fromEntries(l.objects.removed.map(id=>[id,true])),heights:Object.fromEntries(l.terrain.heights)}};}
+export function normalizeScene(scene){const l=scene.landscape;return {...(scene.terrainPaint?{terrainPaint:keyed(scene.terrainPaint.map((s,order)=>({...s,order})))}:{}),buildings:keyed(scene.buildings),landscape:{overrides:keyed(l.objects.overrides),added:keyed(l.objects.added),removed:Object.fromEntries(l.objects.removed.map(id=>[id,true])),heights:Object.fromEntries(l.terrain.heights)}};}
 function fingerprint(v){let h=2166136261;for(const c of JSON.stringify(canonical(v)))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0).toString(16).padStart(8,'0');}
 export function createSceneDiff(base,current){
  const a=normalizeScene(base),b=normalizeScene(current),changes=[];
@@ -30,7 +30,7 @@ export function applySceneDiff(base,diff){
   if(c.op==='add'){if(Object.hasOwn(parent,key))throw Error('Existing diff path');parent[key]=copy(c.value);}
   else {if(!Object.hasOwn(parent,key)||!equal(parent[key],c.old))throw Error('Changed diff value');if(c.op==='remove')delete parent[key];else if(c.op==='replace')parent[key]=copy(c.value);else throw Error('Unknown diff operation');}
  }
- const out=copy(base),rows=map=>Object.entries(map).map(([id,fields])=>({id,...fields}));out.buildings=rows(result.buildings);
+ const out=copy(base);if(result.terrainPaint)out.terrainPaint=Object.entries(result.terrainPaint).map(([id,s])=>({id,...s})).sort((a,b)=>a.order-b.order).map(({order,...s})=>s);const rows=map=>Object.entries(map).map(([id,fields])=>({id,...fields}));out.buildings=rows(result.buildings);
  out.landscape.objects={overrides:rows(result.landscape.overrides),added:rows(result.landscape.added),removed:Object.keys(result.landscape.removed)};
  out.landscape.terrain.heights=Object.entries(result.landscape.heights).map(([i,y])=>[Number(i),y]).sort((a,b)=>a[0]-b[0]);return out;
 }

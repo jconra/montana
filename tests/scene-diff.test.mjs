@@ -10,3 +10,9 @@ assert.throws(()=>applySceneDiff(current,diff),/baseline/);
 const deleted=structuredClone(base);deleted.buildings[0].deleted=true;deleted.landscape.objects.removed.push('tree/a');assert.deepEqual(applySceneDiff(base,createSceneDiff(base,deleted)),deleted);
 const fresh=structuredClone(base);fresh.landscape.objects.added.push({id:'added:new',x:3});assert.deepEqual(applySceneDiff(base,createSceneDiff(base,fresh)),fresh);
 console.log('Diff-only export: empty, fields, additions, deletions, resets, heights, repeat copy and stale-baseline protection passed');
+
+const paintedBase={...structuredClone(base),terrainPaint:[{id:'default-green',kind:'green',x:4,z:9,radius:10,opacity:.7}]};
+const painted=structuredClone(paintedBase);painted.terrainPaint.push({id:'stroke-new',kind:'dry',x:5,z:8,radius:3,opacity:.5});
+const pd=createSceneDiff(paintedBase,painted);assert.equal(pd.changes.length,1);assert.deepEqual(pd.changes[0].path,['terrainPaint','stroke-new']);assert.deepEqual(applySceneDiff(paintedBase,pd),painted);
+assert.ok(!JSON.stringify(pd).includes('default-green'),'Unchanged published paint omitted');
+const erased=structuredClone(paintedBase);erased.terrainPaint=[];assert.deepEqual(applySceneDiff(paintedBase,createSceneDiff(paintedBase,erased)),erased);

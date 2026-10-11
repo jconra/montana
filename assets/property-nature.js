@@ -88,19 +88,21 @@ export function preparePond(tiles,sample){
  const mix=d>=0?1:1-smooth(0,3,-d);t.baseY[i]=t.baseY[i]*(1-mix)+target*mix;
  }}return level;
 }
-export async function createPropertyNature({scene,heightAt,driveway,buildings,pondLevel}){
+export async function createPropertyNature({scene,heightAt,driveway,buildings,pondLevel,paintUniforms}){
  const route=createRoute(driveway),R=rng(423031),o=new THREE.Object3D(),chunks=new Map(),props=[],wind={value:0},fadeDistance={value:90};let vex=1,quality=1,lastCam=new THREE.Vector3(1e8,0,0),radius=70;
  const geos={grass:grassGeometry(71),reeds:grassGeometry(75,true),white:flowerGeometry(81,false),yellow:flowerGeometry(85,true)};
  const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:1});
  function plantMaterial(material,sway){
- material.onBeforeCompile=sh=>{sh.uniforms.plantTime=wind;sh.uniforms.plantDistance=fadeDistance;
- sh.vertexShader='uniform float plantTime;varying float plantViewDistance;\n'+sh.vertexShader;
+ material.onBeforeCompile=sh=>{Object.assign(sh.uniforms,paintUniforms);sh.uniforms.plantTime=wind;sh.uniforms.plantDistance=fadeDistance;
+ sh.vertexShader='varying vec2 plantGround;uniform float plantTime;varying float plantViewDistance;\n'+sh.vertexShader;
  sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
  vec3 root=(modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.)).xyz;
  transformed.x+=sin(plantTime*.85+root.x*.37+root.z*.2)*position.y*position.y*${sway.toFixed(3)};
- plantViewDistance=length(cameraPosition.xz-root.xz)+abs(cameraPosition.y-root.y)*.2;`);
- sh.fragmentShader='uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
- sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
+ plantGround=root.xz;plantViewDistance=length(cameraPosition.xz-root.xz)+abs(cameraPosition.y-root.y)*.2;`);
+ sh.fragmentShader='varying vec2 plantGround;uniform sampler2D paintSurface;uniform sampler2D paintMoisture;uniform float paintHalf;uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
+ sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){vec2 paintUV=vec2(plantGround.x/(2.*paintHalf)+.5,.5-plantGround.y/(2.*paintHalf));vec4 paintedSurface=texture2D(paintSurface,paintUV);if(${sway===.08?'true':'false'}&&paintedSurface.r*paintedSurface.a>.35)discard;float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
+ sh.fragmentShader=sh.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ vec4 moisture=texture2D(paintMoisture,paintUV);diffuseColor.rgb*=mix(vec3(1.),mix(vec3(1.8,1.1,.85),vec3(.9,1.13,.96),moisture.r),moisture.a);`);
  };
  material.customProgramCacheKey=()=>`property-plant-${sway}`;
  }
@@ -170,11 +172,11 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   });
   chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
- function place(group,p,rotation=0){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y});return group;}
- place(firepit(),CLEARING.fire);place(picnic(),CLEARING.picnic,.1);place(woodpile(),CLEARING.wood,-.3);
- HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z));});
+ function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
+ place(firepit(),CLEARING.fire,0,'prop:firepit','Campfire');place(picnic(),CLEARING.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),CLEARING.wood,-.3,'prop:wood','Wood stack');
+ HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});
  const chairColors=[0x2b9798,0xce5669,0x40a6a1,0xc85871,0x3f91a0];
- chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CLEARING.fire.x+Math.sin(a)*2.35,z:CLEARING.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI);});
+ chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CLEARING.fire.x+Math.sin(a)*2.35,z:CLEARING.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
  // Horizontal water surface with animated ripple normals and sky tint, no reflection render pass.
  const shape=new THREE.Shape(POND_OUTLINE.map(p=>new THREE.Vector2(p.x,-p.z))),waterGeo=new THREE.ShapeGeometry(shape,24);waterGeo.rotateX(-Math.PI/2);
  const waterMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:wind},vertexShader:'varying vec3 waterWorld;void main(){waterWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(waterWorld,1.);}',fragmentShader:`uniform float time;varying vec3 waterWorld;
@@ -194,5 +196,5 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  function setVerticalScale(value){vex=value;water.position.y=pondLevel*vex;for(const p of props)p.group.position.y=p.baseY*vex;for(const c of chunks.values())writeTransforms(c);}
  function detachSage(){for(const [key,c] of chunks)if(c.kind==='sage'){for(const im of c.meshes){scene.remove(im);im.dispose();}chunks.delete(key);}}
  function reanchor(){for(const c of chunks.values()){for(const t of c.list)t.y=heightAt(t.x,t.z)/vex;writeTransforms(c);}for(const p of props){p.baseY=heightAt(p.group.position.x,p.group.position.z)/vex;p.group.position.y=p.baseY*vex;}}
- return {setQuality,update,setVerticalScale,water,props,chunks,pondLevel,models,detachSage,reanchor};
+ return {setQuality,update,setVerticalScale,water,props,chunks,pondLevel,models,detachSage,detachProps(){for(const p of props)scene.remove(p.group);props.length=0;},reanchor};
 }

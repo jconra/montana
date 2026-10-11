@@ -4,11 +4,11 @@ import {TransformControls} from 'three/addons/controls/TransformControls.js';
 
 // One transform target per authored object, including an editable proxy for
 // instanced vegetation. Never transform a shared instanced geometry itself.
-export function createSceneTransform({scene,camera,controls,canvas,landscape,placed,heightAt,getVex,onBuilding,stopDrive}){
+export function createSceneTransform({scene,camera,controls,canvas,landscape,placed,heightAt,getVex,onBuilding,stopDrive,paint}){
  const gizmo=new TransformControls(camera,canvas);for(const [event,fn] of [['pointerdown','_onPointerDown'],['pointermove','_onPointerHover'],['pointermove','_onPointerMove'],['pointerup','_onPointerUp']])canvas.removeEventListener(event,gizmo[fn]);gizmo.setSize(.85);scene.add(gizmo);
  for(const mode of ['translate','scale','rotate'])for(const h of gizmo._gizmo.gizmo[mode].children)if(h.name==='XYZ'||h.name==='XYZE'){h.geometry.dispose();h.geometry=new THREE.SphereGeometry(.1,16,12);}
  const center=new THREE.Mesh(new THREE.SphereGeometry(.1,16,12),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,depthTest:false,depthWrite:false}));center.name='XYZE';center.renderOrder=Infinity;gizmo._gizmo.gizmo.rotate.add(center);
- const bar=document.createElement('div');bar.id='sceneTransform';bar.innerHTML=`<div id="stStatus" role="status">Select a tool, then an object</div><div class="st-buttons"><button data-mode="translate" title="Move along an axis; center sphere follows the ground" aria-pressed="false">Move</button><button data-mode="rotate" title="Rotate around an axis or freely with the center sphere" aria-pressed="false">Rotate</button><button data-mode="scale" title="Resize on an axis; center sphere resizes uniformly" aria-pressed="false">Scale</button><button id="stBuildingsOnly" aria-pressed="false" title="Select buildings through trees, bushes, and rocks">Buildings only</button><button id="stUndo" disabled title="Undo (Ctrl/Cmd+Z)">Undo</button><button id="stRedo" disabled title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button><button id="stLock" aria-pressed="false">Lock</button><button id="stExport" title="Copy only changes since published defaults">Copy edits</button></div>`;
+ const bar=document.createElement('div');bar.id='sceneTransform';bar.innerHTML=`<div id="stStatus" role="status">Select a tool, then an object</div><div class="st-buttons"><button data-mode="translate" title="Move along an axis; center sphere follows the ground" aria-pressed="false">Move</button><button data-mode="rotate" title="Rotate around an axis or freely with the center sphere" aria-pressed="false">Rotate</button><button data-mode="scale" title="Resize on an axis; center sphere resizes uniformly" aria-pressed="false">Scale</button><button id="stBuildingsOnly" aria-pressed="false" title="Select buildings through trees, bushes, and rocks">Buildings only</button><button id="stUndo" disabled title="Undo (Ctrl/Cmd+Z)">Undo</button><button id="stRedo" disabled title="Redo (Ctrl/Cmd+Shift+Z)">Redo</button><select id="stAsset" aria-label="Model to add"></select><button id="stAdd">Add</button><button id="stDelete">Delete</button><button id="stExport" title="Copy only changes since published defaults">Copy edits</button></div>`;
  const style=document.createElement('style');style.textContent=`#sceneTransform{position:fixed;bottom:calc(var(--photo-bar-height, 32px) + 4px);right:0;z-index:45;background:#14202eea;color:#e6edf3;padding:8px;border:1px solid #526478;border-radius:10px;font:12px system-ui;max-width:calc(100vw - 36px)}#sceneTransform .st-buttons{display:flex;gap:5px;flex-wrap:wrap}#sceneTransform button{background:#28394b;color:inherit;border:1px solid #617080;border-radius:5px;padding:7px;cursor:pointer}#sceneTransform button:disabled{opacity:.4;cursor:default}#sceneTransform button[aria-pressed=true]{background:#26675f;border-color:#8cffe1}#stStatus{margin-bottom:6px}#stats{bottom:calc(var(--photo-bar-height, 32px) + 90px)}`;document.head.append(style);document.body.append(bar);
  const status=bar.querySelector('#stStatus'),lock=document.getElementById('lockGeometry'),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();
  let active=false,target=null,building=null,gesture=null,buildingsOnly=false;
@@ -56,9 +56,17 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
   if(buildingsOnly&&!active&&!lock.checked)setMode('translate');
   status.textContent=buildingsOnly?'Buildings only: click through vegetation to select a building':'All objects can be selected';
  };
- function syncLock(){if(lock.checked)disable();bar.querySelector('#stLock').setAttribute('aria-pressed',lock.checked);bar.querySelector('#stLock').textContent=lock.checked?'Unlock':'Lock';syncHistory();}
- bar.querySelector('#stLock').onclick=()=>{lock.checked=!lock.checked;lock.dispatchEvent(new Event('change'));};lock.addEventListener('change',syncLock);syncLock();
- document.getElementById('leLockGeometry').addEventListener('change',syncLock);
+ lock.checked=false;document.getElementById('leLockGeometry').checked=false;
+ for(const [key,asset] of landscape.catalog){const option=document.createElement('option');option.value=key;option.textContent=asset.label;bar.querySelector('#stAsset').append(option);}
+ bar.querySelector('#stAdd').onclick=()=>{disable();stopDrive();landscape.startAdding(bar.querySelector('#stAsset').value);status.textContent='Click the ground to place the model; Escape cancels.';};
+ landscape.onAdd(rec=>{landscape.setActive(false);setMode('translate');building=null;target=landscape.selectForGizmo(rec.id);attachTarget();remember({kind:'landscape',id:rec.id,record:null},{kind:'landscape',id:rec.id,record:copy(rec)});status.textContent='Added '+landscape.catalog.get(rec.asset).label;});
+ function removeTarget(){
+  if(!active||!target)return;cancel();const before=selectionState();gizmo.detach();
+  if(building){building.deleted=true;building.group.visible=false;scene.remove(building.group);onBuilding(null);saveBuildings();}else landscape.removeSelected();
+  remember(before,{...before,record:before.kind==='building'?{...before.record,deleted:true}:null});
+  target=null;building=null;status.textContent='Object removed. Undo restores it; Copy edits includes the deletion.';
+ }
+ bar.querySelector('#stDelete').onclick=removeTarget;
  function consume(e){e.preventDefault();e.stopImmediatePropagation();}
  canvas.addEventListener('pointerdown',e=>{
   if(!active||lock.checked||e.button!==0)return;const p=pointerAt(e);scene.updateMatrixWorld(true);gizmo.pointerHover(p);
@@ -83,18 +91,14 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  canvas.addEventListener('pointerup',finish,true);canvas.addEventListener('pointercancel',cancel,true);canvas.addEventListener('lostpointercapture',cancel,true);
  addEventListener('keydown',e=>{
   if(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
-  if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())&&(active||!landscape.active)){consume(e);historyStep(e.shiftKey||e.key.toLowerCase()==='y');return;}
+  if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())&&(active||document.getElementById('dock-objects')?.hidden===false)){consume(e);historyStep(e.shiftKey||e.key.toLowerCase()==='y');return;}
   if(!active)return;
   if(e.key==='Delete'&&!e.repeat&&target&&!lock.checked){
-   consume(e);cancel();const before=selectionState();gizmo.detach();
-   if(building){building.deleted=true;building.group.visible=false;scene.remove(building.group);onBuilding(null);saveBuildings();}
-   else landscape.removeSelected();
-   const after={...before,record:before.kind==='building'?{...before.record,deleted:true}:null};remember(before,after);
-   target=null;building=null;status.textContent='Object removed. Export edits to share the deletion.';
+   consume(e);removeTarget();
   }else if(e.key==='Escape'){cancel();gizmo.detach();target=null;building=null;landscape.clearGizmoSelection();}
  },true);
  bar.querySelector('#stExport').onclick=async()=>{
-  const data=createSceneDiff({buildings:publishedBuildings,landscape:landscape.published},{buildings:buildingRows(),landscape:landscape.state.export()});
+  const data=createSceneDiff({buildings:publishedBuildings,landscape:landscape.published,terrainPaint:paint.published()},{buildings:buildingRows(),landscape:landscape.state.export(),terrainPaint:paint.export()});
   if(!data.changes.length){status.textContent='No changes since the published defaults.';return;}
   const text=JSON.stringify(data);
   try{await navigator.clipboard.writeText(text);status.textContent=`Copied ${data.changes.length} changes. Paste them into chat.`;}
@@ -102,5 +106,5 @@ export function createSceneTransform({scene,camera,controls,canvas,landscape,pla
  };
 
  document.getElementById('editLandscape').addEventListener('click',()=>{if(active){disable();landscape.setActive(true);}});
- return {disable,get active(){return active;}};
+ return {disable,setMode,get active(){return active;}};
 }
