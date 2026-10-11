@@ -432,36 +432,44 @@ function makeCabin(){
   for(const px of [-w/2+0.4,w/2-0.4]) for(const pz of [-d/2+0.4,d/2-0.4]) box(g,0.3,DY,0.3,px,DY/2,pz,pier);
   box(g,w,wh,d,0,DY+wh/2,0,side);
   box(g,w+0.06,1.0,d+0.06,0,DY+wh-0.5,0,shake);                        // shake band under eaves
-  {const s=new THREE.Shape();s.moveTo(-w/2-eave,0);s.lineTo(w/2+eave,0);s.lineTo(0,rh);s.lineTo(-w/2-eave,0);
-   const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:d+2*eave,bevelEnabled:false}),roof);
-   r.position.set(0,DY+wh,-(d/2+eave)); g.add(r);}                     // main gable roof only
+  // Carry the main ridge and roof planes forward over the porch. The left
+  // plane also reaches the widened deck; there is no separate front lean-to.
+  const dExt=P+1.0,deckLeft=-w/2-1.1,deckRight=w/2,deckFront=d/2+dExt;
+  const ridgeY=DY+wh+rh,pitch=rh/(w/2+eave),roofBack=-d/2-eave,roofFront=deckFront+.3;
+  const roofY=x=>ridgeY-Math.abs(x)*pitch;
+  function roofPlane(x0,x1){
+    const y0=roofY(x0),y1=roofY(x1),slope=Math.atan2(y1-y0,x1-x0);
+    const panel=box(g,Math.hypot(x1-x0,y1-y0),.14,roofFront-roofBack,(x0+x1)/2,(y0+y1)/2,(roofBack+roofFront)/2,roof);
+    panel.rotation.z=slope;
+  }
+  roofPlane(-w/2-eave,0);roofPlane(0,w/2+eave);
+  // The widened left porch continues the same left roof pitch, only over
+  // the porch: the shed-side stair run behind it stays uncovered.
+  {const x0=deckLeft-.3,x1=-w/2-eave,y0=roofY(x0),y1=roofY(x1);
+   box(g,Math.hypot(x1-x0,y1-y0),.14,roofFront-d/2,(x0+x1)/2,(y0+y1)/2,(roofFront+d/2)/2,roof).rotation.z=Math.atan2(y1-y0,x1-x0);}
   {const s=new THREE.Shape();s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(0,rh);s.lineTo(-w/2,0);
    const tri=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.1,bevelEnabled:false}),shake);
    tri.position.set(0,DY+wh,d/2); g.add(tri);}                        // front gable infill
   const zf=d/2+0.06;
   box(g,1.8,1.3,0.14,-0.6,DY+1.7,zf,glass); box(g,2.1,1.6,0.07,-0.6,DY+1.7,zf-0.02,accent);  // window + accent frame
   box(g,1.0,2.1,0.12,1.9,DY+1.05,zf,door);                            // door
-  const dExt=P+1.0;
-  box(g,w,0.18,dExt,0,DY-0.09,d/2+dExt/2,deckM);                       // front porch deck
-  for(const c of [[-w/2+0.4,d/2+dExt-0.4],[w/2-0.4,d/2+dExt-0.4]])
-    box(g,0.25,DY,0.25,c[0],DY/2,c[1],pier);                          // front deck piers
-  // A shallow lean-to roof covers the porch's left portion. Its right edge
-  // stops before the stair landing, matching the drone close-up.
-  // Leave the left stair landing outside the roof footprint.
-  const porchW=5.0, porchDepth=dExt+0.25, porchX=0.25, porchZ=d/2+porchDepth/2;
-  const porchRoofY=DY+wh+0.85;
-  const porchRoof=box(g,porchW,0.18,porchDepth,porchX,porchRoofY,porchZ,roof);
-  porchRoof.rotation.x=Math.atan2(0.55,porchDepth);                  // shed away from the cabin
-  const porchFrontZ=d/2+porchDepth-0.15;
-  for(const lx of [porchX-porchW/2+0.12,porchX,porchX+porchW/2-0.12]){
-    const p=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.16,porchRoofY-DY,7),logM);
-    p.position.set(lx,DY+(porchRoofY-DY)/2,porchFrontZ); g.add(p);
-  }                                                               // peeled-log porch posts
-  {const b=new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,porchW+0.4,7),logM);b.rotation.z=Math.PI/2;b.position.set(porchX,porchRoofY-0.15,porchFrontZ);g.add(b);}  // log header
-  railSeg(g,railM,-w/2,d/2+dExt, w/2,d/2+dExt, DY,1.0);               // front rail
+  box(g,deckRight-deckLeft,.18,dExt,(deckLeft+deckRight)/2,DY-.09,d/2+dExt/2,deckM);
+  for(const x of [deckLeft+.18,deckRight-.18])box(g,.25,DY,.25,x,DY/2,deckFront-.2,pier);
+  // Log posts/header follow the roof's eave height; the gable above is open.
+  for(const x of [deckLeft+.12,-w/2+.12,deckRight-.12]){
+    const top=roofY(x)-.16,h=top-DY;
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.14,.16,h,7),logM);
+    post.position.set(x,DY+h/2,deckFront-.12);g.add(post);
+  }
+  function header(x0,x1){const y0=roofY(x0)-.16,y1=roofY(x1)-.16;
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,Math.hypot(x1-x0,y1-y0),7),logM);
+    beam.rotation.z=Math.atan2(y1-y0,x1-x0)-Math.PI/2;beam.position.set((x0+x1)/2,(y0+y1)/2,deckFront-.12);g.add(beam);}
+  header(deckLeft+.12,-w/2+.12);
+  {const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,w-.24,7),logM);beam.rotation.z=Math.PI/2;beam.position.set(0,roofY(w/2-.12)-.16,deckFront-.12);g.add(beam);}
+  railSeg(g,railM,deckLeft,deckFront,deckRight,deckFront,DY,1);
   // Gates in both side rails keep the deck connected to both stairways.
   const stairZ=d/2+dExt-0.62, stairWidth=.9;
-  railSeg(g,railM,-w/2,d/2+1.1, -w/2,d/2+dExt, DY,1.0);
+  railSeg(g,railM,deckLeft,d/2,deckLeft,deckFront,DY,1.0);
   railSeg(g,railM,w/2,d/2, w/2,stairZ-stairWidth/2, DY,1.0);
   railSeg(g,railM,w/2,stairZ+stairWidth/2, w/2,d/2+dExt, DY,1.0);
 
@@ -470,13 +478,9 @@ function makeCabin(){
   stairFlight(garageStairs,deckM,railM,conc,w/2,stairZ,DY,stairWidth,.38,8,1);
   // Opposite side: turn off the porch, then descend back along the cabin wall.
   // The side landing is covered, but the wooden stairs have no roof or pad.
-  const landingX=-w/2-.55, landingZ=d/2+.55;
-  box(g,1.1,.18,1.1,landingX,DY-.09,landingZ,deckM);
-  railSeg(g,railM,-w/2-1.1,d/2,-w/2-1.1,d/2+1.1,DY,1);
-  railSeg(g,railM,-w/2-1.1,d/2+1.1,-w/2,d/2+1.1,DY,1);
-  const sideRoof=box(g,1.35,.14,1.25,landingX,DY+2.65,landingZ,roof);
-  sideRoof.rotation.z=.12;
-  for(const x of [-w/2-1.05,-w/2-.05])box(g,.1,2.65,.1,x,DY+1.325,d/2+1.05,railM);
+  const landingX=-w/2-.55;
+  // The former small landing is now part of the full-width porch slab;
+  // keep its rear opening and the stair transform exactly where they were.
   const shedStairs=new THREE.Group();shedStairs.name='cabin-shed-stairs';
   shedStairs.position.set(landingX,0,d/2);shedStairs.rotation.y=Math.PI/2;g.add(shedStairs);
   stairFlight(shedStairs,deckM,railM,null,0,0,DY,stairWidth,.38,8,1);
