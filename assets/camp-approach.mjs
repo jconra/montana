@@ -1,6 +1,7 @@
 // Permanent garage apron -> camp lawn, registered against DJI_121 and the
 // house-facing-cabin / garage-facing-southeast photos. Units are world metres.
 // Width is the half-width of the worn lane; wear fades out toward the fire pit.
+import {grassReclaim} from './driveway-refinements.mjs';
 import {tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
 // Centers registered to the user's red marks, facing each other across the lawn.
 export const HORSESHOES=[{x:-10.05,z:28.84},{x:-10.76,z:19.78}];
@@ -29,9 +30,9 @@ export function campSurface(x,z){
   const a=HORSESHOES[0],b=HORSESHOES[1],dx=b.x-a.x,dz=b.z-a.z,t=clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz));
   const court=1-smooth(2.4,4.4,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));
   const tallGrass=tallGrassCoverage(x,z);
-  const lawn=Math.max(laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass);
+  const lawn=Math.max(grassReclaim(x,z),laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass);
   const patch=.5+.28*Math.sin(x*1.37+z*.73)+.22*Math.sin(z*2.07-x*.61);
   const wear=clamp(best.wear+(patch-.5)*.24*(1-best.wear));
-  const gravel=Math.max(edge*wear*(1-tallGrass),frontDoorGravel(x,z));
+  const gravel=Math.max(edge*wear*(1-tallGrass),frontDoorGravel(x,z))*(1-grassReclaim(x,z));
   return {gravel,lawn,tallGrass,clear:gravel>.45,distance:best.distance,along:best.along};
 }

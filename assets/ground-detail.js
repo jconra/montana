@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createRoute,POND_OUTLINE} from './property-layout.mjs';
+import {grassReclaim} from './driveway-refinements.mjs';
 import {campSurface} from './camp-approach.mjs';
 const random=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 // Small repeatable detail maps; no remote texture dependencies.
@@ -32,10 +33,11 @@ export function createGroundDetail(half,driveway){
   // footprint as the grass renderer, so blades cannot sprout through gravel.
   const pixels=g.getImageData(0,0,c.width,c.height),data=pixels.data;
   const left=Math.floor((-55-maskMin.x)/maskSize.x*c.width),right=Math.ceil((20-maskMin.x)/maskSize.x*c.width);
-  const top=Math.floor((-16-maskMin.y)/maskSize.y*c.height),bottom=Math.ceil((48-maskMin.y)/maskSize.y*c.height);
+  const top=Math.floor((-20-maskMin.y)/maskSize.y*c.height),bottom=Math.ceil((48-maskMin.y)/maskSize.y*c.height);
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
     data[i]=Math.max(data[i],Math.round(s.gravel*255));data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));data[i+2]=Math.round(s.lawn*255);
+    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));data[i+1]=Math.max(data[i+1],Math.round(reclaim*255));data[i+2]=Math.max(data[i+2],Math.round(reclaim*255));
   }
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;

@@ -1,3 +1,4 @@
+import {correctedDriveway,GRAVEL_EXCLUSIONS,grassReclaim} from './driveway-refinements.mjs';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,smooth} from './property-layout.mjs';
@@ -133,6 +134,10 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  for(let i=0;i<800;i++){const x=-12+R()*47,z=50+R()*24,d=polygonDistance(x,z);if(d<-.1&&d> -2.5)add('reeds',x,z,.7+R()*.5);}
  // Add denser grass only after the stable sage scatter has been generated.
  // This keeps saved landscape IDs unchanged. Tufts remain instanced and culled.
+ const correctedRoute=createRoute(correctedDriveway(driveway)),reclaimR=rng(20261011);
+ for(const patch of GRAVEL_EXCLUSIONS){const xs=patch.outline.map(p=>p.x),zs=patch.outline.map(p=>p.z),xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs);
+  for(let i=0;i<(xmax-xmin)*(zmax-zmin)*2;i++){const x=xmin+reclaimR()*(xmax-xmin),z=zmin+reclaimR()*(zmax-zmin);if(reclaimR()<grassReclaim(x,z))add('grass',x,z,.8+reclaimR()*.4);}
+ }
  const meadowR=rng(20261010);
  for(const patch of TALL_GRASS_PATCHES){
   const xs=patch.outline.map(p=>p.x),zs=patch.outline.map(p=>p.z),xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs);
@@ -151,7 +156,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   // Trim after generating the stable scatter: changing this footprint must not
   // renumber the sagebrush objects in existing exported landscape edits.
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
-    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(s.gravel>.45||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
+    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if((t.x>-23&&t.x<26.5&&t.z>-10&&t.z<7&&correctedRoute.nearest(t.x,t.z).distance<1.65)||s.gravel>.45||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
       if(chunk.kind!=='grass')return s.lawn<.3;
       if(s.tallGrass>.1&&!t.tallPatch)t.s=Math.max(t.s,1.05+s.tallGrass*.5);
       t.s*=1-s.lawn*.83;return true;});
