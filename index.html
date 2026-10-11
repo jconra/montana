@@ -145,6 +145,7 @@ import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=39';
+import {loadBigBush} from './assets/sagebrush.js?v=big-bush-1';
 import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js';
@@ -1304,6 +1305,7 @@ const landscapeReady=(async()=>{
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
   if(propertyNature.models.sage.length)asset('bush/sage','Sagebrush',propertyNature.models.sage,[1,1,1]);
+  try{const parts=await loadBigBush();asset('bush/big-bush','BigBush',parts,[2.95,2.95,2.95]);base.push({id:'bush:big-bush:sample',asset:'bush/big-bush',x:-15,z:27,offset:0,rotation:[0,0,0],scale:[2.95,2.95,2.95],tint:1});}catch(error){console.warn('Big bush unavailable:',error);}
   asset('prop/propane','Propane tank',propaneTank(),[1,1,1]);
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+ezPines[t.variant].name,t,[t.h,t.h,t.h]));
@@ -1367,6 +1369,7 @@ const landscapeReady=(async()=>{
   await groundDetail.paint.ready;
   toolDock=createToolDock({landscape,sceneTransform,paint:groundDetail.paint,canvas:renderer.domElement,camera:cam,controls,scene,heightAt,groundHit:bridge.groundHit,stopDrive:()=>endDrive({preserveView:true}),stopRoute(){routeAdd=false;$('radd').textContent='add waypoints';}});
   if(new URLSearchParams(location.search).has('edit')){toolDock.open('objects');}
+  if(new URLSearchParams(location.search).get('view')==='big-bush'){endDrive({preserveView:true});const y=heightAt(-15,27);cam.position.set(-9,y+3.4,34);controls.target.set(-15,y+1.4,27);controls.update();toolDock.open('objects');$('stAsset').value='bush/big-bush';}
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
 const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
