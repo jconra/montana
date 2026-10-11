@@ -40,11 +40,25 @@ export function createGroundDetail(half,driveway){
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;
   const uniforms={detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},greenness:{value:.85},grassDetail:{value:surface(3)},soilDetail:{value:surface(0)},gravelDetail:{value:surface(1)},stoneDetail:{value:surface(2)}};
-  return {uniforms,attach(material){material.onBeforeCompile=sh=>{
+  // Static soft canopy contact shadows: one small mask, no shadow-map pass.
+  const shade=document.createElement('canvas');shade.width=shade.height=1024;
+  const shadeContext=shade.getContext('2d'),shadeTexture=new THREE.CanvasTexture(shade);
+  shadeTexture.generateMipmaps=false;shadeTexture.minFilter=THREE.LinearFilter;
+  uniforms.canopyShade={value:shadeTexture};uniforms.canopyHalf={value:half};
+  function setTrees(trees){
+    const g=shadeContext,scale=shade.width/(half*2);g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,shade.width,shade.height);
+    g.setTransform(scale,0,0,scale,half*scale,half*scale);
+    for(const t of trees){const radius=Math.max(1.5,Math.min(12,Math.max(t.editorScale?.[0]||t.h,t.editorScale?.[2]||t.h)*.35));
+      const gradient=g.createRadialGradient(t.x,t.z,0,t.x,t.z,radius);
+      gradient.addColorStop(0,'rgba(0,0,0,.48)');gradient.addColorStop(.45,'rgba(0,0,0,.28)');gradient.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=gradient;g.fillRect(t.x-radius,t.z-radius,radius*2,radius*2);
+    }shadeTexture.needsUpdate=true;
+  }
+  return {uniforms,setTrees,attach(material){material.onBeforeCompile=sh=>{
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader='uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
       #ifdef USE_MAP
       vec2 landUV=detailWorld.xz;vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 maskUV=vec2(localMask.x,1.-localMask.y);
@@ -69,8 +83,12 @@ export function createGroundDetail(half,driveway){
       detailed=mix(detailed,gravel,road*.94);
       float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
       diffuseColor.rgb=mix(diffuseColor.rgb,detailed,detailEnabled*proximity);
-      #endif`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v4';}};
+      #endif
+      vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
+      float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
+      canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
+      diffuseColor.rgb*=1.-canopy*.75;`);
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v5';}};
 }
 export function rockGeometry(seed){
   const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);

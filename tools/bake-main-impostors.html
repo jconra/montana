@@ -4,6 +4,7 @@
 <script type="importmap">{"imports":{"three":"../vendor/three/three.module.js"}}</script>
 <script type="module">
 import * as THREE from 'three';
+import {shadeCanopy} from '../assets/tree-lod.mjs';
 THREE.ColorManagement.enabled=false;
 const renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});
 renderer.useLegacyLights=true;renderer.outputColorSpace=THREE.SRGBColorSpace;
@@ -22,7 +23,8 @@ for(const [i,v] of variants.entries()){
  const data=await (await fetch('../assets/trees/'+v.file)).json(),x=v.tex;
  const bark=new THREE.MeshStandardMaterial({map:await texture(x.barkColor,true),normalMap:await texture(x.barkNormal),roughnessMap:await texture(x.barkRough),aoMap:await texture(x.barkAO),roughness:1});
  const leaves=new THREE.MeshStandardMaterial({map:await texture(x.leaf,true),alphaTest:v.alphaTest??.4,alphaToCoverage:true,side:THREE.DoubleSide,roughness:1});
- const group=new THREE.Group();group.add(new THREE.Mesh(geometry(data.branches),bark),new THREE.Mesh(geometry(data.leaves),leaves));
+ bark.vertexColors=leaves.vertexColors=true;
+ const group=new THREE.Group();group.add(new THREE.Mesh(shadeCanopy(THREE,geometry(data.branches)),bark),new THREE.Mesh(shadeCanopy(THREE,geometry(data.leaves)),leaves));
  const bounds=new THREE.Box3().setFromObject(group);let radius=0;
  group.traverse(o=>{if(o.isMesh){const p=o.geometry.attributes.position;for(let j=0;j<p.count;j++)radius=Math.max(radius,Math.hypot(p.getX(j),p.getZ(j)));}});
  // One fixed square bound per model keeps all views at the same world scale.
@@ -39,7 +41,7 @@ for(const [i,v] of variants.entries()){
  frames[v.name]={span,centerY,firstFrame:i*24,views:24,pixelsPerView:192,source:v.file};
  group.traverse(o=>{if(o.isMesh){o.geometry.dispose();for(const key of ['map','normalMap','roughnessMap','aoMap'])o.material[key]?.dispose();o.material.dispose();}});
 }
-window.bakedImpostors={image:atlas.toDataURL('image/png'),metadata:{version:2,atlas:'impostor_variants.png',size:2048,columns:10,pixelsPerView:192,azimuthViews:8,elevations:[0,45,85],frames}};
+window.bakedImpostors={image:atlas.toDataURL('image/png'),metadata:{version:2,lighting:'canopy-occlusion-v1',atlas:'impostor_variants.png',size:2048,columns:10,pixelsPerView:192,azimuthViews:8,elevations:[0,45,85],frames}};
 document.getElementById('status').textContent=JSON.stringify(window.bakedImpostors.metadata,null,2);
 document.getElementById('save').disabled=false;document.getElementById('save').onclick=()=>{for(const [name,url] of [['impostor_variants.png',window.bakedImpostors.image],['impostor_variants.json',URL.createObjectURL(new Blob([JSON.stringify(window.bakedImpostors.metadata,null,2)+'\n'],{type:'application/json'}))]]){const a=document.createElement('a');a.href=url;a.download=name;a.click();}};
 renderer.dispose();

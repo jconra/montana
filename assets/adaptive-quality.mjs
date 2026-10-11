@@ -7,7 +7,7 @@ export const QUALITY_LEVELS = [
   {name:'Ultra', distance:240, meshes:500, density:1, pixelRatio:2},
 ];
 export class AdaptiveQuality {
-  constructor(onChange){this.onChange=onChange;this.level=1;this.mode='auto';this.target=30;this.time=0;this.nextUpgrade=0;this.reset();}
+  constructor(onChange){this.onChange=onChange;this.level=2;this.mode='auto';this.target=30;this.time=0;this.nextUpgrade=0;this.reset();}
   reset(warmup=5){this.warmup=warmup;this.samples=[];this.elapsed=0;this.slow=0;this.fast=0;}
   configure(mode,target){
     this.mode=mode;this.target=target;this.reset();

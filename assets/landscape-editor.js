@@ -83,7 +83,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  function showPreview(){
   const rec=state.get(selected);if(!rec||!active||mode!=='objects'){clearPreview();return;}
   if(!preview||preview.userData.id!==rec.id){clearPreview();preview=new THREE.Group();preview.userData.id=rec.id;
-   for(const part of catalog.get(rec.asset).parts){const material=part.material.clone();if(!part.geometry.hasAttribute('color'))material.color.multiplyScalar(rec.tint);preview.add(new THREE.Mesh(part.geometry,material));}scene.add(preview);
+   for(const part of catalog.get(rec.asset).parts){const material=part.material.clone();if(rec.asset.startsWith('tree/')||!part.geometry.hasAttribute('color'))material.color.multiplyScalar(rec.tint);preview.add(new THREE.Mesh(part.geometry,material));}scene.add(preview);
   }
   preview.position.set(rec.x,bridge.heightAt(rec.x,rec.z)+rec.offset,rec.z);preview.rotation.set(...rec.rotation);preview.scale.set(...rec.scale);preview.updateMatrixWorld(true);outline.box.setFromObject(preview,true);outline.visible=true;bridge.hide(rec.id);
  }

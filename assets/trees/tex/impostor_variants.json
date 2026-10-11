@@ -35,5 +35,6 @@
       "pixelsPerView": 192,
       "source": "aspen.json"
     }
-  }
+  },
+  "lighting": "canopy-occlusion-v1"
 }
