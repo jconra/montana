@@ -206,13 +206,15 @@ export function buildHouse(THREE, spec, opts){
         const leaf=new THREE.Group(); leaf.position.set(o.a,(o.y0+o.y1)/2,0);
         const l=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a,o.y1-o.y0,0.15),o.mat!=null?swatchMat(o.mat,defTrim):doorMat); l.position.x=(o.b-o.a)/2; leaf.add(l);
         if(o.closed&&o.lites){                                // glazed upper part with a muntin grid, proud of the leaf on both faces
-          const [cols,rws]=o.lites,lw=o.b-o.a,lh=o.y1-o.y0,gx=.2,gy0=lh*(o.liteFrom??.48),gw=lw-2*gx,gh=lh-gy0-gx;
+          const [cols,rws]=o.lites,lw=o.b-o.a,lh=o.y1-o.y0,gx=.2,gy0=lh*(o.liteFrom??.48),gw=lw-2*gx,gh=lh-gy0-gx-(o.arch?gw/2:0);
           const glass=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,.2),glassMat);glass.position.set(lw/2,-lh/2+gy0+gh/2,0);leaf.add(glass);
           const mull=o.liteMat!=null?swatchMat(o.liteMat,defTrim):o.mat!=null?swatchMat(o.mat,defTrim):doorMat;
           if(o.liteMat!=null){const fw=.13,fr=(w2,h2,x,y)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,.24),mull);b.position.set(x,y,0);leaf.add(b);};   // a crisp frame round the sash
             fr(gw+2*fw,fw,lw/2,-lh/2+gy0+gh+fw/2);fr(gw+2*fw,fw,lw/2,-lh/2+gy0-fw/2);fr(fw,gh,gx-fw/2,-lh/2+gy0+gh/2);fr(fw,gh,gx+gw+fw/2,-lh/2+gy0+gh/2);}
           const mb=o.liteMat!=null?.1:.06;for(let c=1;c<cols;c++){const b=new THREE.Mesh(new THREE.BoxGeometry(mb,gh,.24),mull);b.position.set(gx+gw*c/cols,-lh/2+gy0+gh/2,0);leaf.add(b);}
           for(let r=1;r<rws;r++){const b=new THREE.Mesh(new THREE.BoxGeometry(gw,mb,.24),mull);b.position.set(lw/2,-lh/2+gy0+gh*r/rws,0);leaf.add(b);}
+          if(o.arch){const R=gw/2,cy=-lh/2+gy0+gh,mk=(g,m,z)=>{const q=new THREE.Mesh(g,m);q.position.set(lw/2,cy,z);q.rotation.y=z<0?Math.PI:0;leaf.add(q);};   // round top over the panes
+            for(const z of [.105,-.105]){mk(new THREE.CircleGeometry(R,20,0,Math.PI),glassMat,z);mk(new THREE.RingGeometry(R-.02,R+.13,20,1,0,Math.PI),mull,z*1.2);mk(new THREE.RingGeometry(R*.34,R*.34+.09,12,1,0,Math.PI),mull,z*1.2);}}
         }
         leaf.rotation.y=o.closed?0:-1.9; wg.add(leaf);
       } else {

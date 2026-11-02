@@ -13,7 +13,7 @@ const VERT_MAIN=`vWxL=transformed;vWxP=(modelMatrix*vec4(transformed,1.)).xyz;vW
 vLocalTop=aLocalTop;vHalf=aHalf;vTintPaint=aTintPaint;
 #endif
 `;
-const FRAG_PARS=`uniform sampler2D uNoise;uniform float uWxOn,uPatchScale,uGrimeAmt,uStreakLen,uStreakScale,uSplashH,uGrimeSoft,uEdgeAmt,uEdgeWidth,uEdgeBreak,uPaintChip,uEdgeDark,uEdgeDarkW,uBevel,uLogRound,uEaveDark,uBleach,uDirtBand,uCornerDirt,uFixedTop,uWxBoard,uWxPanelV;uniform vec3 uGrimeColor,uMudColor,uShadeDir;
+const FRAG_PARS=`uniform sampler2D uNoise;uniform float uWxOn,uPatchScale,uGrimeAmt,uStreakLen,uStreakScale,uSplashH,uGrimeSoft,uEdgeAmt,uEdgeWidth,uEdgeBreak,uPaintChip,uEdgeDark,uEdgeDarkW,uBevel,uLogRound,uEaveDark,uWallBand,uBleach,uDirtBand,uCornerDirt,uFixedTop,uWxBoard,uWxPanelV;uniform vec3 uGrimeColor,uMudColor,uShadeDir;
 varying vec3 vWxP;varying vec3 vWxL;varying vec3 vWxN;
 #ifdef W_BOX
 varying vec4 vLocalTop;varying vec4 vHalf;
@@ -173,6 +173,12 @@ float wShakeE = max(-wKind, 0.0), wSetBack = 0.0;
   // the shade under an eave: the top 40-odd cm of a wall below the roof edge over it (a noisy lower line)
   float wEave = (1.0 - smoothstep(0.0, 0.6 + 0.15 * wFine.g, wBelow)) * step(-0.03, wBelow) * wVert * wVert;
   diffuseColor.rgb *= 1.0 - uEaveDark * wEave;
+  // the stain fades unevenly: a darker, slightly purple band through the middle of the wall, redder near the ground and in the gable, broken into soft patches
+  if (uWallBand > 0.0 && wLum < 0.35) {
+    float wBandE = (wBig.g - 0.5) * 0.9 + (wFine.g - 0.5) * 0.25;
+    float wBand = smoothstep(1.3, 2.5, wP.y + wBandE) * (1.0 - smoothstep(3.2, 4.4, wP.y + wBandE)) * smoothstep(0.1, 0.55, wBig.r + 0.15) * wVert * wVert;
+    diffuseColor.rgb *= mix(vec3(1.0 + 0.1 * uWallBand), vec3(1.0 - 1.15 * uWallBand, 1.0 - 1.2 * uWallBand, 1.0 - 0.85 * uWallBand), wBand);
+  }
   // the dirt band: the bottom 40-odd cm of everything standing on the ground (walls, piers, posts, barrels) darker and
   // browner from splashed mud and damp, fading upward through noise
   float wLowD = (1.0 - smoothstep(0.2, 0.85 + 0.4 * (wFine.g - 0.5), wP.y)) * (1.0 - 0.6 * max(wN.y, 0.0));
@@ -234,7 +240,7 @@ normal=normalize(abs(wdet)*normal-sign(wdet)*(whx*wr1+why*wr2));}
 `;
 const col=(THREE,h)=>new THREE.Color(h);
 const LOOKS={
- house:{uFixedTop:4.72,uGrimeAmt:.45},garage:{uFixedTop:5.6,uGrimeAmt:.22,uStreakLen:1.2},cabin:{uFixedTop:4.05,uGrimeAmt:.55},shed:{uFixedTop:2.85,uGrimeAmt:.6}};
+ house:{uFixedTop:4.72,uGrimeAmt:.45,uWallBand:.24},garage:{uFixedTop:5.6,uGrimeAmt:.22,uStreakLen:1.2},cabin:{uFixedTop:4.05,uGrimeAmt:.55},shed:{uFixedTop:2.85,uGrimeAmt:.6}};
 const KIND={plain:0,hsiding:1,roof:2,roofV:2,vboard:5};
 function patch(THREE,m,type,o){
   const T=sharedTextures(THREE),box=!!o.box,defs={...(m.defines||{})};
@@ -242,7 +248,7 @@ function patch(THREE,m,type,o){
   else defs.W_KIND=KIND[o.kind||'plain'];
   m.defines=defs;
   const look=LOOKS[type]||{};
-  const u={uNoise:{value:T.noise},uWxOn:amount,uPatchScale:{value:1/5.6},uGrimeAmt:{value:box?.7:look.uGrimeAmt},uStreakLen:{value:look.uStreakLen??2.2},uStreakScale:{value:14/8},uSplashH:{value:.5},uGrimeSoft:{value:.2},uEdgeAmt:{value:box?1:0},uEdgeWidth:{value:.014},uEdgeBreak:{value:.75},uPaintChip:{value:o.chip??.75},uEdgeDark:{value:.5},uEdgeDarkW:{value:.03},uBevel:{value:.6},uLogRound:{value:.55},uEaveDark:{value:.15},uBleach:{value:.5},uDirtBand:{value:box?.5:.45},uCornerDirt:{value:0},uFixedTop:{value:look.uFixedTop??4},uWxBoard:{value:o.board??.2},uWxPanelV:{value:o.kind==='roofV'?1:0},uGrimeColor:{value:col(THREE,'#5e574d')},uMudColor:{value:col(THREE,'#5a4430')},uShadeDir:{value:new THREE.Vector3(0,0,-1)}};
+  const u={uNoise:{value:T.noise},uWxOn:amount,uPatchScale:{value:1/5.6},uGrimeAmt:{value:box?.7:look.uGrimeAmt},uStreakLen:{value:look.uStreakLen??2.2},uStreakScale:{value:14/8},uSplashH:{value:.5},uGrimeSoft:{value:.2},uEdgeAmt:{value:box?1:0},uEdgeWidth:{value:.014},uEdgeBreak:{value:.75},uPaintChip:{value:o.chip??.75},uEdgeDark:{value:.5},uEdgeDarkW:{value:.03},uBevel:{value:.6},uLogRound:{value:.55},uEaveDark:{value:.15},uWallBand:{value:box?0:look.uWallBand??0},uBleach:{value:.5},uDirtBand:{value:box?.5:.45},uCornerDirt:{value:0},uFixedTop:{value:look.uFixedTop??4},uWxBoard:{value:o.board??.2},uWxPanelV:{value:o.kind==='roofV'?1:0},uGrimeColor:{value:col(THREE,'#5e574d')},uMudColor:{value:col(THREE,'#5a4430')},uShadeDir:{value:new THREE.Vector3(0,0,-1)}};
   const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
   m.onBeforeCompile=function(s,r){previous.call(this,s,r);Object.assign(s.uniforms,u);
     s.vertexShader=VERT_PARS+s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+VERT_MAIN);
