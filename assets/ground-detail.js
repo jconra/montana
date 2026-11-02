@@ -72,7 +72,7 @@ export function createGroundDetail(half,driveway,sunDir){
   // The apron's own marks: red tyre arcs, green the pale scuffed middle of the Y.
   const apronCanvas=document.createElement('canvas');apronCanvas.width=apronCanvas.height=512;{const a=apronCanvas.getContext('2d'),k=512/APRON_SIZE,r=random(5151);a.fillStyle='black';a.fillRect(0,0,512,512);a.setTransform(k,0,0,k,-APRON_MIN.x*k,-APRON_MIN.y*k);a.globalCompositeOperation='lighter';a.filter='blur(9px)';a.strokeStyle='#00a000';a.lineCap='round';a.lineWidth=2.6;
     for(const l of [[[-22,-3],[-15,0],[-6,3.6],[3,5.4]],[[-15.5,1],[-17.5,8],[-19,15]]]){a.beginPath();l.forEach(([x,z],i)=>a[i?'lineTo':'moveTo'](x,z));a.stroke();}
-    a.filter='blur(1.2px)';for(const line of RUTS){a.strokeStyle=`rgba(${150+r()*105|0},0,0,1)`;a.lineWidth=.2+r()*.14;a.beginPath();a.moveTo(line[0].x,line[0].z);for(let i=1;i<line.length-1;i++){const m=line[i],n=line[i+1];a.quadraticCurveTo(m.x,m.z,(m.x+n.x)/2,(m.z+n.z)/2);}const e=line[line.length-1];a.lineTo(e.x,e.z);a.stroke();}}
+    a.filter='blur(1.2px)';for(const line of RUTS.slice(3)){a.strokeStyle=`rgba(${190+r()*65|0},0,0,1)`;a.lineWidth=.2+r()*.14;a.beginPath();a.moveTo(line[0].x,line[0].z);for(let i=1;i<line.length-1;i++){const m=line[i],n=line[i+1];a.quadraticCurveTo(m.x,m.z,(m.x+n.x)/2,(m.z+n.z)/2);}const e=line[line.length-1];a.lineTo(e.x,e.z);a.stroke();}}
   const apronMap=new THREE.CanvasTexture(apronCanvas);apronMap.generateMipmaps=false;apronMap.minFilter=THREE.LinearFilter;
   const uniforms={greenness:{value:.85},detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},patchMap:{value:patchNoise()},colourHi:{value:colourMap('./ground-colour-hi.jpg')},colourMid:{value:colourMap('./ground-colour-mid.jpg')},tileDry:{value:detailTile('./tile-dry.jpg')},tileGreen:{value:detailTile('./tile-green.jpg')},tileRoad:{value:detailTile('./tile-road.jpg')},hiMin:{value:HI_MIN},hiSize:{value:HI_SIZE},midHalf:{value:MID_HALF},lushMap:{value:null},lushMin:{value:new THREE.Vector2()},lushSize:{value:new THREE.Vector2(1,1)},apronMap:{value:apronMap},apronMin:{value:APRON_MIN},apronSize:{value:APRON_SIZE}};
   // Static soft canopy contact shadows: one small mask, no shadow-map pass.
@@ -140,10 +140,10 @@ export function createGroundDetail(half,driveway,sunDir){
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D lushMap;uniform vec2 lushMin;uniform vec2 lushSize;uniform sampler2D apronMap;uniform vec2 apronMin;uniform float apronSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader='float apronLift=0.;float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D lushMap;uniform vec2 lushMin;uniform vec2 lushSize;uniform sampler2D apronMap;uniform vec2 apronMin;uniform float apronSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
       // Light bounced round the meadow: shaded grass stays a living blue-green.
-      totalEmissiveRadiance+=diffuseColor.rgb*vec3(.09,.12,.1);`).replace('#include <map_fragment>',`#include <map_fragment>
+      totalEmissiveRadiance+=diffuseColor.rgb*vec3(.09,.12,.1)+diffuseColor.rgb*apronLift*vec3(.3,.22,.14);`).replace('#include <map_fragment>',`#include <map_fragment>
       #ifdef USE_MAP
       vec2 landUV=detailWorld.xz;
       // The coarse tile's map holds the same colouring for the whole property.
@@ -165,7 +165,7 @@ export function createGroundDetail(half,driveway,sunDir){
       // The apron: its colour is drawn, so the shadows the drone caught on it stay out of the map. Pale scuffed middle, tyre arcs, gravel grain.
       float apron=road*(1.-smoothstep(-1.,3.,landUV.x));
       if(apron>0.){vec2 apronUV=(landUV-apronMin)/apronSize;vec2 apronMark=texture2D(apronMap,vec2(apronUV.x,1.-apronUV.y)).rg;
-       vec3 gravel=mix(vec3(.72,.65,.6),vec3(.84,.78,.72),apronMark.g)*(.9+fine.r*.12+tiny.b*.1);gravel*=1.-apronMark.r*.2;near=mix(near,gravel,apron);}
+       vec3 gravel=mix(vec3(.72,.65,.6),vec3(.84,.78,.72),apronMark.g)*(.9+fine.r*.12+tiny.b*.1);gravel*=1.-apronMark.r*.3;near=mix(near,gravel,apron);apronLift=apron;}
       // Lush ground has no dirt showing: a green mat under the blades, wherever the frames' plant map says lush.
       vec2 lushUV=(landUV-lushMin)/lushSize;float lushHere=texture2D(lushMap,lushUV).r*step(0.,lushUV.x)*step(lushUV.x,1.)*step(0.,lushUV.y)*step(lushUV.y,1.);
       near=mix(near,vec3(.4,.53,.23)*(.82+fine.g*.26+tiny.r*.12),smoothstep(.1,.42,lushHere+(fine.r-.5)*.25)*(1.-road)*.92);
@@ -206,7 +206,7 @@ export function createGroundDetail(half,driveway,sunDir){
       diffuseColor.rgb=mix(diffuseColor.rgb,${shown('#7a5a42')}*(.75+fine.a*.5),clamp(baked.b*1.5,0.,1.)*(.25+tiny.r*.45));
       diffuseColor.rgb*=1.-baked.g*.42;
       diffuseColor.rgb*=mix(vec3(1.),vec3(.5,.5,.55),clamp(baked.r*2.,0.,1.)*castStrength);`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v19';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v20';}};
 }
 export function rockGeometry(seed,detail=2){
   const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);

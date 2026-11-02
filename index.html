@@ -154,7 +154,7 @@ import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
 import {censusTone} from './assets/plant-census.mjs';
 import {installGrade,gradeLand} from './assets/land-grade.mjs';
-import {evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {verifiable,juniperVariety,evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
 import {createHillStones} from './assets/hill-stones.js';
 import {createPlantFill,loadPlantFillMap} from './assets/plant-fill.js';
@@ -701,7 +701,7 @@ let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 const WEBGL2=renderer.capabilities.isWebGL2;
-function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});}
+function treeKindOf(id,x,z,h,authored=false){const k=treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});return k==='juniper'&&!authored?juniperVariety(id,h):k;}
 function treeTint(kind,id,tint,tone){
   const own=toneTint(kind,tone);if(own)return new THREE.Color(own[0],own[1],own[2]);
   const measured=censusTone.get(id);
@@ -788,9 +788,9 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
   fillTrees.forEach(([x,z,h],n)=>{const id='fill:'+n,asset=treeKindOf(id,x,z,h);list.push({id,asset,x,z,gy:heightAt(x,z),h,r:treeHash(id,5)*6.283,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});
   // Knee-high junipers dotting the dry slope, too small for the LiDAR to have found. Invented; the ids stay put by order.
   {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
-   for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:'juniper',x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
+   for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:juniperVariety(id,h),x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
   // Smaller trees between the big ones in the deep forest: the LiDAR finds tops only, and the real wood has a wide spread of heights. Invented, sized from their neighbour; new ids after all the others.
-  {const k=rng(5501);trees.forEach((t,n)=>{if(t.h<12||neighboursAt(t.x,t.z)<10||k()>.55){k();k();k();return;}const a=k()*6.283,d=3+k()*4,h=t.h*(.3+k()*.35),x=t.x+Math.cos(a)*d,z=t.z+Math.sin(a)*d,id='under:'+n;if(inBuilding(x,z))return;const asset=treeKindOf(id,x,z,h);list.push({id,asset:asset==='snag'?'fir_small':asset,x,z,gy:heightAt(x,z),h,r:a*3,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});}
+  {const k=rng(5501);trees.forEach((t,n)=>{if(t.h<12||neighboursAt(t.x,t.z)<10||k()>.55){k();k();k();return;}const a=k()*6.283,d=3+k()*4,h=t.h*(.3+k()*.35),x=t.x+Math.cos(a)*d,z=t.z+Math.sin(a)*d,id='under:'+n;if(inBuilding(x,z)||verifiable(x,z))return;const asset=treeKindOf(id,x,z,h);list.push({id,asset:asset==='snag'?'fir_small':asset,x,z,gy:heightAt(x,z),h,r:a*3,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});}
   return list;
 }
 let groveList=[];

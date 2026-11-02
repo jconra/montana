@@ -1,9 +1,10 @@
 // The drive, traced on a top-down mosaic of the solved May 2026 drone frames projected onto LiDAR ground
 // (checked by shooting frame pixels onto the ground, within about 0.5 m). World metres: x east, z south.
-import {polygonDistance,smooth} from './property-layout.mjs';
+import {polygonDistance,smooth,CLEARING} from './property-layout.mjs';
+const FIRE=CLEARING.fire;
 const pts=a=>a.map(([x,z])=>({x,z}));
 // Packed dirt: the Y as the mosaic shows it. The garage arm runs up to the slab, the south arm fades out toward camp, the east arm narrows into the two wheel tracks.
-export const DIRT_OUTLINE=pts([[-22.3,-8.3],[-18.4,-7.1],[-17.3,-4.8],[-13.75,-2.4],[-9.8,-.5],[-5.9,1.9],[-1.25,3.8],[3,4.5],[3,6.3],[-1.25,5.6],[-8.3,4.7],[-13.4,5.2],[-14.7,7],[-15,11.25],[-15.9,14.4],[-17.8,16.7],[-19.6,18.7],[-22.7,18.1],[-21.7,13.2],[-20,8.5],[-18.6,4.4],[-19.1,2.3],[-21.6,.7],[-24,-.5],[-26.25,-1.9],[-24.5,-8]]);
+export const DIRT_OUTLINE=pts([[-18.4,-7.1],[-17.3,-4.8],[-13.75,-2.4],[-9.8,-.5],[-5.9,1.9],[-1.25,3.8],[3,4.5],[3,6.3],[-1.25,5.6],[-8.3,4.7],[-13.4,5.2],[-14.7,7],[-15,11.25],[-15.9,14.4],[-17.8,16.7],[-19.6,18.7],[-22.7,18.1],[-21.7,13.2],[-20,8.5],[-18.6,4.4],[-19.1,2.3],[-21.6,.7],[-24,-.5],[-27.6,-2.2],[-24.2,-9.4],[-21.5,-8.9]]);
 // Centre of the two-track, gate side first, read from 390 solved July 2022 frames on LiDAR ground (every 3 m; a few stretches behind trees interpolated); ends on the apron.
 export const DRIVE_LINE=pts([[98.8,-101.7],[101.0,-99.6],[103.3,-97.6],[105.5,-95.5],[107.6,-93.4],[109.6,-91.1],[111.5,-88.9],[113.4,-86.8],[115.5,-84.8],[117.7,-82.7],[120.0,-80.7],[122.5,-78.7],[125.0,-76.2],[127.2,-73.2],[128.5,-69.9],[129.5,-66.8],[129.9,-63.4],[130.1,-60.4],[130.2,-57.4],[130.2,-54.2],[129.9,-50.8],[129.2,-47.7],[128.5,-44.6],[127.3,-41.5],[125.7,-38.8],[123.9,-36.1],[121.2,-34.5],[118.7,-33.0],[115.8,-32.3],[112.9,-31.4],[110.2,-30.5],[107.3,-30.0],[104.4,-29.5],[101.2,-28.9],[98.2,-27.6],[95.5,-26.1],[92.9,-24.5],[90.3,-22.7],[88.0,-20.7],[85.7,-18.7],[83.4,-16.9],[81.0,-15.2],[78.5,-13.6],[76.0,-12.1],[73.4,-10.6],[70.8,-9.1],[68.1,-7.6],[65.6,-6.2],[63.0,-5.2],[60.2,-4.6],[57.3,-4.0],[54.4,-3.3],[51.5,-2.7],[48.7,-2.2],[45.8,-1.8],[42.8,-1.2],[39.8,-0.7],[36.9,0.1],[33.9,0.7],[31.0,1.3],[28.1,1.8],[25.1,2.1],[22.1,2.5],[19.2,3.0],[16.2,3.5],[13.3,4.0],[10.4,4.4],[7.4,4.8],[4.5,4.9],[1.5,4.8],[-1.4,4.4],[-4.3,3.6],[-7.2,2.8],[-10.1,2.0],[-12.9,0.9],[-15.5,-0.3],[-18.0,-2.0],[-20.3,-3.8],[-22.7,-5.6]]);
 // Beyond the frames the old line was traced on the aerial, which sits about 4.5 m north of LiDAR along the whole measured part.
@@ -30,6 +31,12 @@ export function correctedDriveway(points){
 }
 function lineDistance(x,z,line){let best=Infinity;for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz)));best=Math.min(best,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));}return best;}
 export const driveLineDistance=(x,z)=>lineDistance(x,z,DRIVE_LINE);
+// Where grass density is spent: round the buildings, along the drive and at the fire pit. 0 elsewhere, 1 there.
+export function grassPriority(x,z){
+ let p=1-smooth(10,26,driveLineDistance(x,z));p=Math.max(p,1-smooth(12,24,Math.hypot(x-FIRE.x,z-FIRE.z)));
+ for(const f of GRASS_BUILDINGS)p=Math.max(p,1-smooth(14,30,Math.hypot(x-f[0],z-f[1])));return p;
+}
+const GRASS_BUILDINGS=[[8.78,-4.88],[-30.73,-8.2],[-38.99,37.7]];
 export const dirtCoverage=(x,z)=>x<-30||x>4||z<-10||z>21?0:smooth(-.35,.35,polygonDistance(x,z,DIRT_OUTLINE));
 // 0..1: is this spot bare drive? Plants use it to stay off the wheel tracks; the short grass strip between them stays.
 export function roadCoverage(x,z){

@@ -1,5 +1,6 @@
 // Which kind of tree stands where. Positions come from LiDAR and hand edits and are never changed here; only the
 // kind is chosen, from the tree's height and how crowded its surroundings are.
+import {driveLineDistance} from '../driveway-measured.mjs';
 export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
@@ -13,6 +14,16 @@ export function neighbourCounter(points,radius=14){
  return (x,z)=>{let n=0;const ci=Math.floor(x/radius),cj=Math.floor(z/radius);for(let i=ci-1;i<=ci+1;i++)for(let j=cj-1;j<=cj+1;j++){const c=cells.get(key(i,j));if(c)for(let q=0;q<c.length;q+=2){const a=c[q]-x,b=c[q+1]-z;if(a*a+b*b<r2&&(a||b))n++;}}return n;};
 }
 
+// Where frames, census or mosaic let anyone check a tree: census zone A, the drive corridor, and the whole drone mosaic. Nothing invented stands here.
+export function verifiable(x,z){
+ if(x>=-160&&x<=200&&z>=-140&&z<=180)return true;
+ return driveLineDistance(x,z)<40;
+}
+// Which juniper form a plant with no measured shape takes: columns, pointed cones, round and broad ones, each plant its own, stable by id.
+export function juniperVariety(id,h){const r=treeHash(id,41);
+ if(h<2.5)return r<.5?'juniper':r<.8?'juniper_cone':'juniper_low';
+ return r<.28?'juniper_column':r<.58?'juniper_cone':r<.9?'juniper':'juniper_low';
+}
 export function inAspenStand(x,z){return ASPEN_STANDS.some(s=>(x-s.x)**2+(z-s.z)**2<s.r*s.r);}
 
 // neighbours: trees within 14 m (a median spot has 9). authored: placed or moved by hand, which on this property has
@@ -27,12 +38,12 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
  if(h<=6)return r<.45?'juniper':'fir_small';
  if(h<=13)return r<.75?'fir_small':'spruce';
  // A few dead silver snags stand in the deep forest.
- if(treeHash(id,21)<.045)return 'snag';
+ if(!verifiable(x,z)&&treeHash(id,21)<.045)return 'snag';
  return r<.55?'fir':'spruce';
 }
 // How wide a tree stands for its height: big firs are narrower for their height than young ones; tall junipers are columns, small ones round.
 export function treeWide(kind,id,h){const r=treeHash(id,4);
- if(kind==='juniper'){const t=Math.max(0,Math.min(1,(h-4)/4));return (1.15+r*.45)*(1-t)+(.6+r*.26)*t;}
+ if(kind.startsWith('juniper'))return .82+r*.42;
  return (1.25+r*.55)*Math.min(1,Math.pow(13/Math.max(1,h),.25));
 }
 

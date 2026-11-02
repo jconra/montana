@@ -3,7 +3,7 @@
 // than popping in. Chunks of instanced tufts, no per-frame CPU beyond switching chunks on and off. WebGL1 safe.
 import * as THREE from 'three';
 import {polygonDistance} from './property-layout.mjs';
-import {roadCoverage,DRIVE_LINE} from './driveway-measured.mjs';
+import {roadCoverage,DRIVE_LINE,grassPriority} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
 import {shown} from './ground-detail.js';
 import {gradeLand} from './land-grade.mjs';
@@ -56,7 +56,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
  const shape=tuftGeometry(),cells=new Map();
  const clear=(x,z)=>{for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}
   return polygonDistance(x,z)<-1&&roadCoverage(x,z)<.3;};
- function add(x,z,size,height,wet,straw){const k=Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,wet,straw,turn:(vnoise(x*.035+9,z*.035)*2+vnoise(x*.16,z*.16+4)*.6)*6.283+(R()-.5)*.7,rank:R(),vary:R()});}
+ function add(x,z,size,height,wet,straw){const keep=.38+.62*grassPriority(x,z);if(R()>keep)return;size*=1+(1-keep)*.45;const k=Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,wet,straw,turn:(vnoise(x*.035+9,z*.035)*2+vnoise(x*.16,z*.16+4)*.6)*6.283+(R()-.5)*.7,rank:R(),vary:R()});}
  const wetAt=(x,z)=>{const [t,r]=zone(x,z),n=(vnoise(x*.032,z*.032)-.5)*.6+(vnoise(x*.13,z*.13)-.5)*.3;return Math.max(0,Math.min(1,t*(r*.92+.08)+(1-t)*.36+n*(1-t*.45)));};
  const STEP=.42,E=150;
  for(let gx=-E;gx<E;gx+=STEP)for(let gz=-E;gz<E;gz+=STEP){
