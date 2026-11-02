@@ -26,13 +26,14 @@ export const TEX_LIST = [
   {id:'stone',   name:'Stone'},
   {id:'shingle', name:'Shingle'},
   {id:'siding',  name:'Lap siding (fine even courses)'},
+  {id:'sidingw', name:'Wide lap siding (12 in courses)'},
   {id:'vboard',  name:'Vertical board and batten'},
   {id:'seam',    name:'Standing-seam metal (16 in panels)'},
   {id:'rib',     name:'Ribbed metal (9 in ribs)'},
 ];
 const ROOF_FEET={metal:8,seam:32/3,rib:6};   // feet per tile on roof panels; each tile holds 8 seams
-const TEX_REPEAT={siding:[1,1],vboard:[1,1],seam:[1,1],rib:[1,1],wood:[2,2],plaster:[4,4],metal:[3,4],brick:[3,3],stone:[3,3],shingle:[4,4]}; // tiles per face (0..1 UV geometry)
-const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:4,shingle:2,siding:4,vboard:4};                          // feet per tile (world-UV geometry, e.g. floor slabs)
+const TEX_REPEAT={siding:[1,1],sidingw:[1,1],vboard:[1,1],seam:[1,1],rib:[1,1],wood:[2,2],plaster:[4,4],metal:[3,4],brick:[3,3],stone:[3,3],shingle:[4,4]}; // tiles per face (0..1 UV geometry)
+const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:4,shingle:2,siding:4,sidingw:4,vboard:4};                          // feet per tile (world-UV geometry, e.g. floor slabs)
 function _rng(seed){ let s=(seed>>>0)||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function _rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function paintTex(ctx,id,S){
@@ -43,10 +44,10 @@ function paintTex(ctx,id,S){
       for(let i=0;i<44;i++){ const y=p*ph+rnd()*ph, a=0.04+rnd()*0.06; ctx.strokeStyle=`rgba(70,50,30,${a})`; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(0,y); ctx.bezierCurveTo(S*0.33,y+(rnd()-0.5)*5,S*0.66,y+(rnd()-0.5)*5,S,y); ctx.stroke(); }
       ctx.fillStyle='rgba(30,20,10,0.5)'; ctx.fillRect(0,p*ph,S,2); }                                   // plank seam
-  } else if(id==='siding'){                                                  // near-white so the swatch colour reads true
-    const courses=6, ph=S/courses;
+  } else if(id==='siding'||id==='sidingw'){                                  // near-white so the swatch colour reads true
+    const courses=id==='sidingw'?4:6, ph=S/courses;
     for(let p=0;p<courses;p++){ const base=232+Math.floor(rnd()*14); ctx.fillStyle=`rgb(${base},${base},${base})`; ctx.fillRect(0,p*ph,S,ph);
-      ctx.fillStyle='rgba(0,0,0,.34)'; ctx.fillRect(0,p*ph,S,Math.max(2,S/128));
+      ctx.fillStyle='rgba(0,0,0,.2)'; ctx.fillRect(0,p*ph,S,Math.max(2,S/128));
       ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fillRect(0,p*ph+Math.max(2,S/128),S,1); }
   } else if(id==='vboard'){
     const boards=3, pw=S/boards;
@@ -57,8 +58,9 @@ function paintTex(ctx,id,S){
     ctx.fillStyle='rgb(238,238,238)'; ctx.fillRect(0,0,S,S);
     const seams=8, sw=S/seams;
     for(let i=0;i<seams;i++){ const x=i*sw+1;
-      ctx.fillStyle='rgba(0,0,0,.8)'; ctx.fillRect(x+Math.max(2,S/170),0,Math.max(2,S/170),S);     // shadow side
-      ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(x,0,Math.max(2,S/170),S); }                // lit edge
+      ctx.fillStyle='rgba(0,0,0,.85)'; ctx.fillRect(x+Math.max(2,S/170),0,Math.max(3,S/100),S);     // shadow side
+      ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(x,0,Math.max(2,S/170),S);                  // lit edge
+      ctx.fillStyle='rgba(0,0,0,.14)'; ctx.fillRect(x+sw/2,0,Math.max(2,S/256),S); }                // faint rib between the seams
   } else if(id==='plaster'){
     ctx.fillStyle='rgb(236,236,236)'; ctx.fillRect(0,0,S,S);   // light base so a white tint reads near-white
     const n=Math.floor(S*S*0.45); for(let i=0;i<n;i++){ const x=rnd()*S,y=rnd()*S, v=rnd()<0.5?60:255, a=0.012+rnd()*0.016; ctx.fillStyle=`rgba(${v},${v},${v},${a})`; ctx.fillRect(x,y,2,2); }
@@ -93,7 +95,7 @@ export function texThumb(id,size){ size=size||40; const cv=document.createElemen
   const ctx=cv.getContext('2d'); paintTex(ctx,id||'',size); return cv.toDataURL(); }
 const _texCache={};
 function makeMap(THREE,id,mode){ const key=id+'|'+(mode||'face'); if(_texCache[key]) return _texCache[key];
-  const S=(id==='siding'||id==='vboard'||id==='seam'||id==='rib')?1024:256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
+  const S=(id==='siding'||id==='sidingw'||id==='vboard'||id==='seam'||id==='rib')?1024:256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
   const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; if('SRGBColorSpace'in THREE) t.colorSpace=THREE.SRGBColorSpace;
   if(mode==='world'||mode==='roof'){ const ft=mode==='roof'&&ROOF_FEET[id]?ROOF_FEET[id]:(TEX_FEET[id]||6); t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
   _texCache[key]=t; return t; }
@@ -124,8 +126,8 @@ export function buildHouse(THREE, spec, opts){
     const tex=(idx==null||idx<0)?'':(PALTEX[idx]||'');
     if(!tex) return solid(hex);
     const key='T|'+hex+'|'+tex+'|'+(mode||'face'); if(matCache[key]) return matCache[key];
-    const metal=(tex==='metal'),painted=(tex==='seam'||tex==='rib');   // painted steel stays matte: metalness turned it pale in sun
-    const m=new THREE.MeshStandardMaterial({color:hex,roughness:painted?.82:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
+    const metal=(tex==='metal'),matte=(tex==='seam'||tex==='rib'||tex==='siding'||tex==='sidingw'||tex==='vboard');   // no specular term: a low sun turned these pale
+    const m=matte?new THREE.MeshLambertMaterial({color:hex,side:THREE.DoubleSide}):new THREE.MeshStandardMaterial({color:hex,roughness:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
     m.map=makeMap(THREE,tex,mode||'face'); matCache[key]=m; return m; };
   const dormerCuts=[];
   const M=(v)=> (v&&v.isMaterial)?v:solid(v);                        // accept a material OR a hex colour
@@ -167,7 +169,7 @@ export function buildHouse(THREE, spec, opts){
       // Keep horizontal siding courses aligned across window fragments and floors.
       for(const face of [0,1,4,5])for(let i=0;i<4;i++){const k=face*4+i;geo.attributes.uv.setY(k,geo.attributes.uv.getY(k)+baseY+y0);}
       const m=new THREE.Mesh(geo,mat); m.position.set((a+b)/2,(y0+y1)/2,0); wg.add(m); };
-    const frame=(a,b,y0,y1,splits,tm=trimMat)=>{ const fw=FRAME_W, d=t+Math.min(.3,fw*.8), fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
+    const frame=(a,b,y0,y1,splits,tm=trimMat,ofw)=>{ const fw=ofw??FRAME_W, d=t+Math.min(.3,fw*.8), fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
       const cx=(a+b)/2, cy=(y0+y1)/2, w=b-a, hh=y1-y0;   // trim frame + centre mullion, proud of the wall
       const fb=(w2,h2,x,yy)=>{ const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),tm); mf.position.set(x,yy,0); wg.add(mf); };
       fb(fw, hh+2*fw, a-fw/2, cy); fb(fw, hh+2*fw, b+fw/2, cy);        // left + right jambs
@@ -208,7 +210,7 @@ export function buildHouse(THREE, spec, opts){
         if(winFrames){ const mw=FRAME_W*0.55, W=o.b-o.a;
           // split lists the pane widths as fractions; the default is two equal panes (a sliding window)
           const fr=o.split||[.5,.5];let at=0;const cuts=fr.slice(0,-1).map(f=>o.a+W*(at+=f));
-          frame(o.a,o.b,o.y0,o.y1,cuts,o.trim!=null?swatchMat(o.trim,defTrim):trimMat);
+          frame(o.a,o.b,o.y0,o.y1,cuts,o.trim!=null?swatchMat(o.trim,defTrim):trimMat,o.frameW);
           [o.a,...cuts].forEach((c,i,l)=>{const end=i+1<l.length?l[i+1]:o.b;pane(c+(i?mw/2+gi:gi),end-(i+1<l.length?mw/2+gi:gi));}); }
         else pane(o.a+gi, o.b-gi);                              // frameless: one inset pane
       }
@@ -431,17 +433,18 @@ export function buildHouse(THREE, spec, opts){
     if(opts.noRoof&&(d.type==='skylight'||d.type==='chimney'))return;
     const dg=new THREE.Group();dg.position.set(d.x||0,d.y||0,d.z||0);dg.rotation.set(...(d.rotation||[0,0,0]).map(v=>v*Math.PI/180));
     // A roof-mounted detail follows its roof piece, so resizing the roof cannot bury it.
-    const seat=d.onRoof!=null&&spec.roofPieces?.[d.onRoof];
-    if(seat){const mt=roofMetrics(seat),t=Math.atan(mt.slope),sg=Math.sign((mt.along?d.z-seat.z:d.x-seat.x)||1);
+    const seat=d.onRoof!=null&&spec.roofPieces?.[d.onRoof];let sg=1,seatAlong=true;
+    if(seat){const mt=roofMetrics(seat),t=Math.atan(mt.slope);seatAlong=mt.along;sg=Math.sign((mt.along?d.z-seat.z:d.x-seat.x)||1);
       dg.position.y=mt.height(d.x,d.z)+(d.lift??0);
+      if(d.type==='chimney')dg.position.y+=(d.h||1)/2-.3;
       if(d.type==='skylight'){dg.position.y+=.2/Math.cos(t)+(d.h||.25)/2;if(mt.along)dg.rotation.x=sg*t;else dg.rotation.z=-sg*t;}}dg.userData.surf={kind:'detail',di};g.add(dg);
     const material=d.type==='skylight'?glassMat:swatchMat(d.mat,defTrim,'world');
     const w=Math.max(.05,d.w||1),h=Math.max(.05,d.h||1),dep=Math.max(.05,d.d||1);
     function part(w,h,dd,x,y,z,mat=material){const geo=new THREE.BoxGeometry(w,h,dd);worldUVBox(geo,w,h,dd);const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);dg.add(m);return m;}
     if(d.type==='chimney'){
       const pipe=new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2,h,12),material);dg.add(pipe);
-      part(w*1.5,.18,w*1.5,0,h/2,0);
-      if(d.collarMat!=null){part(w*1.9,.35,w*1.9,0,-h/2+.1,0,swatchMat(d.collarMat,defTrim));}
+      const cap=new THREE.Mesh(new THREE.CylinderGeometry(w*.55,w*.72,.3,12),material);cap.position.y=h/2+.1;dg.add(cap);
+      if(d.collarMat!=null){const c=new THREE.Mesh(new THREE.CylinderGeometry(w*.75,w*1.1,.4,12),swatchMat(d.collarMat,defTrim));c.position.y=-h/2+.3;dg.add(c);}
     }else if(d.type==='balcony'){
       const rail=swatchMat(d.railMat,'#24282b'),post=.45;
       part(w,.5,dep,0,0,0);
@@ -456,7 +459,9 @@ export function buildHouse(THREE, spec, opts){
       dg.add(new THREE.Mesh(new THREE.TubeGeometry(curve,64,.10,6,true),material));
     }else if(d.type==='skylight'){
       const pale=d.glass?new THREE.MeshStandardMaterial({color:d.glass,roughness:.3,flatShading:true}):glassMat;
-      part(w+.25,h,dep+.25,0,0,0,swatchMat(d.mat,defTrim));part(w,.04,dep,0,h/2+.025,0,pale);
+      part(w+.3,h,dep+.3,0,0,0,swatchMat(d.mat,defTrim));part(w,.04,dep,0,h/2+.025,0,pale);
+      if(d.apronMat!=null){const am=swatchMat(d.apronMat,defTrim),len=d.apron??1,y=-h/2+.04;   // flashing apron on the downslope side
+        if(seatAlong)part(w+.7,.06,len,0,y,sg*(dep/2+len/2),am);else part(len,.06,dep+.7,sg*(w/2+len/2),y,0,am);}
     }else if(d.type==='railing'){                              // posts, top + bottom rails and balusters along one run
       const rail=swatchMat(d.mat,'#141414'),x1=d.x1-(d.x||0),z1=d.z1-(d.z||0),L=Math.hypot(x1,z1),bays=d.bays||1,per=d.perBay||0,pw=d.postW??.3,inset=d.railDrop??.1,bw=d.baluster??.07,ang=-Math.atan2(z1,x1);
       const piece=(l,hh,dd,a,yy)=>{const m=part(l,hh,dd,0,yy,0,rail);m.position.set(x1*a,yy,z1*a);m.rotation.y=ang;return m;};
@@ -468,7 +473,10 @@ export function buildHouse(THREE, spec, opts){
       const a=new THREE.Vector3(d.from[0]-(d.x||0),d.from[1]-(d.y||0),d.from[2]-(d.z||0)),b=new THREE.Vector3(d.to[0]-(d.x||0),d.to[1]-(d.y||0),d.to[2]-(d.z||0)),v=b.clone().sub(a),L=v.length();
       const m=d.round?new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2,L,7),material):part(w,L,dep,0,0,0);if(d.round)dg.add(m);
       m.position.copy(a.clone().add(b).multiplyScalar(.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());
-    }else if(d.type==='sconce'){                               // wall lantern on a mounting block; +z is outward
+    }else if(d.type==='disc'){                                 // low round pad
+      dg.add(new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2,h,24),material));
+    }else if(d.type==='sconce'){
+      if(d.scale)dg.scale.setScalar(d.scale);                               // wall lantern on a mounting block; +z is outward
       if(d.blockMat!=null)part(.55,.8,.08,0,0,-.08,swatchMat(d.blockMat,defTrim));
       part(.34,.55,.34,0,0,.2);part(.46,.08,.46,0,.3,.2);part(.1,.12,.1,0,.4,.2);
     }else if(d.type==='dish'){                                 // satellite dish on a short arm

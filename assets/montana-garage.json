@@ -63,7 +63,7 @@
           "y1": 6.5,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -74,7 +74,7 @@
           "y1": 6.5,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         }
       ],
       "mats": {
@@ -114,11 +114,11 @@
           "edge": 2,
           "off": 2.9,
           "w": 4,
-          "y0": 3.2,
+          "y0": 3.6,
           "y1": 6.6,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -126,21 +126,22 @@
           "off": 10.5,
           "w": 5,
           "y0": 0.15,
-          "y1": 6.85,
+          "y1": 6.6,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25,
+          "frameW": 0.34
         },
         {
           "on": "outline",
           "edge": 2,
           "off": 19.1,
           "w": 4,
-          "y0": 3.2,
+          "y0": 3.6,
           "y1": 6.6,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -151,7 +152,7 @@
           "y1": 6.2,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -162,7 +163,7 @@
           "y1": 6.2,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -173,7 +174,7 @@
           "y1": 6.4,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         },
         {
           "on": "outline",
@@ -184,7 +185,7 @@
           "y1": 6.4,
           "type": "window",
           "casing": 9,
-          "casingW": 0.4
+          "casingW": 0.25
         }
       ],
       "mats": {
@@ -205,33 +206,34 @@
       "z": 0,
       "w": 26,
       "d": 26,
-      "base": 18.4,
+      "base": 18.25,
       "style": "gable",
       "pitch": 0.5,
       "mat": 2,
       "gableMat": 0,
       "flipRidge": true,
       "raiseWalls": false,
-      "rise": 7.3,
-      "overhang": 1.6,
-      "rake": 1.6,
+      "rise": 7.45,
+      "overhang": 1.9,
+      "rake": 2,
       "fasciaMat": 10,
-      "fasciaH": 0.7
+      "fasciaH": 0.5
     }
   ],
   "stairs": [],
   "palette": [
-    "#3a2a22",
+    "#1c130f",
     "#e8e8e2",
-    "#1c1215",
+    "#231c22",
     "#3d2c26",
     "#54302b",
     "#0c0c0c",
-    "#c28a3a",
-    "#77776f",
+    "#c47a1c",
+    "#6f6e68",
     "#2f2428",
-    "#4a3626",
-    "#1c1412"
+    "#2c2019",
+    "#1c1412",
+    "#3f4a4c"
   ],
   "palTex": [
     "siding",
@@ -247,8 +249,8 @@
     ""
   ],
   "colors": {
-    "wall": "#3a2a22",
-    "roof": "#1c1215",
+    "wall": "#1c130f",
+    "roof": "#231c22",
     "trim": "#e8e8e2"
   },
   "windowFrames": true,
@@ -269,10 +271,10 @@
       "type": "box",
       "name": "Deck rim beam front",
       "x": 0,
-      "y": 9.35,
+      "y": 9.2,
       "z": 19.9,
       "w": 26.5,
-      "h": 1.1,
+      "h": 1.45,
       "d": 0.28,
       "mat": 6,
       "floor": 0
@@ -281,10 +283,10 @@
       "type": "box",
       "name": "Deck rim beam side",
       "x": -13.1,
-      "y": 9.35,
+      "y": 9.2,
       "z": 16.5,
       "w": 0.28,
-      "h": 1.1,
+      "h": 1.45,
       "d": 7,
       "mat": 6,
       "floor": 0
@@ -293,10 +295,10 @@
       "type": "box",
       "name": "Deck rim beam side",
       "x": 13.1,
-      "y": 9.35,
+      "y": 9.2,
       "z": 16.5,
       "w": 0.28,
-      "h": 1.1,
+      "h": 1.45,
       "d": 7,
       "mat": 6,
       "floor": 0
@@ -756,10 +758,10 @@
       "name": "Concrete apron",
       "x": 0,
       "y": -0.05,
-      "z": 17.1,
-      "w": 26.2,
+      "z": 17,
+      "w": 27,
       "h": 0.5,
-      "d": 8.2,
+      "d": 8,
       "mat": 7,
       "floor": 0
     },
@@ -844,9 +846,10 @@
       "w": 0.4,
       "h": 0.6,
       "d": 0.4,
-      "mat": 10,
+      "mat": 5,
       "blockMat": 9,
-      "floor": 1
+      "floor": 1,
+      "scale": 1.9
     },
     {
       "type": "sconce",
@@ -857,35 +860,38 @@
       "w": 0.4,
       "h": 0.6,
       "d": 0.4,
-      "mat": 10,
+      "mat": 5,
       "blockMat": 9,
-      "floor": 1
+      "floor": 1,
+      "scale": 1.9
     },
     {
       "type": "skylight",
       "name": "Garage skylight",
-      "x": -6.2,
-      "z": 4.5,
-      "w": 2.5,
-      "d": 4.5,
-      "h": 0.3,
+      "x": -8.2,
+      "z": 4,
+      "w": 4.6,
+      "d": 2.2,
+      "h": 0.4,
       "onRoof": 0,
-      "mat": 1,
-      "glass": "#34423f",
-      "floor": 1
+      "mat": 7,
+      "glass": "#141e1e",
+      "floor": 1,
+      "apronMat": 11,
+      "apron": 0.9
     },
     {
       "type": "chimney",
       "name": "Roof vent",
-      "x": -2.2,
-      "y": 24.7,
+      "x": -4.2,
       "z": -9.5,
-      "w": 0.36,
-      "d": 0.36,
-      "h": 2.4,
+      "w": 0.45,
+      "d": 0.45,
+      "h": 3.6,
       "mat": 1,
       "collarMat": 10,
-      "floor": 1
+      "floor": 1,
+      "onRoof": 0
     }
   ],
   "frameW": 0.2

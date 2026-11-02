@@ -452,10 +452,10 @@ function makeCabin(){
   // Body 14 x 16 ft, 6 ft porch; rail, post and picket counts are read from the drone frames.
   const g=new THREE.Group(),F=FT;
   const X0=-15.6,X1=13,WF=8,DF=14,DECK=5.6,EAVE=13.3,RIDGE=17.4,PITCH=.5,HW=7;
-  const mapped=(hex,pattern,feet,r=.95)=>{const m=new THREE.MeshStandardMaterial({color:hex,roughness:r,flatShading:false});const t=cabinTexture(pattern);m.map=t;return m;};
-  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x171316,'rib',0,.82),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x7d6238,.85),logPale=MAT(0x857c6c,.85),
-        post=MAT(0x634a2c,.9),rail=MAT(0x5f4f36,.95),railTop=MAT(0x74664e,.95),deckRed=mapped(0x571a1c,'deck'),deckGrey=mapped(0x6b5a46,'deck'),rim=MAT(0x5c4a2e,.95),
-        red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x5a5f66,.5),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
+  const mapped=(hex,pattern)=>{const m=new THREE.MeshLambertMaterial({color:hex});const t=cabinTexture(pattern);m.map=t;return m;};
+  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x141319,'rib'),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x7d6238,.85),logPale=MAT(0x6e6556,1),
+        post=MAT(0x634a2c,.9),rail=MAT(0x4a3b29,1),railTop=MAT(0x564733,1),deckRed=mapped(0x571a1c,'deck'),deckGrey=mapped(0x6b5a46,'deck'),rim=MAT(0x463722,1),
+        red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x26262a,1),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
         white=MAT(0xe6e2d6),blue=MAT(0x4e93b0),dark=MAT(0x1c2024);
   const B=(w,h,d,x,y,z,mat)=>box(g,w*F,h*F,d*F,x*F,y*F,z*F,mat);
   const uvBox=(w,h,d,x,y,z,mat,tile)=>{const m=B(w,h,d,x,y,z,mat);cabinBoxUV(m.geometry,w,h,d,tile);return m;};
@@ -469,59 +469,60 @@ function makeCabin(){
    for(const z of [WF,-WF-.1]){const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:.1*F,bevelEnabled:false}),side);cabinScaleUV(m.geometry,1/(F*4));m.position.set(0,(EAVE+.5)*F,z*F);g.add(m);}}
   for(const x of [-HW,HW])T([x,DECK,WF+.05],[x,EAVE,WF+.05],.6,log,true);
   // main roof: ridge from z=-11.3 to +12.1, overhangs the eaves by 1.2 ft
-  const zB=-11.3,zF=12.1,run=HW+1.2,fall=run*PITCH;
+  const zB=-11.3,zF=13.2,run=HW+1.2,fall=run*PITCH;
   const slope=(sgn,x0,x1,y0,y1,za,zb,mat=roof)=>{const pos=[],uv=[],q=[[x0,y0,za],[x1,y1,za],[x1,y1,zb],[x0,y0,zb]],len=Math.hypot(x1-x0,y1-y0);
-    const U=[[za,0],[za,len],[zb,len],[zb,0]];for(const i of [0,1,2,0,2,3,0,2,1,0,3,2]){pos.push(q[i][0]*F,q[i][1]*F+.04,q[i][2]*F);uv.push(U[i][0]/8,U[i][1]/8);}
+    const U=[[za,0],[za,len],[zb,len],[zb,0]];for(const i of [0,1,2,0,2,3,0,2,1,0,3,2]){pos.push(q[i][0]*F,q[i][1]*F+.04,q[i][2]*F);uv.push(U[i][0]/6,U[i][1]/6);}
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
   slope(1,0,run,RIDGE,RIDGE-fall,zB,zF);slope(-1,0,-run,RIDGE,RIDGE-fall,zB,zF);
   B(.8,.14,zF-zB,0,RIDGE+.05,(zB+zF)/2,fascia);
   // low porch roof: nearly flat from the south eave out past the deck
-  const pY=RIDGE-fall,pX=-16.5,pY1=12.7;
-  slope(-1,-run,pX,pY,pY1,WF-.2,DF+.4);
-  for(const [a,b] of [[[-run,pY-.2,DF+.4],[pX,pY1-.2,DF+.4]],[[pX,pY1-.2,WF-.2],[pX,pY1-.2,DF+.4]]])T(a,b,.3,fascia);
+  const pY=RIDGE-fall,pX=-16.8,pY1=12.7;
+  const pB=WF-4.2,pF=zF;                       // runs back into the valley beside the main roof; front edge continues the gable
+  slope(-1,-run,pX,pY,pY1,pB,pF);
+  for(const [a,b] of [[[-run,pY-.2,pF],[pX,pY1-.2,pF]],[[pX,pY1-.2,pB],[pX,pY1-.2,pF]]])T(a,b,.3,fascia);
   // eave fascia + pale rake boards on the front gable
-  for(const sgn of [-1,1]){T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,zF],.25,fascia);
+  for(const sgn of [-1,1]){if(sgn>0)T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,zF],.25,fascia);else T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,pB],.25,fascia);
     T([0,RIDGE-.25,zF],[sgn*run,RIDGE-fall-.25,zF],.25,fascia);T([0,RIDGE-.55,WF+.2],[sgn*HW,EAVE+.25,WF+.2],.4,rake);T([0,RIDGE-.25,zB],[sgn*run,RIDGE-fall-.25,zB],.25,fascia);}
   // skylight on the south slope, 2 x 4 ft
   {const t=Math.atan(PITCH),sk=new THREE.Group();sk.position.set(-3.6*F,(RIDGE-3.6*PITCH+.14)*F,2.8*F);sk.rotation.z=t;
-   const a=new THREE.Mesh(new THREE.BoxGeometry(2.3*F,.22*F,4.3*F),white);const b=new THREE.Mesh(new THREE.BoxGeometry(1.9*F,.06*F,3.9*F),glass);b.position.y=.12*F;sk.add(a,b);g.add(sk);sk.updateMatrix();
+   const a=new THREE.Mesh(new THREE.BoxGeometry(2.3*F,.3*F,4.3*F),MAT(0x4a4b4c,1));const b=new THREE.Mesh(new THREE.BoxGeometry(1.9*F,.06*F,3.9*F),glass);b.position.y=.16*F;sk.add(a,b);g.add(sk);sk.updateMatrix();
    for(const m of [a,b]){m.geometry.applyMatrix4(new THREE.Matrix4().compose(m.position,m.quaternion,m.scale));m.position.set(0,0,0);m.geometry.applyMatrix4(sk.matrix);g.add(m);}g.remove(sk);}
   // front wall: door north of the window, red shutters, curtains, signs, antlers, picture
   const zW=WF+.08;
   B(5.2,3.9,.1,-2.4,DECK+4.1,zW,glass);              // window
   B(5.6,.3,.25,-2.4,DECK+6.1,zW,red);B(5.6,.3,.35,-2.4,DECK+2.1,zW+.05,red);
-  B(.9,3.9,.14,-4.2,DECK+4.1,zW+.04,curtain);B(.9,3.9,.14,-.7,DECK+4.1,zW+.04,curtain);
+  B(.45,3.9,.14,-4.75,DECK+4.1,zW+.04,curtain);B(.45,3.9,.14,-.05,DECK+4.1,zW+.04,curtain);
   B(2.2,4.6,.16,-6.1,DECK+4.1,zW+.02,red);B(1.5,4.6,.16,1.1,DECK+4.1,zW+.02,red);
   {const m=new THREE.Mesh(new THREE.CylinderGeometry(.55*F,.55*F,.05*F,14),dark);m.rotation.x=Math.PI/2;m.position.set(-6.1*F,(DECK+4.3)*F,(zW+.14)*F);g.add(m);}
   B(1,.75,.06,1.1,DECK+4.3,zW+.13,blue);
   B(3.5,7,.1,4.3,DECK+3.45,zW,doorRed);B(2.5,6.5,.08,4.3,DECK+3.25,zW+.07,doorGlass);B(2.9,.25,.14,4.3,DECK+6.7,zW+.08,doorRed);
   for(const x of [-.9,.0,.9])T([3.6+x*0+x,DECK+1,zW+.13],[3.6+x+.9,DECK+5,zW+.13],.03,dark);
-  B(1.7,2.1,.1,-.4,14.6,zW+.05,dark);B(1.25,1.65,.06,-.4,14.6,zW+.11,blue);
+  B(1.75,2.15,.1,-.4,13.6,zW+.05,dark);B(1.45,1.85,.06,-.4,13.6,zW+.11,MAT(0xbdb9a8));B(1.05,1.45,.06,-.4,13.6,zW+.15,blue);
   // antler above the window, resting on the front log
   const AY=13.5,AZ=DF-.4;
-  for(const [a,b] of [[[-2.9,AY,AZ],[.3,AY+.15,AZ]],[[-2.9,AY,AZ],[-3.7,AY+1.9,AZ]],[[-2,AY,AZ],[-1.3,AY-1,AZ]],[[-.8,AY+.05,AZ],[-.3,AY-1.1,AZ]],[[.3,AY+.15,AZ],[.9,AY+.5,AZ]]])T(a,b,.2,white,true);
+  for(const [a,b] of [[[-2.2,AY,AZ],[.1,AY+.1,AZ]],[[-2.2,AY,AZ],[-2.8,AY+1.35,AZ]],[[-1.6,AY,AZ],[-1.1,AY-.7,AZ]],[[-.7,AY+.04,AZ],[-.3,AY-.8,AZ]],[[.1,AY+.1,AZ],[.5,AY+.35,AZ]]])T(a,b,.12,MAT(0xfaf8f0,1),true);
   // deck frame: one coat of red across the whole deck; 2 x 12 rim
   const SPLIT=2.6;
   uvBox(SPLIT-X0,.2,DF-WF,(X0+SPLIT)/2,DECK-.1,(WF+DF)/2,deckRed,.5);
   uvBox(X1-SPLIT,.2,DF-WF,(SPLIT+X1)/2,DECK-.1,(WF+DF)/2,deckRed,.5);
   B(X1-X0+.3,1,.2,(X0+X1)/2,DECK-.65,DF,rim);B(.2,1,DF-WF,X0,DECK-.65,(WF+DF)/2,rim);B(.2,1,DF-WF,X1,DECK-.65,(WF+DF)/2,rim);
   // 5 log posts under the front rim, plus 2 at the back of the deck and a block pier
-  for(const x of [X0+.4,-6.3,-2.4,6.7,X1-.4])T([x,-3,DF-.3],[x,DECK-1,DF-.3],.65,post,true);
+  for(const x of [X0+.4,-6.6,-2.4,6.7,X1-.4])T([x,-3,DF-.3],[x,DECK-1,DF-.3],.65,post,true);
   for(const x of [X0+.4,X1-.4])T([x,-3,WF+.4],[x,DECK-1,WF+.4],.55,post,true);
   B(2,DECK+2,2,4,DECK/2-1.5,WF+.2,block);
   // porch-roof posts: SE corner, one at 30 percent, north end; one at the back of the south deck
-  for(const [x,z,top] of [[X0+.3,DF-.3,12.5],[-6.3,DF-.3,13.1],[6.7,DF-.3,13.1],[X0+.3,WF+.8,12.5]])T([x,DECK,z],[x,top,z],.45,post,true);
+  for(const [x,z,top] of [[X0+.3,zF-.3,12.5],[-6.6,DF-.3,13.1],[6.7,DF-.3,13.1],[X0+.3,WF+.8,12.5]])T([x,DECK,z],[x,top,z],.68,post,true);
   // horizontal log across the front, overhanging north; short log on the south run
-  T([-9.5,13.15,DF-.1],[9.6,13.15,DF-.1],.5,logPale,true);
-  T([X0+.3,12.45,DF-.3],[-6.3,12.45,DF-.3],.35,log,true);
+  {const lg=new THREE.Mesh(new THREE.CylinderGeometry(.21*F,.29*F,(run+9.5)*F,8),logPale);lg.rotation.z=Math.PI/2;lg.position.set((run-9.5)/2*F,13.15*F,(DF-.1)*F);g.add(lg);} // tapered, stops at the north eave
+  T([X0+.3,12.45,zF-.3],[-6.6,12.45,DF-.3],.35,log,true);
   // rail runs: posts, top rail, pickets at about 10 in
   const run2=(xa,za,xb,zb,n,yA=DECK,yB=DECK,thick=true)=>{const H=3,L=Math.hypot(xb-xa,zb-za);
     T([xa,yA+H,za],[xb,yB+H,zb],.28,railTop);T([xa,yA+H-.5,za],[xb,yB+H-.5,zb],.16,rail);if(yA===yB)T([xa,yA+.3,za],[xb,yB+.3,zb],.16,rail);
     for(const t of [0,1]){const x=xa+(xb-xa)*t,z=za+(zb-za)*t,y=yA+(yB-yA)*t;if(thick)T([x,y,z],[x,y+H+.1,z],.38,rail);}
     for(let i=1;i<=n;i++){const t=i/(n+1),x=xa+(xb-xa)*t,z=za+(zb-za)*t,y=yA+(yB-yA)*t;T([x,y+.05,z],[x,y+H-.1,z],.16,rail);}};
-  run2(X0,DF,-6.3,DF,11);run2(-6.3,DF,6.7,DF,15);run2(6.7,DF,X1,DF,7);             // front: 3 sections
-  run2(X0,WF+.6,X0,DF,6);                                                           // south end
-  run2(X0,WF+.6,X0+2.2,WF+.6,2);run2(-11,WF+.6,-HW,WF+.6,4);                        // back of the south deck, stair gap between
+  run2(X0,DF,-6.6,DF,11);run2(-6.6,DF,6.7,DF,15);run2(6.7,DF,X1,DF,7);             // front: 3 sections
+  run2(X0,WF+.2,X0,DF,6);                                                           // south end
+  run2(X0,WF+.2,X0+2.2,WF+.2,2);run2(-11,WF+.2,-HW,WF+.2,4);                        // back of the south deck, stair gap between
   run2(HW,WF,X1,WF,6);run2(X1,WF,X1,10.8,2);                                        // north deck back rail and return
   // north stair: 8 treads, 8 risers, 2 stringers, 2 end posts + 10 pickets each side, pad at the foot
   const N=8,SW=3.2,RIS=DECK/N,TR=.98,SZ=(10.8+DF)/2;
@@ -1274,7 +1275,7 @@ const landscapeReady=(async()=>{
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   // Apply authored transforms after the scatter baseline to preserve existing
   // landscape object IDs. Keep per-axis scale and the full Euler rotation.
-  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-37.985,125.7,37.665],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.6,127.55,45.2],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
+  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-37.985,125.7,37.665],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.6,127.2,45.9],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
   for(const [i,rec] of placed.entries()){
     const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];
