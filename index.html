@@ -462,8 +462,8 @@ function makeCabin(){
   const mapped=(hex,pattern)=>{const m=new THREE.MeshLambertMaterial({color:hex});const t=cabinTexture(pattern);m.map=t;return m;};
   const tag=(m,kind,wear,horiz)=>{m.userData.wx={kind,wear,horiz};return m;};
   const side=tag(mapped(0x9c7a3e,'board'),'vboard'),roof=tag(mapped(0x141319,'rib'),'roofV'),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),
-        Tx=sharedTextures(THREE),woodMat=new THREE.MeshStandardMaterial({map:Tx.wood,normalMap:Tx.woodN,normalScale:new THREE.Vector2(.9,.9),roughness:.94});woodMat.userData.wx={box:true,chip:1.1};
-  const RED=[.125,.013,.016],BROWN=[.3,.2,.11],post={wood:true,paint:[.2,.125,.065]},rail={wood:true,paint:BROWN},railTop={wood:true,paint:[.36,.25,.15]},rim={wood:true,paint:BROWN},deckB={wood:true,paint:RED,kind:1.25},log={wood:true,tint:[.9,.82,.72]},logPale={wood:true,tint:[1.6,1.62,1.68]},
+        Tx=sharedTextures(THREE),woodMat=new THREE.MeshStandardMaterial({map:Tx.wood,normalMap:Tx.woodN,normalScale:new THREE.Vector2(.9,.9),roughness:.94});woodMat.userData.wx={box:true,chip:0};
+  const RED=[.125,.013,.016],BROWN=[.3,.2,.11],post={wood:true,paint:[.2,.125,.065]},rail={wood:true,paint:BROWN},railTop={wood:true,paint:[.36,.25,.15]},rim={wood:true,paint:BROWN},deckB={wood:true,paint:RED,kind:1.25},log={wood:true,paint:[.3,.22,.13]},logPale={wood:true,tint:[1.15,1.15,1.2]},
         
         red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=makeGlass(THREE,{alpha:1,tint:0x0d1114}),doorGlass=MAT(0x2c2d31,1),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
         white=MAT(0xe6e2d6),blue=MAT(0x4e93b0),dark=MAT(0x1c2024);
@@ -494,8 +494,8 @@ function makeCabin(){
   for(const sgn of [-1,1]){if(sgn>0)T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,zF],.25,fascia);else T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,pB],.25,fascia);
     T([0,RIDGE-.25,zF],[sgn*run,RIDGE-fall-.25,zF],.25,fascia);T([0,RIDGE-.55,WF+.2],[sgn*HW,EAVE+.25,WF+.2],.4,rake);T([0,RIDGE-.25,zB],[sgn*run,RIDGE-fall-.25,zB],.25,fascia);}
   // skylight on the south slope, 2 x 4 ft
-  {const t=Math.atan(PITCH),sk=new THREE.Group();sk.position.set(-3.6*F,(RIDGE-3.6*PITCH+.14)*F,2.8*F);sk.rotation.z=t;
-   const a=new THREE.Mesh(new THREE.BoxGeometry(2.3*F,.3*F,4.3*F),MAT(0x4a4b4c,1));const b=new THREE.Mesh(new THREE.BoxGeometry(1.9*F,.06*F,3.9*F),glass);b.position.y=.16*F;sk.add(a,b);g.add(sk);sk.updateMatrix();
+  {const skyGlass=makeGlass(THREE,{alpha:1,tint:0x0d1114,reflect:.3});const t=Math.atan(PITCH),sk=new THREE.Group();sk.position.set(-3.6*F,(RIDGE-3.6*PITCH+.14)*F,2.8*F);sk.rotation.z=t;
+   const a=new THREE.Mesh(new THREE.BoxGeometry(2.3*F,.3*F,4.3*F),MAT(0x4a4b4c,1));const b=new THREE.Mesh(new THREE.BoxGeometry(1.9*F,.06*F,3.9*F),skyGlass);b.position.y=.16*F;sk.add(a,b);g.add(sk);sk.updateMatrix();
    for(const m of [a,b]){m.geometry.applyMatrix4(new THREE.Matrix4().compose(m.position,m.quaternion,m.scale));m.position.set(0,0,0);m.geometry.applyMatrix4(sk.matrix);g.add(m);}g.remove(sk);}
   // front wall: door north of the window, red shutters, curtains, signs, antlers, picture
   const zW=WF+.08;

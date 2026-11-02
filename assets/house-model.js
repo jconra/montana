@@ -138,7 +138,7 @@ export function buildHouse(THREE, spec, opts){
 
   const streakMat=()=>{if(matCache.__streak)return matCache.__streak;
     const c=document.createElement('canvas');c.width=128;c.height=64;const x=c.getContext('2d');let seed=98765;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-    for(let i=0;i<34;i++){const px=rnd()*128,w=1+rnd()*5,l=18+rnd()*46,grad=x.createLinearGradient(0,0,0,l);grad.addColorStop(0,`rgba(0,0,0,${.1+rnd()*.3})`);grad.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=grad;x.fillRect(px,0,w,l);}
+    for(let i=0;i<34;i++){const px=rnd()*128,w=1+rnd()*5,l=18+rnd()*46,grad=x.createLinearGradient(0,0,0,l);grad.addColorStop(0,`rgba(0,0,0,${.05+rnd()*.13})`);grad.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=grad;x.fillRect(px,0,w,l);}
     const tx=new THREE.CanvasTexture(c);if('SRGBColorSpace'in THREE)tx.colorSpace=THREE.SRGBColorSpace;
     const m=new THREE.MeshBasicMaterial({map:tx,transparent:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1});m.userData.noShadow=true;return matCache.__streak=m;};
   const mesh=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;};
@@ -470,7 +470,7 @@ export function buildHouse(THREE, spec, opts){
     }else if(d.type==='skylight'){
       const cm=swatchMat(d.mat,defTrim),cb=.2;   // curb round an opening cut in the roof, so the glass is a real window
       part(cb,h,dep+.3,-(w+.3-cb)/2,0,0,cm);part(cb,h,dep+.3,(w+.3-cb)/2,0,0,cm);part(w+.3-2*cb,h,cb,0,0,-(dep+.3-cb)/2,cm);part(w+.3-2*cb,h,cb,0,0,(dep+.3-cb)/2,cm);
-      part(w,.04,dep,0,h/2-.05,0,glassMat);
+      part(w,.04,dep,0,h/2-.05,0,d.skyBase?makeGlass(THREE,{alpha:spec.glassAlpha??.5,base:d.skyBase}):glassMat);
       if(d.apronMat!=null){const am=swatchMat(d.apronMat,defTrim),len=d.apron??1,y=-h/2+.04;   // flashing apron on the downslope side
         if(seatAlong)part(w+.7,.06,len,0,y,sg*(dep/2+len/2),am);else part(len,.06,dep+.7,sg*(w/2+len/2),y,0,am);}
     }else if(d.type==='railing'){                              // posts, top + bottom rails and balusters along one run

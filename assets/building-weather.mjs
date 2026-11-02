@@ -127,6 +127,13 @@ float wShakeE = max(-wKind, 0.0), wSetBack = 0.0;
       wPaint = mix(wPaint * vec3(0.8), wPaint * vec3(1.15, 1.08, 1.05), smoothstep(0.3, 0.8, wBig.g * 0.55 + wBoard * 0.45));
     }
     #endif
+    #ifdef USE_MAP
+    if (wKind < 1.2 && wPainted > 0.5) {
+      // Baked coat lifting in long flakes along the grain.
+      float wG1 = texture2D(uNoise, vec2(vMapUv.x * 0.55, vMapUv.y * 7.0)).g, wG2 = texture2D(uNoise, vec2(vMapUv.x * 1.7, vMapUv.y * 19.0)).b;
+      wChip = max(wChip, smoothstep(0.6, 0.64, wG1 * 0.7 + wG2 * 0.3 + (wBig.r - 0.5) * 0.25 + max(wN.y, 0.0) * 0.06));
+    }
+    #endif
     wPaintVis = wPainted * (1.0 - wChip);
     diffuseColor.rgb = mix(wWood, wPaint, wPaintVis);
   #else
@@ -214,7 +221,7 @@ wPaintVisO=wPaintVis;wBareO=wBare;wStreakO=wStreak;wRimHO=wRimH;
 }
 `;
 const FRAG_ROUGH=`
-roughnessFactor=mix(roughnessFactor,.62,wPaintVisO*.8);
+roughnessFactor=mix(roughnessFactor,.92,wPaintVisO*.8);
 roughnessFactor=mix(roughnessFactor,.55,wBareO*.6);
 `;
 const FRAG_NORMAL=`
