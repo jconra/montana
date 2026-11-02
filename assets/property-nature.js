@@ -59,10 +59,13 @@ function horseshoePit(){
  mergeGroup(g);g.name='horseshoe-pit';return g;
 }
 // A low heap of split firewood on the ground, as the May frames show it: no rack, no roof.
-function woodpile(){const g=new THREE.Group(),R=rng(916);
- for(let row=0;row<3;row++)for(let i=0;i<9-row*2;i++)log(g,.5+R()*.2,.07+R()*.03,[(i-(8-row*2)/2)*.17+(R()-.5)*.06,.07+row*.13,(R()-.5)*.28],[Math.PI/2,(R()-.5)*.6,0]);
+function stoneRow(len,seed){const g=new THREE.Group(),R=rng(seed),m=mat(0x8d8a80),n=Math.round(len/.32);for(let i=0;i<n;i++){const r=.1+R()*.11,o=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),m);o.position.set((i-(n-1)/2)*len/n+(R()-.5)*.1,r*.55,(R()-.5)*.28);o.rotation.set(R()*3,R()*3,R()*3);o.scale.y=.7;g.add(o);}mergeGroup(g);return g;}
+// Firewood rounds stacked ends-out between end stakes, after the woodpile in the Mathwood props lab: rows sit in each other's hollows.
+function woodStack(len,height,seed){const g=new THREE.Group(),R=rng(seed),r=.085,up=r*1.6,rows=Math.round(height/up),n0=Math.max(2,Math.round(len/(r*1.9)));
+ for(const z of[-.18,.18])box(g,[len+.12,.07,.08],[0,.035,z],mat(0x4a3d30));
+ for(let row=0;row<rows;row++){const n=n0-(row%2);for(let i=0;i<n;i++)log(g,.42+R()*.1,r*(.92+R()*.18),[(i-(n-1)/2)*len/n0,.09+r+row*up,(R()-.5)*.05],[Math.PI/2,(R()-.5)*.12,0]);}
+ for(const x of[-len/2-.05,len/2+.05])box(g,[.07,height+.2,.07],[x,(height+.2)/2,0],mat(0x4a3d30));
  mergeGroup(g);return g;}
-function tarp(color,w,d){const g=new THREE.Group(),n=10,geo=new THREE.PlaneGeometry(w,d,n,4);geo.rotateX(-Math.PI/2);const p=geo.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,.05+.035*Math.sin(p.getX(i)*5.1+p.getZ(i)*3)+.025*Math.sin(p.getZ(i)*7.3));geo.computeVertexNormals();const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.8,side:THREE.DoubleSide}));g.add(m);mergeGroup(g);return g;}
 function lumber(pieces,color=0x9c8a6c){const g=new THREE.Group(),R=rng(77),m=mat(color),dk=mat(0x8d7a5c);for(let i=0;i<pieces;i++)box(g,[3.2+R()*.5,.05,.2+R()*.14],[(R()-.5)*.3,.05+Math.floor(i/4)*.06,(i%4-1.5)*.32+(R()-.5)*.06],R()<.3?dk:m,[0,(R()-.5)*.06,0]);mergeGroup(g);return g;}
 function brushPile(){const g=new THREE.Group(),R=rng(303),m=mat(0x6b5a43),d=mat(0x4a3f30);for(let i=0;i<34;i++){const a=R()*6.283,l=1.4+R()*1.6,c=new THREE.Mesh(new THREE.CylinderGeometry(.018,.045,l,5),R()<.5?m:d);c.position.set(Math.cos(a)*R()*.9,.12+R()*.55,Math.sin(a)*R()*.9);c.rotation.set((R()-.5)*1.1,R()*6.28,Math.PI/2+(R()-.5)*.8);g.add(c);}mergeGroup(g);return g;}
 function pedestal(w,h,d,color){const g=new THREE.Group();box(g,[w,h,d],[0,h/2,0],mat(color));box(g,[w*1.1,.04,d*1.1],[0,h+.02,0],mat(color));mergeGroup(g);return g;}
@@ -200,11 +203,10 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
- place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),{x:-9.3,z:37.3},-.3,'prop:wood','Firewood heap');
+ place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodStack(3.05,1.35,916),{x:-5.89,z:35.76},-.145,'prop:wood','Firewood stack');
  // Ground clutter measured on the May mosaic and by rays from solved frames.
- [[tarp(0x4a9fd0,3,1.2),-6.6,33.5,-.42,'tarp-blue','Blue tarp'],[tarp(0xa89e8e,2,1.4),-9.7,35,-.3,'tarp-pale','Pale tarp'],[tarp(0x3f7fb0,3.6,.8),-7.1,35.9,-.05,'tarp-dark','Blue tarp, folded'],
-  [lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
-    [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
+ [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
+    [stoneRow(2.4,47),-5.28,6.9,-.25,'stones-boxes','Stone row'],[pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
  // The two pale poles by the entry, measured on the drone mosaic. They lie along the slope: a straight piece levelled at its middle would dip under the ground and show as dashes.
  [[3.2,.075,-3.99,-1.97,0,'pole-entry'],[3.65,.08,-3.31,-.02,.16,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]).material=[PALE_LOG,PALE_LOG,PALE_LOG];mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);let lift=0;for(let q=-1;q<=1;q+=.25)lift=Math.max(lift,heightAt(x+Math.cos(yaw)*e*q,z-Math.sin(yaw)*e*q)-((hi+lo)*.5+(hi-lo)*.5*q));g.children.forEach(m=>{m.position.y=r*1.05+lift+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});

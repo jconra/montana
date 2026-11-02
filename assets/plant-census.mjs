@@ -25,7 +25,7 @@ export function applyCensusToObjects(objects,census,baseIds,keep=[]){
   if(plant.record&&added.has(plant.record)){const rec=censusRecord(plant,added.get(plant.record));added.set(rec.id,rec);continue;}
   const rec=censusRecord({...plant,record:null});added.set(rec.id,rec);
  }
- for(const id of census.removed){if(!baseIds.has(id)||kept.has(id))continue;overrides.delete(id);removed.add(id);}
+ for(const id of census.removed){if(kept.has(id))continue;added.delete(id);if(!baseIds.has(id))continue;overrides.delete(id);removed.add(id);}
  return {overrides:[...overrides.values()],added:[...added.values()],removed:[...removed]};
 }
 const censusId=plant=>plant.record||'added:census-'+plant.id;
