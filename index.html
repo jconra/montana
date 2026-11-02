@@ -95,6 +95,7 @@
 
   <div class="sec">route / sim</div>
   <label>show route guides <input id="routeGuides" type="checkbox"></label>
+  <label>show property line <input id="propertyLine" type="checkbox"></label>
   <label><button id="radd">add waypoints</button> <button id="rclear">clear</button></label>
   <label><button id="rdrive">drive route</button> <button id="rintro">▶ play intro</button></label>
   <label><button id="rcopy">copy route</button></label>
@@ -157,6 +158,7 @@ import {installGrade,gradeLand} from './assets/land-grade.mjs';
 import {verifiable,juniperVariety,evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
 import {createHillStones} from './assets/hill-stones.js';
+import {createPropertyLine} from './assets/property-line.js';
 import {createPlantFill,loadPlantFillMap} from './assets/plant-fill.js';
 import {roadCoverage,DRIVE_LINE,driveLineDistance} from './assets/driveway-measured.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
@@ -1123,6 +1125,7 @@ $('treeStyle').onchange=e=>setTreeStyle(e.target.value);
 $('reseed').onclick=()=>buildTreesFrom(+$('treeN').value);
 $('drive').onclick=()=> driveMode?endDrive():beginDrive('manual');
 $('routeGuides').onchange=()=>{routeObj.visible=$('routeGuides').checked||routeAdd;};
+{let line=null;$('propertyLine').onchange=async()=>{const on=$('propertyLine').checked;if(on&&!line)line=await createPropertyLine({scene,heightAt});if(line)line.visible=$('propertyLine').checked;};}
 $('radd').onclick=()=>{routeAdd=!routeAdd;if(routeAdd){endDrive();$('coordinateMode').checked=false;marker.visible=false;}routeObj.visible=$('routeGuides').checked||routeAdd; $('radd').textContent=routeAdd?'tap terrain… (done)':'add waypoints';};
 $('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='add waypoints';};
 $('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
