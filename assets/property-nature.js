@@ -1,7 +1,7 @@
 import {correctedDriveway,GRAVEL_EXCLUSIONS,grassReclaim} from './driveway-refinements.mjs';
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,smooth} from './property-layout.mjs';
+import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,CAMP_PROPS,smooth} from './property-layout.mjs';
 import {loadSagebrush} from './sagebrush.js';
 import {TALL_GRASS_PATCHES,tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
 import {campSurface,HORSESHOES} from './camp-approach.mjs';
@@ -173,10 +173,10 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
- place(firepit(),CLEARING.fire,0,'prop:firepit','Campfire');place(picnic(),CLEARING.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),CLEARING.wood,-.3,'prop:wood','Wood stack');
+ place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),CLEARING.wood,-.3,'prop:wood','Wood stack');
  HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});
  const chairColors=[0x2b9798,0xce5669,0x40a6a1,0xc85871,0x3f91a0];
- chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CLEARING.fire.x+Math.sin(a)*2.35,z:CLEARING.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
+ chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CAMP_PROPS.fire.x+Math.sin(a)*2.35,z:CAMP_PROPS.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
  // Horizontal water surface with animated ripple normals and sky tint, no reflection render pass.
  const shape=new THREE.Shape(POND_OUTLINE.map(p=>new THREE.Vector2(p.x,-p.z))),waterGeo=new THREE.ShapeGeometry(shape,24);waterGeo.rotateX(-Math.PI/2);
  const waterMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:wind},vertexShader:'varying vec3 waterWorld;void main(){waterWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(waterWorld,1.);}',fragmentShader:`uniform float time;varying vec3 waterWorld;

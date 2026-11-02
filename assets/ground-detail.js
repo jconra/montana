@@ -83,12 +83,12 @@ export function createGroundDetail(half,driveway){
       vec3 grass=texture2D(grassDetail,landUV*.65).rgb;
       // The greener trip is the color reference. Keep fine lawn variation,
       // rather than flattening the clearing to one color or baking dry-season tan.
-      grass=mix(grass,grass*vec3(1.03,1.15,.98),coverage.b*.75);
+      grass=mix(grass,grass*vec3(.86,.92,.74),coverage.b*.75);
       float grassWeight=clamp(greenness*(.48+patches*.5+coverage.g*.48),0.,1.)*(1.-steep*.85);
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
       vec4 moisture=texture2D(paintMoisture,paintUV),surfacePaint=texture2D(paintSurface,paintUV);
       vec3 dryGrass=texture2D(grassDetail,landUV*.65).rgb*vec3(2.25,1.25,1.4);
-      grass=mix(grass,mix(dryGrass,grass*vec3(.92,1.18,.96),moisture.r),moisture.a);
+      grass=mix(grass,mix(dryGrass,grass*vec3(.84,.94,.74),moisture.r),moisture.a);
       grassWeight=mix(grassWeight,.93,moisture.a);
       road=mix(road,surfacePaint.r,surfacePaint.a);
       grassWeight=mix(grassWeight,.95,surfacePaint.a*(1.-surfacePaint.r));
@@ -111,7 +111,7 @@ export function createGroundDetail(half,driveway){
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
       diffuseColor.rgb*=1.-canopy*.75;`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v7';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v8';}};
 }
 export function rockGeometry(seed){
   const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);

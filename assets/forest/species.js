@@ -94,7 +94,7 @@ export async function buildTreeSpecies(baseUrl){
   const inner=lathe([[.1,.05],[.3,.13],[.55,.13],[.78,.07],[.9,.02]],7,[.012,.022,.012]);
   const m=new THREE.MeshStandardMaterial({map:branch,color:0x5f7c5e,alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   out.push(pack('juniper','Round juniper',4,{leaf:g,wood:inner},m,coreMat(),{shape:{...lump,lump:.14},sink:.07,wideBase:1.3,sway:.1}));}
- {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:leafTexture(77),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xe6e6da,vertexColors:true,roughness:1,metalness:0,name:'bark'});
+ {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:leafTexture(77),color:0xa8c090,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xe6e6da,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},sway:.2}));}
  return out;
 }

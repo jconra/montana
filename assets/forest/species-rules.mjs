@@ -3,7 +3,7 @@
 export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
-export const ASPEN_STANDS=[{x:-52,z:9,r:11,planted:14,hMin:8,hMax:14},{x:-31,z:50,r:4,planted:3,hMin:7,hMax:11}];
+export const ASPEN_STANDS=[{x:-52,z:9,r:11,planted:14,hMin:8,hMax:14}];
 export function treeHash(id,salt=0){let h=2166136261^salt;for(const c of String(id))h=Math.imul(h^c.charCodeAt(0),16777619);h^=h>>>13;h=Math.imul(h,1540483477);return ((h^h>>>15)>>>0)/4294967296;}
 
 // Counts trees within `radius` of a spot; built once from the LiDAR list.

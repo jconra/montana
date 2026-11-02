@@ -11,7 +11,10 @@ export const POND_OUTLINE=pondAnchors.flatMap((p1,i)=>Array.from({length:6},(_,j
  const interp=k=>.5*((2*p1[k])+(-p0[k]+p2[k])*t+(2*p0[k]-5*p1[k]+4*p2[k]-p3[k])*t*t+(-p0[k]+3*p1[k]-3*p2[k]+p3[k])*t*t*t);
  return {x:interp('x'),z:interp('z')};
 }));
+// CLEARING seeds the scatter whose object ids saved edits refer to, so it stays put; props stand at CAMP_PROPS.
 export const CLEARING={fire:photoToWorld(796,454),picnic:photoToWorld(830,491),wood:photoToWorld(808,591)};
+// Measured from solved May 2026 drone cameras.
+export const CAMP_PROPS={fire:{x:-19,z:39.25},picnic:{x:-16.1,z:36.56}};
 export const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 export const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
 export function polygonDistance(x,z,points=POND_OUTLINE){
