@@ -790,7 +790,7 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
   {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
    for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:juniperVariety(id,h),x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
   // Smaller trees between the big ones in the deep forest: the LiDAR finds tops only, and the real wood has a wide spread of heights. Invented, sized from their neighbour; new ids after all the others.
-  {const k=rng(5501);trees.forEach((t,n)=>{if(t.h<12||neighboursAt(t.x,t.z)<10||k()>.55){k();k();k();return;}const a=k()*6.283,d=3+k()*4,h=t.h*(.3+k()*.35),x=t.x+Math.cos(a)*d,z=t.z+Math.sin(a)*d,id='under:'+n;if(inBuilding(x,z)||verifiable(x,z))return;const asset=treeKindOf(id,x,z,h);list.push({id,asset:asset==='snag'?'fir_small':asset,x,z,gy:heightAt(x,z),h,r:a*3,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});}
+  {trees.forEach((t,n)=>{const id='under:'+(t.id??n);if(t.h<12||neighboursAt(t.x,t.z)<10||treeHash(id,51)>.55)return;const a=treeHash(id,52)*6.283,d=3+treeHash(id,53)*4,h=t.h*(.3+treeHash(id,54)*.35),x=t.x+Math.cos(a)*d,z=t.z+Math.sin(a)*d;if(inBuilding(x,z)||verifiable(x,z))return;const asset=treeKindOf(id,x,z,h);list.push({id,asset:asset==='snag'?'fir_small':asset,x,z,gy:heightAt(x,z),h,r:a*3,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});}
   return list;
 }
 let groveList=[];
@@ -1301,14 +1301,9 @@ const landscapeReady=(async()=>{
     shrubSpecies.forEach((sp,i)=>{asset('bush/'+sp.name.replace('_','-'),sp.label,sp.parts,[sp.defaultHeight,sp.defaultHeight,sp.defaultHeight]);catalog.get('bush/'+sp.name.replace('_','-')).shrub=()=>i;});
   }
   landscapeCatalog=catalog;
-  // Dense sage on the dry slope and at road edges and foundations, and small pale rocks across the hillside; new ids, invented placements.
-  {const k=rng(7719),free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25;
-   if(propertyNature.models.sage.length){const put=(n,x,z,s)=>{if(free(x,z))base.push(row('sage2:'+n,'bush/sage',{x,z,r:k()*6.283,tint:.88+k()*.24},[s*(.9+k()*.3),s,s*(.9+k()*.3)]));};
-    for(let n=0;n<1500;n++){const x=-55+k()*185,z=-85+k()*80,cl=Math.sin(x*.21+Math.sin(z*.13)*2)+Math.cos(z*.17-x*.07);if(cl>-.2)put(n,x,z,.5+k()*.75);else{k();k();k();k();}}
-    for(let n=0;n<130;n++){const line=DRIVE_LINE[Math.floor(k()*(DRIVE_LINE.length-1))],s=k()<.5?-1:1;put(2000+n,line.x+(k()-.5)*9,line.z+s*(2.2+k()*3),.45+k()*.5);}
-    [[8.78,-4.88,11.5,5.6],[-30.7,-8.2,5.5,5.5],[-39,37.7,4,5]].forEach(([cx,cz,hx,hz],b)=>{for(let n=0;n<26;n++){const a=k()*6.283;put(3000+b*100+n,cx+Math.cos(a)*(hx+.8+k()*1.4),cz+Math.sin(a)*(hz+.8+k()*1.4),.35+k()*.4);}});}
-   const shapes=[11,27,43,61];for(let n=0;n<1100;n++){const x=-60+k()*190,z=-85+k()*82,near=inCentralArea(x,z),v=k(),s=(near?.28:.09)*(.6+v*v*2.2);if(!free(x,z)||campSurface(x,z).tallGrass>.2){k();k();continue;}base.push(row('pebble:'+n,'rock/'+shapes[n%4],{x,z,r:k()*6.283,tint:1.02+k()*.2},[s,s*.65,s*.85],undefined,-s*.14));}
-  }
+  // Scatter records (sage2:*, pebble:*) come from a frozen list. They were once dealt from one seed in a loop that drew numbers only for spots passing `free`, so any change to the road, lawn or pond re-dealt every id after it, and census removals and saved edits then pointed at other plants. The list holds the deal the census was written against; `free` only hides a row, it never moves an id.
+  {const free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25;
+   for(const [id,asset,x,z,offset,rotation,scale,tint] of await (await fetch('./assets/scatter-frozen.json')).json())if(free(x,z)&&(id.startsWith('sage2:')?propertyNature.models.sage.length:(campSurface(x,z).tallGrass<=.2)))base.push({id,asset,x,z,offset,rotation,scale,tint});}
   for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
   // Bake each prop in its own local coordinates, then register it with the
   // same persistent object IDs and instanced editor used for vegetation.

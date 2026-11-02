@@ -11,6 +11,7 @@ const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.92});
 const wood=mat(0x827053),endWood=mat(0xb39a70),dark=mat(0x302c24),stone=mat(0x777468);
 function box(g,size,pos,material,rotation){const m=new THREE.Mesh(new THREE.BoxGeometry(...size),material);m.position.set(...pos);if(rotation)m.rotation.set(...rotation);g.add(m);return m;}
+const PALE_LOG=new THREE.MeshStandardMaterial({color:0xcfc39a,roughness:.95});
 function log(g,length,radius,pos,rotation=[0,0,Math.PI/2]){const m=new THREE.Mesh(new THREE.CylinderGeometry(radius*.86,radius,length,9,1,false),[wood,endWood,endWood]);m.position.set(...pos);m.rotation.set(...rotation);g.add(m);return m;}
 function mergeGroup(group){
  const buckets=new Map();group.updateMatrixWorld(true);
@@ -206,7 +207,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
     [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
  // The two pale poles by the entry, measured on the drone mosaic. They lie along the slope: a straight piece levelled at its middle would dip under the ground and show as dashes.
- [[3.2,.075,-3.99,-1.97,0,'pole-entry'],[3.65,.08,-3.31,-.02,.16,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]);mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);g.children.forEach(m=>{m.position.y=r*.9+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});
+ [[3.2,.075,-3.99,-1.97,0,'pole-entry'],[3.65,.08,-3.31,-.02,.16,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]).material=[PALE_LOG,PALE_LOG,PALE_LOG];mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);let lift=0;for(let q=-1;q<=1;q+=.25)lift=Math.max(lift,heightAt(x+Math.cos(yaw)*e*q,z-Math.sin(yaw)*e*q)-((hi+lo)*.5+(hi-lo)*.5*q));g.children.forEach(m=>{m.position.y=r*1.05+lift+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});
  place(rootCellar(),{x:-7.28,z:-4.67},.03,'prop:root-cellar','Root cellar door');
  {const g=cellarTimbers(),p=place(g,{x:-7,z:-6},0,'prop:cellar-timbers','Old timbers');g.position.y=125.3;props.at(-1).baseY=125.3;}
  {const g=new THREE.Group();log(g,2.8,.13,[0,.12,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x:-27.5,z:17.5},.97,'prop:log-west','Downed log');}

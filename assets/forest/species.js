@@ -70,7 +70,7 @@ function juniperForm({seed,radius,lobes,cards,pointed=1.25,tips=1,egg=0}){
  for(let i=0;i<tips;i++){const y=r()*6.283,d=i?radius*(.3+r()*.3):0;tip.push([Math.cos(y)*d,Math.sin(y)*d,i?.66+r()*.24:1]);}
  const E=f=>radius*(egg?Math.pow(Math.max(0,1-Math.pow(f,egg)),.62):Math.pow(Math.max(0,1-f),1/pointed)),ss=(x,y,v)=>{const t=Math.max(0,Math.min(1,(v-x)/(y-x)));return t*t*(3-2*t);};
  for(let l=0;l<lobes;l++){
-  const f=Math.pow(r(),.85),t=tip[Math.floor(r()*tips)],yaw=r()*6.283,Rm=E(f),L=Math.max(radius*(.2+r()*.17),.055+r()*.04)*(1-f*.4),out=Math.max(0,Rm-L*.5)*(.35+.65*Math.sqrt(r())),cx=t[0]*f+Math.cos(yaw)*out,cz=t[1]*f+Math.sin(yaw)*out,cy=Math.max(L*.55,f*t[2]),own=.82+r()*.36;
+  const f=Math.pow(r(),1.12),t=tip[Math.floor(r()*tips)],yaw=r()*6.283,Rm=E(f),L=Math.max(radius*(.2+r()*.17),.055+r()*.04)*(1-f*.4),out=Math.max(0,Rm-L*.5)*(.35+.65*Math.sqrt(r())),cx=t[0]*f+Math.cos(yaw)*out,cz=t[1]*f+Math.sin(yaw)*out,cy=Math.max(L*.55,f*t[2]),own=.82+r()*.36;
   for(let k=0;k<cards;k++){
    let dx=r()*2-1,dy=r()*1.5-.5,dz=r()*2-1;const n=Math.hypot(dx,dy,dz)||1;dx/=n;dy/=n;dz/=n;
    const at=L*(.5+.5*r()),size=.054+r()*.034,top=ss(-.15,.75,dy),sunlit=top>.6&&r()<.62,c=sunlit?[1.72,1.5,.78]:[.5+.55*top,.58+.5*top,.46+.46*top],sh=own*(.85+r()*.3);
@@ -79,7 +79,7 @@ function juniperForm({seed,radius,lobes,cards,pointed=1.25,tips=1,egg=0}){
  }
  return a;
 }
-function juniper(opts){const a=juniperForm(opts),R=opts.radius*.6,leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);return {leaf,wood:lumpyBody(opts.egg?[[0,R*.6],[.2,R*.64],[.42,R*.56],[.62,R*.4],[.76,R*.2],[.84,.002]]:[[0,R*.42],[.25,R*.36],[.5,R*.24],[.66,R*.1],[.74,.002]],13,[.028,.038,.018],opts.seed+3)};}
+function juniper(opts){const a=juniperForm(opts),R=opts.radius*.6,leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);return {leaf,wood:lumpyBody(opts.egg?[[0,R*.4],[.2,R*.42],[.4,R*.32],[.55,R*.16],[.64,.002]]:[[0,R*.28],[.22,R*.22],[.4,R*.13],[.54,.002]],13,[.028,.038,.018],opts.seed+3)};}
 const FLAME={u0:0,u1:1,v0:0,v1:1};
 // A soft flame of juniper foliage: fine scaly strokes, dark olive at the base going to yellow at the tips.
 function flameTexture(seed){
