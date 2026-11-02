@@ -528,7 +528,7 @@
       "pitch": 0.6,
       "raiseWalls": true,
       "mat": 4,
-      "flipRidge": true,
+      "flipRidge": false,
       "overhang": 1,
       "rake": 0.3,
       "fasciaMat": 11

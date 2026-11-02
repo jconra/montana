@@ -3,8 +3,8 @@
 // Width is the half-width of the worn lane; wear fades out toward the fire pit.
 import {grassReclaim} from './driveway-refinements.mjs';
 import {tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
-// Centers registered to the user's red marks, facing each other across the lawn.
-export const HORSESHOES=[{x:-10.05,z:28.84},{x:-10.76,z:19.78}];
+// Centers measured from solved drone cameras, facing each other across the lawn.
+export const HORSESHOES=[{x:-8.5,z:32.05},{x:-9.05,z:23.05}];
 export const CAMP_APPROACH=[
   {x:-24,z:-6,width:5.2,wear:1},
   {x:-18,z:-1,width:5.0,wear:1},

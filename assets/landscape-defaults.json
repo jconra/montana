@@ -1241,6 +1241,78 @@
           0.6
         ],
         "tint": 0.96
+      },
+      {
+        "id": "added:reference-lawn-rock-pit",
+        "asset": "rock/27",
+        "x": -7.79,
+        "z": 23.1,
+        "offset": 0,
+        "rotation": [
+          0,
+          0.7,
+          0
+        ],
+        "scale": [
+          0.45,
+          0.16,
+          0.28
+        ],
+        "tint": 0.96
+      },
+      {
+        "id": "added:reference-lawn-rock-log",
+        "asset": "rock/11",
+        "x": -5.53,
+        "z": 23.68,
+        "offset": 0,
+        "rotation": [
+          0,
+          0.7,
+          0
+        ],
+        "scale": [
+          0.32,
+          0.1,
+          0.2
+        ],
+        "tint": 0.96
+      },
+      {
+        "id": "added:reference-lawn-rock-east",
+        "asset": "rock/27",
+        "x": -2.29,
+        "z": 26.06,
+        "offset": 0,
+        "rotation": [
+          0,
+          0.7,
+          0
+        ],
+        "scale": [
+          0.35,
+          0.22,
+          0.25
+        ],
+        "tint": 0.96
+      },
+      {
+        "id": "added:reference-lawn-rock-east2",
+        "asset": "rock/11",
+        "x": -2.92,
+        "z": 28.04,
+        "offset": 0,
+        "rotation": [
+          0,
+          0.7,
+          0
+        ],
+        "scale": [
+          0.16,
+          0.12,
+          0.14
+        ],
+        "tint": 0.96
       }
     ],
     "removed": [

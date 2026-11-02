@@ -48,13 +48,12 @@ function firepit(){const g=new THREE.Group(),R=rng(501);
  for(let i=0;i<4;i++){const m=log(g,1.1,.09,[(i-1.5)*.17,.1+i*.04,0],[Math.PI/2,0,(i%2)*1.3]);m.material=dark;}
  mergeGroup(g);return g;}
 function horseshoePit(){
- const g=new THREE.Group(),sand=mat(0x908976),stake=mat(0x626965);
- box(g,[1.15,.025,1.45],[0,.018,0],sand);
- // Three substantial logs per pit: two sides and a back, open toward the
- // opposing stake (+Z). Retain separate bark and cut-end wood materials.
- for(const x of [-.72,.72])log(g,1.65,.14,[x,.13,0],[Math.PI/2,0,0]);
- log(g,1.7,.14,[0,.13,-.92],[0,0,Math.PI/2]);
- const pin=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.43,8),stake);pin.position.set(0,.2,-.14);pin.rotation.x=-.12;g.add(pin);
+ const g=new THREE.Group(),stake=mat(0x626965);
+ // Three slim poles laid on the grass, two sides and a back, open toward the
+ // opposing stake (+Z). No sand box: the frame sits directly on the lawn.
+ for(const x of [-.8,.8])log(g,1.1,.05,[x,.05,0],[Math.PI/2,0,0]);
+ log(g,1.65,.05,[0,.05,-.52],[0,0,Math.PI/2]);
+ const pin=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.43,8),stake);pin.position.set(0,.2,.2);pin.rotation.x=-.12;g.add(pin);
  mergeGroup(g);g.name='horseshoe-pit';return g;
 }
 function woodpile(){const g=new THREE.Group(),R=rng(916);
@@ -174,6 +173,8 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
  place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),CLEARING.wood,-.3,'prop:wood','Wood stack');
+ // Loose logs beside the upper pit, measured from solved drone cameras.
+ [[1.76,.15,-6.59,21.27,.49],[.95,.17,-5.3,23.22,1.45]].forEach(([len,r,x,z,yaw],i)=>{const g=new THREE.Group();log(g,len,r,[0,r*.8,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x,z},yaw,`prop:loose-log:${i}`,`Loose log ${i+1}`);});
  HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});
  const chairColors=[0x2b9798,0xce5669,0x40a6a1,0xc85871,0x3f91a0];
  chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CAMP_PROPS.fire.x+Math.sin(a)*2.35,z:CAMP_PROPS.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
