@@ -7,7 +7,7 @@ const at={x:300,z:300,neighbours:12,id:'lidar:1'};
 assert.equal(treeKind({...at,h:3}),'juniper');
 assert.ok(['fir','spruce'].includes(treeKind({...at,h:25})));
 assert.ok(['fir_small','spruce'].includes(treeKind({...at,h:10})));
-assert.equal(treeKind({...at,neighbours:2,h:10}),'fir_small');
+assert.ok(['juniper','open_fir'].includes(treeKind({...at,neighbours:2,h:10})));
 for(let i=0;i<200;i++)assert.ok(TREE_KINDS.includes(treeKind({id:'lidar:'+i,x:i,z:i,h:2+i/5,neighbours:i%20})));
 assert.equal(treeKind({...at,h:9}),treeKind({...at,h:9}));
 assert.ok(Math.abs(treeHash('a')-treeHash('a'))===0&&treeHash('a')!==treeHash('b'));

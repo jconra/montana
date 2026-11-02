@@ -9,6 +9,6 @@ async function loadParts(file){
  if(!parts.size)throw new Error(file+' contains no meshes');
  return parts;
 }
-export async function loadBoulder(name){return [...(await loadParts(`./models/${name}.glb?v=1`)).values()];}
+export async function loadBoulder(name){const parts=[...(await loadParts(`./models/${name}.glb?v=1`)).values()];for(const part of parts)part.material.color.setRGB(1.5,1.4,1.22);return parts;}
 // Four detailed shapes sharing one texture, named after the rock asset they replace.
-export async function loadCentralRocks(){const parts=await loadParts('./models/central-rocks.glb?v=1');for(const part of parts.values()){part.instanceTint=true;part.material.color.setScalar(.8);}return parts;}
+export async function loadCentralRocks(){const parts=await loadParts('./models/central-rocks.glb?v=1');for(const part of parts.values()){part.instanceTint=true;part.material.color.setRGB(1,.92,.78);}return parts;}

@@ -32,7 +32,7 @@ export class LandscapeState{
    if(!this.assets.has(o.asset)||!finite(o.x,-749,749)||!finite(o.z,-749,749)||!finite(o.offset,-1000,1000)||!finite(o.tint,0,2))throw Error('An object has an unknown model or invalid position.');
    if(!Array.isArray(o.rotation)||o.rotation.length!==3||!o.rotation.every(n=>finite(n,-100,100))||!Array.isArray(o.scale)||o.scale.length!==3||!o.scale.every(n=>finite(n,.01,100)))throw Error('An object has an invalid rotation or size.');
   }
-  for(const id of obj.removed){if(typeof id!=='string'||!this.base.has(id)||seen.has(id))throw Error('A removed object ID is unknown or duplicated.');seen.add(id);}
+  for(const id of obj.removed){if(typeof id!=='string'||!this.base.has(id)||seen.has(id))throw Error('A removed object ID is unknown or duplicated: '+id);seen.add(id);}
   const vertices=new Set(),{W,H}=this.reference.grid;
   for(const entry of terrain.heights){if(!Array.isArray(entry)||entry.length!==2)throw Error('Invalid terrain vertex entry.');const [i,y]=entry;
    if(!Number.isInteger(i)||i<0||i>=W*H||vertices.has(i)||!finite(y,-1000,3000)||i%W<6||i%W>=W-6||Math.floor(i/W)<6||Math.floor(i/W)>=H-6)throw Error('Invalid terrain vertex height or boundary vertex.');vertices.add(i);

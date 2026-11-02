@@ -31,11 +31,12 @@ function lathe(profile,sides,color){
  return fromArrays(pos,nor,uv,col,idx);
 }
 
-function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46}){
+function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46,open=false}){
  const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]};
  for(let t=0;t<tiers;t++){
   const f=t/(tiers-1),y=.03+Math.pow(f,1.06)*.955,reach=radius*Math.pow(1-f*.985,pointed)*(.86+.34*Math.sin(t*2.7+seed))+.01,n=Math.max(4,Math.round(perTier*(1-f*.5)));
   for(let i=0;i<n;i++){
+   if(open&&(f<.14||r()<.35+.25*(.5+.5*Math.sin(t*1.9+seed))))continue;   // gaps between limbs, a bare lower trunk
    const yaw=(i+r()*.8)/n*Math.PI*2+t*2.399,len=reach*(.95+r()*.55),w=Math.max(.03,reach*(.85+r()*.35)),dr=droop+(r()-.5)*.3,start=[Math.cos(yaw)*reach*.12,y,Math.sin(yaw)*reach*.12];
    // a skirt card, outward and down, its face turned out; the lowest reach the ground
    addBranch(a,start,yaw,len,w,dr,.1,(r()-.5)*.5,2,.78+r()*.4);
@@ -44,6 +45,7 @@ function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46}){
   }
  }
  const leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);
+ if(open)return {leaf,wood:lathe([[0,.016],[.3,.012],[.65,.008],[.97,.002]],6,[.2,.14,.09])};
  const dark=[.022,.034,.02],R=radius*core,inner=lathe([[0,R],[.25,R*.8],[.5,R*.55],[.75,R*.28],[.92,.002]],7,dark);
  return {leaf,wood:inner};
 }
@@ -84,7 +86,7 @@ export async function buildTreeSpecies(baseUrl){
  const pack=(name,label,defaultHeight,g,leafMat,woodMat,extra)=>{const root=new THREE.Group(),L=new THREE.Mesh(g.leaf,leafMat),W=new THREE.Mesh(g.wood,woodMat);root.add(W,L);return {name,label,defaultHeight,height:1,root,parts:[{geometry:g.wood,material:woodMat},{geometry:g.leaf,material:leafMat}],soften:.3,spec:.12,...extra};};
  const lump={lump:.09,mix:.8,dark:.8,tip:.5,olive:.22,branchDark:.2,under:.2,glow:.12};
  const out=[];
- out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.3,tiers:24,perTier:9,droop:.72,pointed:.72}),needle(0x667a4e),coreMat(),{shape:lump,sway:.05}));
+ out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.27,tiers:24,perTier:9,droop:.72,pointed:.72}),needle(0x667a4e),coreMat(),{shape:lump,sway:.05}));
  out.push(pack('spruce','Narrow spruce',24,conifer({seed:4202,radius:.235,tiers:27,perTier:7,droop:.85,pointed:.7}),needle(0x567064),coreMat(),{shape:lump,sway:.05}));
  out.push(pack('fir_small','Young fir',9,conifer({seed:4303,radius:.38,tiers:15,perTier:9,droop:.62,pointed:.78}),needle(0x6c8052),coreMat(),{shape:{...lump,lump:.13},sway:.08}));
  // The big bush model, its stem sunk into the ground, and a dark inside so its hanging cards read as one mass.
@@ -96,5 +98,6 @@ export async function buildTreeSpecies(baseUrl){
   out.push(pack('juniper','Round juniper',4,{leaf:g,wood:inner},m,coreMat(),{shape:{...lump,lump:.14},sink:.07,wideBase:1.3,sway:.1}));}
  {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:leafTexture(77),color:0x9db487,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xe6e6da,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},sway:.2}));}
+ out.push(pack('open_fir','Open fir',18,conifer({seed:4606,radius:.25,tiers:14,perTier:8,droop:.6,pointed:.62,open:true}),needle(0x74864f),coreMat(),{shape:lump,sway:.06}));
  return out;
 }
