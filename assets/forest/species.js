@@ -34,7 +34,7 @@ function lathe(profile,sides,color){
 function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46}){
  const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]};
  for(let t=0;t<tiers;t++){
-  const f=t/(tiers-1),y=.03+Math.pow(f,1.06)*.955,reach=radius*Math.pow(1-f*.985,pointed)+.01,n=Math.max(4,Math.round(perTier*(1-f*.5)));
+  const f=t/(tiers-1),y=.03+Math.pow(f,1.06)*.955,reach=radius*Math.pow(1-f*.985,pointed)*(.86+.34*Math.sin(t*2.7+seed))+.01,n=Math.max(4,Math.round(perTier*(1-f*.5)));
   for(let i=0;i<n;i++){
    const yaw=(i+r()*.8)/n*Math.PI*2+t*2.399,len=reach*(.95+r()*.55),w=Math.max(.03,reach*(.85+r()*.35)),dr=droop+(r()-.5)*.3,start=[Math.cos(yaw)*reach*.12,y,Math.sin(yaw)*reach*.12];
    // a skirt card, outward and down, its face turned out; the lowest reach the ground
@@ -44,28 +44,28 @@ function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46}){
   }
  }
  const leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);
- const dark=[.012,.02,.012],R=radius*core,inner=lathe([[0,R],[.25,R*.8],[.5,R*.55],[.75,R*.28],[.92,.002]],7,dark);
+ const dark=[.022,.034,.02],R=radius*core,inner=lathe([[0,R],[.25,R*.8],[.5,R*.55],[.75,R*.28],[.92,.002]],7,dark);
  return {leaf,wood:inner};
 }
 
 function leafTexture(seed){
  const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d'),r=rnd(seed);
  g.clearRect(0,0,256,256);
- for(let i=0;i<340;i++){const a=r()*6.283,d=Math.sqrt(r())*110,x=128+Math.cos(a)*d,y=128+Math.sin(a)*d,s=6+r()*8,k=r();
-  g.fillStyle=`rgb(${(k<.25?110:148)+r()*26|0},${(k<.25?150:190)+r()*20|0},${(k<.25?38:48)+r()*18|0})`;
+ for(let i=0;i<220;i++){const a=r()*6.283,d=Math.sqrt(r())*118,x=128+Math.cos(a)*d,y=128+Math.sin(a)*d,s=5+r()*7,k=r();
+  const tone=k<.33?[127,168,60]:k<.72?[159,200,74]:[184,212,90];g.fillStyle=`rgb(${tone[0]+r()*16|0},${tone[1]+r()*14|0},${tone[2]+r()*14|0})`;
   g.save();g.translate(x,y);g.rotate(r()*6.283);g.beginPath();g.ellipse(0,0,s,s*.72,0,0,6.283);g.fill();g.restore();}
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;
 }
 
 function aspen({seed}){
  const r=rnd(seed),pos=[],nor=[],uv=[],col=[],idx=[];
- const clumps=[];for(let i=0;i<12;i++){const y=.38+r()*.54,sp=.1*(1-Math.abs(y-.6)*.9),a=r()*6.283;clumps.push([Math.cos(a)*sp*(.3+r()*.9),y,Math.sin(a)*sp*(.3+r()*.9),.06+r()*.035]);}
+ const clumps=[];for(let i=0;i<20;i++){const y=.34+r()*.6,sp=.12*(1-Math.abs(y-.6)*.9),a=r()*6.283;clumps.push([Math.cos(a)*sp*(.3+r()*.9),y,Math.sin(a)*sp*(.3+r()*.9),.042+r()*.03]);}
  clumps.push([0,.93,0,.05]);
  const card=(cx,cy,cz,nx,ny,nz,s,shade)=>{const q=pos.length/3,u=[r()-.5,r()-.5,r()-.5],lu=Math.hypot(...u)||1;u.forEach((_,i)=>u[i]/=lu);
   const v=[u[1]*nz-u[2]*ny,u[2]*nx-u[0]*nz,u[0]*ny-u[1]*nx],lv=Math.hypot(...v)||1;v.forEach((_,i)=>v[i]/=lv);
   for(const [e,f] of [[-1,-1],[1,-1],[-1,1],[1,1]]){pos.push(cx+(u[0]*e+v[0]*f)*s,cy+(u[1]*e+v[1]*f)*s,cz+(u[2]*e+v[2]*f)*s);nor.push(nx,ny,nz);uv.push((e+1)/2,(f+1)/2);col.push(shade,shade,shade);}
   idx.push(q,q+1,q+2,q+1,q+3,q+2);};
- for(const [x,y,z,R] of clumps)for(let i=0;i<20;i++){let dx=r()-.5,dy=r()-.5,dz=r()-.5;const l=Math.hypot(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;const out=Math.cbrt(r());const ox=x*.6+dx*.5,oy=.45+dy*.5,oz=z*.6+dz*.5,ol=Math.hypot(ox,oy,oz)||1;card(x+dx*R*out,y+dy*R*out*.9,z+dz*R*out,ox/ol,oy/ol,oz/ol,.036+r()*.022,.62+out*.42);}
+ for(const [x,y,z,R] of clumps)for(let i=0;i<15;i++){let dx=r()-.5,dy=r()-.5,dz=r()-.5;const l=Math.hypot(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;const out=Math.cbrt(r());const ox=x*.6+dx*.5,oy=.45+dy*.5,oz=z*.6+dz*.5,ol=Math.hypot(ox,oy,oz)||1;card(x+dx*R*out,y+dy*R*out*.9,z+dz*R*out,ox/ol,oy/ol,oz/ol,.026+r()*.016,.58+out*.5);}
  const leaf=fromArrays(pos,nor,uv,col,idx);
  const white=[1,1,1],parts=[lathe([[0,.0125],[.3,.0095],[.65,.0065],[.97,.002]],6,white)];
  for(let i=0;i<7;i++){const y=.36+i*.075,a=r()*6.283,l=.1+r()*.08,g=lathe([[0,.0055],[l,.0015]],4,white);g.rotateZ(-.72-r()*.3);g.rotateY(a);g.translate(0,y,0);parts.push(g);}
@@ -82,19 +82,19 @@ export async function buildTreeSpecies(baseUrl){
  const needle=(color)=>new THREE.MeshStandardMaterial({map:branch,color,alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
  const coreMat=()=>new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'core'});
  const pack=(name,label,defaultHeight,g,leafMat,woodMat,extra)=>{const root=new THREE.Group(),L=new THREE.Mesh(g.leaf,leafMat),W=new THREE.Mesh(g.wood,woodMat);root.add(W,L);return {name,label,defaultHeight,height:1,root,parts:[{geometry:g.wood,material:woodMat},{geometry:g.leaf,material:leafMat}],soften:.3,spec:.12,...extra};};
- const lump={lump:.07,mix:.8,dark:.88,tip:.3,olive:.1,branchDark:.2,under:.15,glow:.12};
+ const lump={lump:.09,mix:.8,dark:.8,tip:.5,olive:.22,branchDark:.2,under:.2,glow:.12};
  const out=[];
- out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.225,tiers:24,perTier:9,droop:.82}),needle(0x45604a),coreMat(),{shape:lump,sway:.05}));
- out.push(pack('spruce','Narrow spruce',24,conifer({seed:4202,radius:.175,tiers:27,perTier:7,droop:.98,pointed:.8}),needle(0x3f5a50),coreMat(),{shape:lump,sway:.05}));
- out.push(pack('fir_small','Young fir',9,conifer({seed:4303,radius:.32,tiers:15,perTier:9,droop:.7,pointed:1}),needle(0x4d6a50),coreMat(),{shape:{...lump,lump:.13},sway:.08}));
+ out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.3,tiers:24,perTier:9,droop:.72,pointed:.72}),needle(0x667a4e),coreMat(),{shape:lump,sway:.05}));
+ out.push(pack('spruce','Narrow spruce',24,conifer({seed:4202,radius:.235,tiers:27,perTier:7,droop:.85,pointed:.7}),needle(0x567064),coreMat(),{shape:lump,sway:.05}));
+ out.push(pack('fir_small','Young fir',9,conifer({seed:4303,radius:.38,tiers:15,perTier:9,droop:.62,pointed:.78}),needle(0x6c8052),coreMat(),{shape:{...lump,lump:.13},sway:.08}));
  // The big bush model, its stem sunk into the ground, and a dark inside so its hanging cards read as one mass.
  {const bounds=new THREE.Box3().setFromObject(bush),h=bounds.max.y-bounds.min.y;
   const g=bushMesh.geometry.clone().applyMatrix4(bushMesh.matrixWorld);g.translate(0,-bounds.min.y,0);g.scale(1/h,1/h,1/h);
   const n=g.attributes.position.count,c=new Float32Array(n*3).fill(1);g.setAttribute('color',new THREE.BufferAttribute(c,3));
   const inner=lathe([[.1,.05],[.3,.13],[.55,.13],[.78,.07],[.9,.02]],7,[.012,.022,.012]);
-  const m=new THREE.MeshStandardMaterial({map:branch,color:0x5f7c5e,alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+  const m=new THREE.MeshStandardMaterial({map:branch,color:0x7a8c66,alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   out.push(pack('juniper','Round juniper',4,{leaf:g,wood:inner},m,coreMat(),{shape:{...lump,lump:.14},sink:.07,wideBase:1.3,sway:.1}));}
- {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:leafTexture(77),color:0xa8c090,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xe6e6da,vertexColors:true,roughness:1,metalness:0,name:'bark'});
+ {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:leafTexture(77),color:0x9db487,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xe6e6da,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},sway:.2}));}
  return out;
 }

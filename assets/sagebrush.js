@@ -3,7 +3,20 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
 // Keep the supplied Blender asset intact. Bake its object transforms once so
 // branches and leaf cards can share each shrub's instancing transform.
-export function loadSagebrush(){return loadBushModel('./models/sage.glb?v=c4f739d5','sagebrush');}
+// The supplied sage is open twigs and thin leaf cards, which from any distance read as a dark scribble. A small lumpy
+// pale body inside gives it the rounded silver-green mass the real plants have.
+function sageBody(){
+ let seed=9011;const r=()=>((seed=(seed*16807)%2147483647)/2147483647),pos=[],col=[],nor=[];
+ for(let i=0;i<70;i++){
+  // little sprays of silver leaves over a dome, thicker toward the top
+  const a=r()*6.283,up=Math.pow(r(),.6),rad=Math.sqrt(1-up*up)*(.34+r()*.16),cx=Math.cos(a)*rad,cz=Math.sin(a)*rad,cy=.1+up*.62+r()*.08,size=.1+r()*.08,turn=r()*6.283,k=.82+r()*.5;
+  for(const [u,v] of [[-1,-.5],[1,-.5],[.15,1.1]]){const lx=u*size,ly=v*size;pos.push(cx+Math.cos(turn)*lx,cy+ly,cz+Math.sin(turn)*lx);nor.push(cx*.3,1,cz*.3);col.push(.165*k,.2*k,.12*k);}
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(pos.length/3*2),2));g.normalizeNormals();
+ const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide,name:'sagebrush-body'});
+ return {geometry:g,material};
+}
+export async function loadSagebrush(){const parts=await loadBushModel('./models/sage.glb?v=c4f739d5','sagebrush');for(const p of parts)p.material.color.setRGB(.62,.68,.5);return [sageBody(),...parts];}
 export function loadBigBush(){return loadBushModel('./models/big-bush.glb?v=bb3','big-bush');}
 async function loadBushModel(file,name){
  const {scene}=await new GLTFLoader().loadAsync(new URL(file,import.meta.url).href);

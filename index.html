@@ -150,6 +150,9 @@ import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
 import {TREE_KINDS,ASPEN_STANDS,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {createMeadow} from './assets/meadow-grass.js';
+import {makeCloudSky} from './assets/sky/cloudSky.js';
+import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
@@ -181,8 +184,10 @@ cam.position.set(420, relief*1.4+320, 620);
 const controls = new OrbitControls(cam, renderer.domElement);
 controls.enableDamping = true;
 
-scene.add(new THREE.HemisphereLight(0xbcd4ff,0x2a2420,0.6));
-const sun = new THREE.DirectionalLight(0xfff2d8,1.4); sun.position.set(-1,1.3,-0.6); scene.add(sun);scene.add(sun.target);
+// Evening sun from just north of west, as in the May frames: long shadows across the lawn. Warm sun, cool shade.
+const SUN_DIR=new THREE.Vector3(-1,.65,-.2).normalize();
+scene.add(new THREE.HemisphereLight(0xa9c6ff,0x2c2a1e,0.5));
+const sun = new THREE.DirectionalLight(0xffedc8,1.95); sun.position.copy(SUN_DIR); scene.add(sun);scene.add(sun.target);
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
 sun.shadow.bias=-.00015;sun.shadow.normalBias=.12;
 let shadowRadius=0,shadowStamp=-Infinity;
@@ -193,11 +198,11 @@ function prepareShadowMaterial(m){if(shadowMaterials.has(m))return;shadowMateria
 const HAZE=new THREE.Color(0xc2d4e2);
 scene.background=HAZE.clone();
 scene.fog=new THREE.Fog(HAZE, 5000, 30000);          // only distant (>5km) fades; near scene stays clear
-const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide, depthWrite:false, depthTest:false, fog:false,
-  uniforms:{zen:{value:new THREE.Color(0x2f6fbf)}, mid:{value:new THREE.Color(0x8fbfe6)}, hor:{value:HAZE.clone()}},
-  vertexShader:'varying vec3 vp; void main(){vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-  fragmentShader:'varying vec3 vp; uniform vec3 zen,mid,hor; void main(){float h=clamp(normalize(vp).y,0.0,1.0); vec3 c=mix(hor,mid,smoothstep(0.0,0.28,h)); c=mix(c,zen,smoothstep(0.22,0.8,h)); gl_FragColor=vec4(c,1.0);}'});
-const skyDome=new THREE.Mesh(new THREE.SphereGeometry(60000,24,14),skyMat); skyDome.renderOrder=-1000; scene.add(skyDome);
+// Drifting clouds on a dome that follows the camera; from Medium up (costly per pixel on the sky), a plain gradient below.
+const cloudSky=makeCloudSky({horizon:0xc6d6e2,zenith:0x3f7cc4,radius:50000});
+cloudSky.mesh.material.fragmentShader=cloudSky.mesh.material.fragmentShader.replace('#include <colorspace_fragment>','');   // the page's sky colours are already display colours
+cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.46});cloudSky.uniforms.cloudScale.value=2400;cloudSky.uniforms.cloudHeight.value=2200;cloudSky.uniforms.cloudSoft.value=.24;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
+const sunbeams=new Sunbeams(renderer,{strength:.75,color:0xfff0d6,threshold:.6,radius:.5,reach:1.1,edge:.15});
 
 // shared aerial texture
 const tex = new THREE.TextureLoader().load('./assets/'+M.coarse.aerial);
@@ -213,7 +218,7 @@ function ramp(t){
 }
 
 const DRIVEWAY=[[26.6,422.4],[15.2,381.4],[18.7,366.1],[28.7,355],[41.2,347.1],[49.8,340.4],[56.8,331.2],[65.3,314.4],[71.9,289.9],[75.6,269.2],[76.5,249.1],[74.3,219.6],[69.8,190],[71.2,163.8],[76.7,139.6],[86,118.1],[98,101],[110.7,85.6],[120.2,76.3],[123.1,72.2],[125.1,65.4],[126.9,52.3],[126.1,43.1],[119.5,37],[108.1,33.9],[96.5,29.7],[85,22.5],[77.6,16.7],[67.2,9.6],[56,6.1],[46.4,4],[35.1,2.3],[26.5,1.2],[10.7,-2.3],[-4.1,-1.4],[-22.9,6.4]].map(([E,N])=>({x:E,z:-N}));
-const groundDetail=createGroundDetail(cHalf,correctedDriveway(DRIVEWAY));
+const groundDetail=createGroundDetail(cHalf,correctedDriveway(DRIVEWAY),SUN_DIR);
 // ---- terrain tiles ------------------------------------------------------
 const mats=[]; const tiles=[];
 function buildTile(data,W,H,px,uvRect,pushBack){
@@ -263,7 +268,7 @@ function heightAt(x,z){
 }
 
 const pondLevel=preparePond(tiles,heightAt);
-let propertyNature=null;
+let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
 let landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 
@@ -671,14 +676,16 @@ function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbour
 function treeTint(kind,id,tint){
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
-  return kind==='aspen'?new THREE.Color(tint*(.84+.3*a),tint*(.94+.1*b),tint*(.78+.3*c)):new THREE.Color(tint*(.88+.2*a),tint*(.92+.14*b),tint*(.86+.26*c));
+  if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
+  // evergreens run between olive and blue-green, a few brighter young ones
+  const olive=a*a,lift=.82+.42*c;return new THREE.Color(tint*lift*(.86+.42*olive),tint*lift*(.92+.14*b),tint*lift*(1.08-.46*olive));
 }
 const treeAssetsReady=(async()=>{
   try{
     treeSpecies=await buildTreeSpecies();
     // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
     forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:120,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
-      sunDir:new THREE.Vector3(-1,1.3,-.6).normalize(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
+      sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;
     if(trees.length)buildTreeMesh();
@@ -691,7 +698,7 @@ function _pSeg(px,pz,ax,az,bx,bz){ const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1; le
 function distDriveway(x,z){ let m=1e9; for(let i=0;i<DRIVEWAY.length-1;i++){ const a=DRIVEWAY[i],b=DRIVEWAY[i+1]; const d=_pSeg(x,z,a.x,a.z,b.x,b.z); if(d<m)m=d; } return m; }
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 // real tree positions from LiDAR (trees.bin = Float32 x,z,height triples)
-let realXZ=new Float32Array(0);
+let realXZ=new Float32Array(0),fillTrees=[];
 const TREE_SHIFT_N=3;        // nudge all trees north to line up with the aerial (z = -N, so subtract)
 function inBuilding(x,z){                                          // LiDAR read building roofs as canopy — reject those
   for(const o of placed){ const r=o.type==='house'?11:o.type==='cabin'?9:8;
@@ -713,7 +720,7 @@ function buildTreesFrom(n){
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
     if(inBuilding(rx,rz)||polygonDistance(rx,rz)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
-    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:1});}
+    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});}
   buildTreeMesh();
 }
 function addInst(geo,mat,list){
@@ -735,6 +742,11 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
     const a=s()*6.283,rad=Math.sqrt(s())*stand.r*.8,x=stand.x+Math.cos(a)*rad,z=stand.z+Math.sin(a)*rad;
     if(inBuilding(x,z)||list.concat(trees).some(t=>(t.x-x)**2+(t.z-z)**2<9))continue;
     list.push({id:`aspen:${n}:${k}`,x,z,gy:heightAt(x,z),h:stand.hMin+s()*(stand.hMax-stand.hMin),r:s()*6.283,tint:.9+s()*.2,lean:0});k++;}});
+  // Canopy the tree list missed: peaks in the LiDAR returns with no tree near them (assets/trees-fill.json, measured).
+  fillTrees.forEach(([x,z,h],n)=>{const id='fill:'+n,asset=treeKindOf(id,x,z,h);list.push({id,asset,x,z,gy:heightAt(x,z),h,r:treeHash(id,5)*6.283,tint:.8+treeHash(id,6)*.35,lean:0,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});});
+  // Knee-high junipers dotting the dry slope, too small for the LiDAR to have found. Invented; the ids stay put by order.
+  {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
+   for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:'juniper',x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
   return list;
 }
 let groveList=[];
@@ -753,10 +765,11 @@ function buildTreeMesh(){
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
     fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint)});
   }
-  groundDetail.setTrees(trees);
+  groundDetail.setTrees(trees.concat(groveList));
   forest.setFixed(fixed);
 }
 const lidarReady=(async()=>{
+  try{fillTrees=await (await fetch('./assets/trees-fill.json')).json();}catch(e){console.warn('Fill trees unavailable',e);}
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   {const pts=[];for(let i=0;i<realXZ.length;i+=3)pts.push([realXZ[i],realXZ[i+1]-TREE_SHIFT_N]);neighboursAt=neighbourCounter(pts);}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
@@ -769,18 +782,10 @@ const lidarReady=(async()=>{
   const dj=await (await fetch('./assets/distant.json')).json();
   const dz=new Float32Array(await (await fetch('./assets/distant.bin')).arrayBuffer());
   const {W,H,span}=dj, hole=450;
-  function ramp(e){
-    const s=[[1500,0x4c5c3a],[1900,0x3c4c34],[2300,0x2a3d2c],[2650,0x34423a],[2900,0x5d6463],[3100,0xa9adb0],[3350,0xf4f4f4]];
-    for(let i=0;i<s.length-1;i++){const[a,ca]=s[i],[b,cb]=s[i+1];
-      if(e<=b){const u=Math.max(0,(e-a)/(b-a));
-        return[((ca>>16&255)+((cb>>16&255)-(ca>>16&255))*u)/255,((ca>>8&255)+((cb>>8&255)-(ca>>8&255))*u)/255,((ca&255)+((cb&255)-(ca&255))*u)/255];}}
-    return[0.96,0.96,0.96];
-  }
-  const verts=new Float32Array(W*H*3), cols=new Float32Array(W*H*3), idx=[];
+  const verts=new Float32Array(W*H*3), idx=[];
   for(let j=0;j<H;j++)for(let i=0;i<W;i++){
     const x=(i/(W-1)-0.5)*span, z=-((0.5-j/(H-1))*span), e=dz[j*W+i], k=(j*W+i)*3;
     verts[k]=x; verts[k+1]=(e-gmin)-3; verts[k+2]=z;      // -3 so it tucks just under the detailed terrain
-    const c=ramp(e); cols[k]=c[0]; cols[k+1]=c[1]; cols[k+2]=c[2];
   }
   for(let j=0;j<H-1;j++)for(let i=0;i<W-1;i++){
     const cx=((i+0.5)/(W-1)-0.5)*span, cz=-((0.5-(j+0.5)/(H-1))*span);
@@ -789,9 +794,9 @@ const lidarReady=(async()=>{
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(verts,3));
-  g.setAttribute('color',new THREE.BufferAttribute(cols,3));
   g.setIndex(idx); g.computeVertexNormals();
-  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1,metalness:0}));
+  const hillMaterial=new THREE.MeshStandardMaterial({roughness:1,metalness:0});groundDetail.attachHills(hillMaterial);
+  const mesh=new THREE.Mesh(g,hillMaterial);
   mesh.renderOrder=-1; scene.add(mesh);
 })();
 
@@ -849,7 +854,7 @@ function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.le
 // ---- vertical exaggeration ---------------------------------------------
 function applyVex(v){
   VEX=v;
-  propertyNature?.setVerticalScale(v);
+  propertyNature?.setVerticalScale(v);if(typeof meadow!=='undefined'&&v!==meadowVex){meadowVex=v;meadow.reanchor();}
   for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();t.mesh.geometry.computeBoundingBox();t.mesh.geometry.computeBoundingSphere();}
   for(const o of placed) o.group.position.y=o.foundationY!=null?o.foundationY*v:heightAt(o.x,o.z);
   for(const {im,list} of treeMeshes){for(let i=0;i<list.length;i++){const t=list[i];
@@ -936,7 +941,8 @@ function makeRav4(){
   for(const [sx,sz] of [[-wx,wz],[wx,wz],[-wx,-wz],[wx,-wz]]){const w=wheel();w.position.set(sx,0.36,sz);g.add(w);wheels.push(w);}
   return g;
 }
-const car={x:16,z:-14,heading:Math.PI,speed:0,group:makeRav4()};
+// Parked where the May 2026 frames show it, on the lawn by the cabin.
+const car={x:-31,z:22.3,heading:1.84,speed:0,group:makeRav4()};
 let rav4Rig=null,carSteering=0;
 // Load locally, without an expiring S3 URL; keep the placeholder on failure.
 loadRav4().then(rig=>{
@@ -1113,6 +1119,7 @@ function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
   flattenPad(hx,hz,hw,hd,padY,5);
 }
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
+const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial});
 applyVex(1);
 // Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
@@ -1137,27 +1144,32 @@ function panCam(dt){                                    // WASD pans; Space/C mo
 let qualityTransition=null,qualityLevel=2,qualityLoading=false;
 function configureShadows(){
   const q=shadowSettings(qualityLevel,$('shadowQuality').value,renderer.capabilities.maxTextureSize);
-  renderer.shadowMap.enabled=sun.castShadow=q.size>0;shadowRadius=q.radius;shadowUniforms.shadowExtent.value=q.radius||55;
+  renderer.shadowMap.enabled=sun.castShadow=q.size>0;groundDetail.uniforms.castStrength.value=q.size>0?0:1;shadowRadius=q.radius;shadowUniforms.shadowExtent.value=q.radius||55;
   if(!q.size&&sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
   if(q.size&&sun.shadow.mapSize.x!==q.size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(q.size,q.size);}
   for(const b of placed)b.group.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;for(const m of (Array.isArray(o.material)?o.material:[o.material]))prepareShadowMaterial(m);}});
   shadowStamp=-Infinity;renderer.shadowMap.needsUpdate=true;
 }
+const _shadowLook=new THREE.Vector3(),shadowCentre=new THREE.Vector2(1e9,1e9);
 function updateTreeShadows(){
   if(!renderer.shadowMap.enabled)return;
-  const now=performance.now()/1000;if(now-shadowStamp<.1)return;shadowStamp=now;
+  const now=performance.now()/1000;if(now-shadowStamp<.1)return;
   // Fixed sunlight direction, camera-following map. Snap to shadow texels.
   const texel=shadowRadius*2/sun.shadow.mapSize.x;
-  const x=Math.round(cam.position.x/texel)*texel,z=Math.round(cam.position.z/texel)*texel;
-  const y=heightAt(x,z);shadowUniforms.shadowFocus.value.set(x,y,z);sun.target.position.set(x,y,z);sun.position.set(x-120,y+156,z-72);sun.target.updateMatrixWorld();
-  const c=sun.shadow.camera;c.left=c.bottom=-shadowRadius;c.right=c.top=shadowRadius;c.near=1;c.far=420;c.updateProjectionMatrix();
+  // Centre the map on the ground being looked at, not under the camera: from the air that is where the shadows must be.
+  cam.getWorldDirection(_shadowLook);const ground=heightAt(cam.position.x,cam.position.z),drop=Math.max(1,cam.position.y-ground),along=Math.min(shadowRadius*.8,_shadowLook.y<-.05?drop/-_shadowLook.y:shadowRadius*.6);
+  const x=Math.round((cam.position.x+_shadowLook.x*along)/texel)*texel,z=Math.round((cam.position.z+_shadowLook.z*along)/texel)*texel;
+  // Trees and sun stand still: redraw when the map has moved, and now and then for the wind.
+  if(now-shadowStamp<1&&Math.hypot(x-shadowCentre.x,z-shadowCentre.y)<texel*.5)return;shadowStamp=now;shadowCentre.set(x,z);
+  const y=heightAt(x,z);shadowUniforms.shadowFocus.value.set(x,y,z);sun.target.position.copy(_shadowLook.set(x,y,z));sun.position.set(x,y,z).addScaledVector(SUN_DIR,240);sun.target.updateMatrixWorld();
+  const c=sun.shadow.camera;c.left=c.bottom=-shadowRadius;c.right=c.top=shadowRadius;c.near=1;c.far=520;c.updateProjectionMatrix();
   renderer.shadowMap.needsUpdate=true;
 }
 try{const mode=localStorage.getItem('montanaShadowQuality');if(['auto','off','2','3','4'].includes(mode))$('shadowQuality').value=mode;}catch(e){}
 $('shadowQuality').onchange=()=>{configureShadows();try{localStorage.setItem('montanaShadowQuality',$('shadowQuality').value);}catch(e){}};
 function applyQuality(level){
   qualityLevel=level;const q=QUALITY_LEVELS[level];configureShadows();
-  propertyNature.setQuality(level,q.density);
+  propertyNature.setQuality(level,q.density);meadow.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;
   treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);
@@ -1218,11 +1230,13 @@ const landscapeReady=(async()=>{
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+t.asset,t,[t.h*t.wide,t.h,t.h*t.wide]));
   let groveId=0;
-  for(const t of groveList)base.push(row(t.id||'grove:'+groveId++,'tree/aspen',t,[t.h,t.h,t.h],[t.lean||0,t.r,0]));
+  for(const t of groveList)base.push(row(t.id||'grove:'+groveId++,'tree/'+(t.asset||'aspen'),t,[t.h*(t.wide||1),t.h,t.h*(t.wide||1)],[t.lean||0,t.r,0]));
   const seenGround=new Set();
   for(const entry of groundMeshes){const type=[...catalog].find(([key,a])=>!key.startsWith('tree/')&&a.parts.some(p=>p.geometry===entry.im.geometry))?.[0];if(!type)continue;
     for(const t of entry.list){const id=type+':'+t.x.toFixed(5)+':'+t.z.toFixed(5);if(seenGround.has(id))continue;seenGround.add(id);base.push(row(id,type,t,[t.s,t.s*(t.sy||1),t.s],[t.rx||0,t.r,0],t.dy||0));}
   }
+  // The shrubs scattered here were generic broadleaf models that read as dark twigs; the same placements now draw the sage model.
+  if(propertyNature.models.sage.length)for(const key of ['bush/broadleaf','bush/evergreen'])if(catalog.has(key))catalog.get(key).parts=propertyNature.models.sage;
   for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
   // Bake each prop in its own local coordinates, then register it with the
   // same persistent object IDs and instanced editor used for vegetation.
@@ -1244,7 +1258,7 @@ const landscapeReady=(async()=>{
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
       forest?.setHidden(id);
     },
-    terrainChanged(){propertyNature.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
+    terrainChanged(){propertyNature.reanchor();meadow.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
@@ -1288,13 +1302,13 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   updateQuality(elapsed,dt);
   updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
   photoMatch.applyRoll();
-  propertyNature.update(now/1000,cam);
+  propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);
   landscapeLayer?.update(cam);
   if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
-  tickWind(dt);updateTreeShadows();
+  tickWind(dt);updateTreeShadows();cloudSky.update(cam,dt);
   const v=new THREE.Vector3(0,0,-1).project(cam);
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
-  renderer.render(scene,cam);
+  renderer.render(scene,cam);if(qualityLevel>=3)sunbeams.render(cam,SUN_DIR);
   frames++; if(now-fpsT>=300){const fps=frames*1000/(now-fpsT);
     statsEl.innerHTML=`${QUALITY_LEVELS[qualityLevel].name}${quality.mode==='auto'?' (auto)':''} · ${fps.toFixed(0)} fps · ${(1000/fps).toFixed(1)} ms<br>${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`;
     frames=0; fpsT=now;}

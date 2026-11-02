@@ -5,6 +5,7 @@ import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,CAMP_PROPS,
 import {loadSagebrush} from './sagebrush.js';
 import {TALL_GRASS_PATCHES,tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
 import {campSurface,HORSESHOES} from './camp-approach.mjs';
+import {roadCoverage} from './driveway-measured.mjs';
 import {rockGeometry} from './ground-detail.js';
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.92});
@@ -100,10 +101,11 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  plantGround=root.xz;plantViewDistance=length(cameraPosition.xz-root.xz)+abs(cameraPosition.y-root.y)*.2;`);
  sh.fragmentShader='varying vec2 plantGround;uniform sampler2D paintSurface;uniform sampler2D paintMoisture;uniform float paintHalf;uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
  sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){vec2 paintUV=vec2(plantGround.x/(2.*paintHalf)+.5,.5-plantGround.y/(2.*paintHalf));vec4 paintedSurface=texture2D(paintSurface,paintUV);if(${sway===.08?'true':'false'}&&paintedSurface.r*paintedSurface.a>.35)discard;float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
+ if(material.name==='sagebrush-body')sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;');
  sh.fragmentShader=sh.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
  vec4 moisture=texture2D(paintMoisture,paintUV);diffuseColor.rgb*=mix(vec3(1.),mix(vec3(1.8,1.1,.85),vec3(.9,1.13,.96),moisture.r),moisture.a);`);
  };
- material.customProgramCacheKey=()=>`property-plant-${sway}`;
+ material.customProgramCacheKey=()=>`property-plant-${sway}-${material.name}`;
  }
  plantMaterial(material,.08);
  const models=Object.fromEntries(Object.entries(geos).map(([kind,geometry])=>[kind,[{geometry,material}]]));
@@ -157,8 +159,10 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   // Trim after generating the stable scatter: changing this footprint must not
   // renumber the sagebrush objects in existing exported landscape edits.
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
-    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if((t.x>-23&&t.x<26.5&&t.z>-10&&t.z<7&&correctedRoute.nearest(t.x,t.z).distance<1.65)||s.gravel>.45||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
+    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(roadCoverage(t.x,t.z)>.3||correctedRoute.nearest(t.x,t.z).distance<.5||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
       if(chunk.kind!=='grass')return s.lawn<.3;
+      // Open ground now has the meadow grass; these full tufts stay only in the marked tall patches and reclaimed corners.
+      if(!t.tallPatch&&!(t.s>=.8&&grassReclaim(t.x,t.z)>.5)&&s.tallGrass<.1)return false;
       if(s.tallGrass>.1&&!t.tallPatch)t.s=Math.max(t.s,1.05+s.tallGrass*.5);
       t.s*=1-s.lawn*.83;return true;});
   }
