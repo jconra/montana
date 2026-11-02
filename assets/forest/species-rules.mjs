@@ -1,7 +1,7 @@
 // Which kind of tree stands where. Positions come from LiDAR and hand edits and are never changed here; only the
 // kind is chosen, from the tree's height and how crowded its surroundings are.
 import {driveLineDistance} from '../driveway-measured.mjs';
-export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone','juniper_pyramid'];
+export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone','juniper_pyramid','fir_back'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
 export const ASPEN_STANDS=[{x:-46,z:12,r:8.5,planted:12,hMin:8,hMax:14}];
@@ -39,6 +39,8 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
  if(h<=13)return r<.75?'fir_small':'spruce';
  // A few dead silver snags stand in the deep forest.
  if(!verifiable(x,z)&&treeHash(id,21)<.045)return 'snag';
+ // Trees with many neighbours stand behind others, away from the clearings: the cheaper model is enough there.
+ if(neighbours>11)return 'fir_back';
  return r<.55?'fir':'spruce';
 }
 // How wide a tree stands for its height: big firs are narrower for their height than young ones; tall junipers are columns, small ones round.
@@ -55,7 +57,7 @@ export function migrateTreeAsset(record,kindOf){
 
 // A plant's own measured colour. A record may carry `tone`: its crown's average colour in sunlight as '#rrggbb'. The model is then tinted so
 // its average comes out at that colour; TONE_REF is a rough average of each model untinted, by eye from one render per kind, so treat a tone as close, not exact.
-export const TONE_REF={fir:'#2f3a22',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#8d8a82'};
+export const TONE_REF={fir:'#2f3a22',fir_back:'#2f3a22',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#8d8a82'};
 export function toneTint(kind,tone){
  if(typeof tone!=='string'||!/^#[0-9a-f]{6}$/i.test(tone))return null;
  const ref=TONE_REF[kind]||'#4c5c32',ch=(h,i)=>Math.pow(parseInt(h.substr(1+i*2,2),16)/255,2.2);
@@ -65,6 +67,6 @@ export function toneTint(kind,tone){
 // Evergreen tones as the frames show them, tree to tree: yellow-olive, olive, grey-green, blue-grey, a rusty one now and then. r g b multipliers over the model's own colour.
 export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
 export function evergreenTone(id,juniper=false){
- const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.22?0:a<.5?1:a<.78?2:a<.94?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.64:.74)+b*.3,red=juniper?.94:.97;
+ const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.06?0:a<.26?1:a<.66?2:a<.98?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.8:.74)+b*.3,red=juniper?.9:.97;
  return [t[0]*lift*red,t[1]*lift,t[2]*lift];
 }

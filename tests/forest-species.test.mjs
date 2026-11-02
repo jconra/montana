@@ -5,7 +5,7 @@ import {LandscapeState} from '../assets/landscape-state.mjs';
 // Kinds follow height and crowding, and stay the same on every run.
 const at={x:300,z:300,neighbours:12,id:'lidar:1'};
 assert.equal(treeKind({...at,h:3}),'juniper');
-assert.ok(['fir','spruce'].includes(treeKind({...at,h:25})));
+assert.ok(['fir','spruce','fir_back'].includes(treeKind({...at,h:25})));
 assert.ok(['fir_small','spruce'].includes(treeKind({...at,h:10})));
 assert.ok(['juniper','open_fir'].includes(treeKind({...at,neighbours:2,h:10})));
 for(let i=0;i<200;i++)assert.ok(TREE_KINDS.includes(treeKind({id:'lidar:'+i,x:i,z:i,h:2+i/5,neighbours:i%20})));
