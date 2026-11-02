@@ -66,11 +66,11 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
   const tall=(1-lawn)*(.7+patch*.6)*(.8+R()*.45),size=(1-lawn*.3)*(.9+R()*.5);
   const dryBunch=(1-lawn)*(wet<.42?1:.15)*(patch>.6?1:.3)*(R()<.1?1:0);
   if(dryBunch)add(x,z,1.5+R()*.7,1.5+R()*.5,wet,.72+R()*.28);
-  else add(x,z,size,lawn>.5?.34+R()*.18:tall,wet,R()<.05?.5:0);
+  else add(x,z,size,lawn>.5?.34+R()*.18:tall,wet,lawn<.3&&R()<.05?.5:0);
  }
  for(const [cx,cz,big] of STRAW_BUNCHES)for(let i=0;i<46;i++){const a=R()*6.283,r=Math.sqrt(R())*big*.55;add(cx+Math.cos(a)*r,cz+Math.sin(a)*r,1.7+R()*.6,1.7+R()*.7,.3,.8+R()*.2);}
  // Skirts: taller tufts round tree bases, along the drive and at the foundations.
- const skirt=(x,z)=>{if(!clear(x,z)||(x>-60&&x<30&&z>-25&&z<60&&campSurface(x,z).lawn>.6))return;const w=wetAt(x,z);add(x,z,1+R()*.5,1+R()*.7,w,R()<.25?.55:0);};
+ const skirt=(x,z)=>{if(!clear(x,z)||(x>-60&&x<30&&z>-25&&z<60&&campSurface(x,z).lawn>.6))return;const w=wetAt(x,z);const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;add(x,z,1+R()*.5,(1+R()*.7)*(1-m*.6),w,m<.2&&R()<.25?.55:0);};
  try{const t=new Float32Array(await (await fetch(new URL('./trees.bin',import.meta.url))).arrayBuffer());for(let i=0;i<t.length;i+=3){const x=t[i],z=t[i+1]-3,h=t[i+2];if(Math.hypot(x+5,z-12)>110)continue;const n=Math.min(9,3+h*.5),rad=Math.max(.8,h*.2);for(let q=0;q<n;q++){const a=R()*6.283,r=rad*(.8+R()*.8);skirt(x+Math.cos(a)*r,z+Math.sin(a)*r);}}}catch(e){console.warn('No tree skirts',e);}
  for(let q=1;q<DRIVE_LINE.length;q++){const a=DRIVE_LINE[q-1],b=DRIVE_LINE[q],len=Math.hypot(b.x-a.x,b.z-a.z);for(let d=0;d<len*5;d++){const t=R(),s=R()<.5?-1:1,o=1.25+R()*1.3,nx=-(b.z-a.z)/len,nz=(b.x-a.x)/len;skirt(a.x+(b.x-a.x)*t+nx*s*o,a.z+(b.z-a.z)*t+nz*s*o);}}
  for(const f of FOOTPRINTS)for(let q=0;q<(f.hx+f.hz)*22;q++){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),side=R(),e=R()*2-1,g=.15+R()*.7;let lx,lz;if(side<.5){lx=e*f.hx;lz=(R()<.5?-1:1)*(f.hz+g);}else{lx=(R()<.5?-1:1)*(f.hx+g);lz=e*f.hz;}skirt(f.x+lx*c+lz*s,f.z-lx*s+lz*c);}
