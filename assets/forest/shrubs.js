@@ -85,11 +85,11 @@ function sageForm({seed,mounds,spread,tufts,size,bare=0,flat=1}){
 }
 
 export const SAGE_FORMS=[
- {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,mounds:5,spread:.68,tufts:190,size:0.24}},
- {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,mounds:6,spread:.82,tufts:210,size:0.25}},
- {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,mounds:7,spread:1.25,tufts:220,size:0.36,flat:.9}},
- {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,mounds:4,spread:.58,tufts:170,size:0.2,bare:.2}},
- {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,mounds:7,spread:.95,tufts:200,size:0.24,bare:.08}},
+ {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,mounds:5,spread:.61,tufts:190,size:0.24}},
+ {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,mounds:6,spread:.67,tufts:210,size:0.25}},
+ {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,mounds:7,spread:1.15,tufts:220,size:0.36,flat:.9}},
+ {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,mounds:4,spread:.52,tufts:170,size:0.2,bare:.2}},
+ {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,mounds:7,spread:.84,tufts:200,size:0.24,bare:.08}},
 ];
 
 // -> species for a Forest, in SAGE_FORMS order.
@@ -97,7 +97,7 @@ export function buildShrubSpecies(){
  const map=sprayTexture();
  return SAGE_FORMS.map(({name,label,defaultHeight,form})=>{
   const {leaf,wood}=sageForm(form);
-  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.72,.72,.63),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.78,.75,.62),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   const root=new THREE.Group();root.add(new THREE.Mesh(wood,woodMat),new THREE.Mesh(leaf,leafMat));
   return {name,label,defaultHeight,height:1,root,parts:[{geometry:wood,material:woodMat},{geometry:leaf,material:leafMat}],tint:false,soften:.25,spec:.08,coverage:true,sway:.12,
    shape:{lump:.14,mix:.7,dark:.42,tip:.18,olive:0,branchDark:.5,under:.12,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};

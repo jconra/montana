@@ -149,19 +149,20 @@ export function createGroundDetail(half,driveway,sunDir){
       vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
       float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
-      float drawn=road*smoothstep(3.,8.,landUV.x);
-      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(3.,8.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);drawn=max(drawn,centre*(1.-tuftsHere));
+      float drawn=road*smoothstep(-1.,2.,landUV.x);
+      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);drawn=max(drawn,centre*(1.-tuftsHere));
       near=mix(near,vec3(.79,.76,.71)*(.88+fine.r*.24),drawn*.95);
       // Mown lawn: a fine sward, mown in stripes that swing a little.
-      float mown=smoothstep(.25,.6,masks.g);
-      if(mown>0.){float stripe=sin(dot(landUV,vec2(.34,.94))*1.9+sin(landUV.x*.07)*1.4);vec3 sward=mix(vec3(.4,.5,.21),vec3(.47,.56,.25),smoothstep(-.2,.2,stripe));sward*=.9+mid.g*.14+tiny.b*.1;near=mix(near,sward,mown*.93);}
+      float mown=smoothstep(.25,.6,masks.g)*(1.-smoothstep(.05,.4,masks.r));
+      if(mown>0.){float stripe=sin(dot(landUV,vec2(.34,.94))*1.9+sin(landUV.x*.07)*1.4);vec3 sward=mix(vec3(.4,.5,.22),vec3(.5,.58,.27),smoothstep(-.16,.16,stripe));sward*=.92+mid.g*.14;near=mix(near,sward,mown*.93);}
       // Real ground from the drone stills, in two sizes so it does not repeat, by what the map says is here.
       float close=1.-smoothstep(70.,300.,distance(cameraPosition,detailWorld));
       vec2 w2=vec2(landUV.x*.8-landUV.y*.6,landUV.x*.6+landUV.y*.8);
-      vec3 dA=texture2D(tileDry,landUV/10.24).rgb,dB=texture2D(tileDry,w2/23.7).rgb,gA=texture2D(tileGreen,landUV/10.24).rgb,gB=texture2D(tileGreen,w2/17.3).rgb;
+      vec3 dA=texture2D(tileDry,landUV/7.).rgb,dB=texture2D(tileDry,w2/16.3).rgb,gA=texture2D(tileGreen,landUV/3.1).rgb,gB=texture2D(tileGreen,w2/7.7).rgb;
       float greenish=smoothstep(-.01,.07,near.g-near.r);
       vec3 grain=mix(dA*.65+dB*.35,gA*.65+gB*.35,greenish);
-      grain=mix(grain,texture2D(tileRoad,landUV/5.12).rgb,road);
+      grain=mix(grain,(gA*.45+gB*.25+texture2D(tileGreen,w2/1.7).rgb*.3),mown);
+      grain=mix(grain,texture2D(tileRoad,landUV/3.3).rgb*.6+texture2D(tileRoad,w2/8.3).rgb*.4,road);
       near*=mix(vec3(1.),grain*2.,close);
       near=pow(max(near,vec3(.0)),vec3(2.2))/1.8;
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
@@ -183,7 +184,7 @@ export function createGroundDetail(half,driveway,sunDir){
       diffuseColor.rgb=mix(diffuseColor.rgb,${shown('#7a5a42')}*(.75+fine.a*.5),clamp(baked.b*1.5,0.,1.)*(.25+tiny.r*.45));
       diffuseColor.rgb*=1.-baked.g*.42;
       diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v14';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v16';}};
 }
 export function rockGeometry(seed,detail=2){
   const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);
