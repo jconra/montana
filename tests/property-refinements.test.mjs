@@ -6,7 +6,7 @@ for(const [x,z] of [[-28,4],[-5,8]]){
  assert.ok(tallGrassCoverage(x,z)>.9);
  const surface=campSurface(x,z);assert.ok(surface.lawn<.1);assert.ok(surface.gravel<.1);
 }
-assert.ok(frontDoorGravel(-12,-6)>.9);assert.ok(campSurface(-12,-6).clear);
+assert.ok(frontDoorGravel(-12,-6)>.9);assert.ok(!campSurface(-12,-6).clear,'the marked gravel area is grass in the May frames');assert.ok(campSurface(-17,8).clear);
 assert.equal(tallGrassCoverage(8,-8),0,'no grass inside house');
 assert.equal(frontDoorGravel(-22,33),0,'camp stays lawn');
 assert.ok(HORSESHOES[0].z>HORSESHOES[1].z);assert.ok(Math.abs(HORSESHOES[0].x-HORSESHOES[1].x)<1);

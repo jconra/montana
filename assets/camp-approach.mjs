@@ -2,7 +2,8 @@
 // house-facing-cabin / garage-facing-southeast photos. Units are world metres.
 // Width is the half-width of the worn lane; wear fades out toward the fire pit.
 import {grassReclaim} from './driveway-refinements.mjs';
-import {tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
+import {tallGrassCoverage} from './property-refinements.mjs';
+import {dirtCoverage} from './driveway-measured.mjs';
 // Centers registered to the user's red marks, facing each other across the lawn.
 export const HORSESHOES=[{x:-10.05,z:28.84},{x:-10.76,z:19.78}];
 export const CAMP_APPROACH=[
@@ -23,16 +24,13 @@ export function campSurface(x,z){
     if(distance<best.distance)best={distance,width:a.width+(b.width-a.width)*t,wear:a.wear+(b.wear-a.wear)*t,along:run+len*t};
     run+=len;
   }
-  const edge=1-smooth(best.width-.6,best.width+1.0,best.distance);
-  const laneLawn=1-smooth(best.width+1,best.width+3,best.distance);
+  const laneLawn=1-smooth(best.width*.5+1,best.width*.5+3,best.distance);
   // Mown opening shared by cabin and camp; keeps the tall grassy islands beside it.
   const oval=Math.hypot((x+26)/14,(z-29)/15);
   const a=HORSESHOES[0],b=HORSESHOES[1],dx=b.x-a.x,dz=b.z-a.z,t=clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz));
   const court=1-smooth(2.4,4.4,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));
   const tallGrass=tallGrassCoverage(x,z);
   const lawn=Math.max(grassReclaim(x,z),laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass);
-  const patch=.5+.28*Math.sin(x*1.37+z*.73)+.22*Math.sin(z*2.07-x*.61);
-  const wear=clamp(best.wear+(patch-.5)*.24*(1-best.wear));
-  const gravel=Math.max(edge*wear*(1-tallGrass),frontDoorGravel(x,z))*(1-grassReclaim(x,z));
+  const gravel=dirtCoverage(x,z);
   return {gravel,lawn,tallGrass,clear:gravel>.45,distance:best.distance,along:best.along};
 }

@@ -180,8 +180,10 @@ cam.position.set(420, relief*1.4+320, 620);
 const controls = new OrbitControls(cam, renderer.domElement);
 controls.enableDamping = true;
 
-scene.add(new THREE.HemisphereLight(0xbcd4ff,0x2a2420,0.6));
-const sun = new THREE.DirectionalLight(0xfff2d8,1.4); sun.position.set(-1,1.3,-0.6); scene.add(sun);scene.add(sun.target);
+// Evening sun from just north of west, as in the May frames: long shadows across the lawn. Warm sun, cool shade.
+const SUN_DIR=new THREE.Vector3(-1,.65,-.2).normalize();
+scene.add(new THREE.HemisphereLight(0xa9c6ff,0x2c2a1e,0.5));
+const sun = new THREE.DirectionalLight(0xffedc8,1.95); sun.position.copy(SUN_DIR); scene.add(sun);scene.add(sun.target);
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
 sun.shadow.bias=-.00015;sun.shadow.normalBias=.12;
 let shadowRadius=0,shadowStamp=-Infinity;
@@ -212,7 +214,7 @@ function ramp(t){
 }
 
 const DRIVEWAY=[[26.6,422.4],[15.2,381.4],[18.7,366.1],[28.7,355],[41.2,347.1],[49.8,340.4],[56.8,331.2],[65.3,314.4],[71.9,289.9],[75.6,269.2],[76.5,249.1],[74.3,219.6],[69.8,190],[71.2,163.8],[76.7,139.6],[86,118.1],[98,101],[110.7,85.6],[120.2,76.3],[123.1,72.2],[125.1,65.4],[126.9,52.3],[126.1,43.1],[119.5,37],[108.1,33.9],[96.5,29.7],[85,22.5],[77.6,16.7],[67.2,9.6],[56,6.1],[46.4,4],[35.1,2.3],[26.5,1.2],[10.7,-2.3],[-4.1,-1.4],[-22.9,6.4]].map(([E,N])=>({x:E,z:-N}));
-const groundDetail=createGroundDetail(cHalf,correctedDriveway(DRIVEWAY));
+const groundDetail=createGroundDetail(cHalf,correctedDriveway(DRIVEWAY),SUN_DIR);
 // ---- terrain tiles ------------------------------------------------------
 const mats=[]; const tiles=[];
 function buildTile(data,W,H,px,uvRect,pushBack){
@@ -641,7 +643,7 @@ const treeAssetsReady=(async()=>{
     treeSpecies=await buildTreeSpecies();
     // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
     forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:120,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
-      sunDir:new THREE.Vector3(-1,1.3,-.6).normalize(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
+      sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;
     if(trees.length)buildTreeMesh();
@@ -716,7 +718,7 @@ function buildTreeMesh(){
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
     fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint)});
   }
-  groundDetail.setTrees(trees);
+  groundDetail.setTrees(trees.concat(groveList));
   forest.setFixed(fixed);
 }
 const lidarReady=(async()=>{
@@ -898,7 +900,8 @@ function makeRav4(){
   for(const [sx,sz] of [[-wx,wz],[wx,wz],[-wx,-wz],[wx,-wz]]){const w=wheel();w.position.set(sx,0.36,sz);g.add(w);wheels.push(w);}
   return g;
 }
-const car={x:16,z:-14,heading:Math.PI,speed:0,group:makeRav4()};
+// Parked where the May 2026 frames show it, on the lawn by the cabin.
+const car={x:-31,z:22.3,heading:1.84,speed:0,group:makeRav4()};
 let rav4Rig=null,carSteering=0;
 // Load locally, without an expiring S3 URL; keep the placeholder on failure.
 loadRav4().then(rig=>{
@@ -1099,20 +1102,25 @@ function panCam(dt){                                    // WASD pans; Space/C mo
 let qualityTransition=null,qualityLevel=2,qualityLoading=false;
 function configureShadows(){
   const q=shadowSettings(qualityLevel,$('shadowQuality').value,renderer.capabilities.maxTextureSize);
-  renderer.shadowMap.enabled=sun.castShadow=q.size>0;shadowRadius=q.radius;shadowUniforms.shadowExtent.value=q.radius||55;
+  renderer.shadowMap.enabled=sun.castShadow=q.size>0;groundDetail.uniforms.castStrength.value=q.size>0?0:1;shadowRadius=q.radius;shadowUniforms.shadowExtent.value=q.radius||55;
   if(!q.size&&sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
   if(q.size&&sun.shadow.mapSize.x!==q.size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(q.size,q.size);}
   for(const b of placed)b.group.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;for(const m of (Array.isArray(o.material)?o.material:[o.material]))prepareShadowMaterial(m);}});
   shadowStamp=-Infinity;renderer.shadowMap.needsUpdate=true;
 }
+const _shadowLook=new THREE.Vector3(),shadowCentre=new THREE.Vector2(1e9,1e9);
 function updateTreeShadows(){
   if(!renderer.shadowMap.enabled)return;
-  const now=performance.now()/1000;if(now-shadowStamp<.1)return;shadowStamp=now;
+  const now=performance.now()/1000;if(now-shadowStamp<.1)return;
   // Fixed sunlight direction, camera-following map. Snap to shadow texels.
   const texel=shadowRadius*2/sun.shadow.mapSize.x;
-  const x=Math.round(cam.position.x/texel)*texel,z=Math.round(cam.position.z/texel)*texel;
-  const y=heightAt(x,z);shadowUniforms.shadowFocus.value.set(x,y,z);sun.target.position.set(x,y,z);sun.position.set(x-120,y+156,z-72);sun.target.updateMatrixWorld();
-  const c=sun.shadow.camera;c.left=c.bottom=-shadowRadius;c.right=c.top=shadowRadius;c.near=1;c.far=420;c.updateProjectionMatrix();
+  // Centre the map on the ground being looked at, not under the camera: from the air that is where the shadows must be.
+  cam.getWorldDirection(_shadowLook);const ground=heightAt(cam.position.x,cam.position.z),drop=Math.max(1,cam.position.y-ground),along=Math.min(shadowRadius*.8,_shadowLook.y<-.05?drop/-_shadowLook.y:shadowRadius*.6);
+  const x=Math.round((cam.position.x+_shadowLook.x*along)/texel)*texel,z=Math.round((cam.position.z+_shadowLook.z*along)/texel)*texel;
+  // Trees and sun stand still: redraw when the map has moved, and now and then for the wind.
+  if(now-shadowStamp<1&&Math.hypot(x-shadowCentre.x,z-shadowCentre.y)<texel*.5)return;shadowStamp=now;shadowCentre.set(x,z);
+  const y=heightAt(x,z);shadowUniforms.shadowFocus.value.set(x,y,z);sun.target.position.copy(_shadowLook.set(x,y,z));sun.position.set(x,y,z).addScaledVector(SUN_DIR,240);sun.target.updateMatrixWorld();
+  const c=sun.shadow.camera;c.left=c.bottom=-shadowRadius;c.right=c.top=shadowRadius;c.near=1;c.far=520;c.updateProjectionMatrix();
   renderer.shadowMap.needsUpdate=true;
 }
 try{const mode=localStorage.getItem('montanaShadowQuality');if(['auto','off','2','3','4'].includes(mode))$('shadowQuality').value=mode;}catch(e){}
