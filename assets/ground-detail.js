@@ -36,7 +36,7 @@ function driveMap(route){
  const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='black';g.fillRect(0,0,1024,512);
  g.setTransform(1024/HI_SIZE.x,0,0,512/HI_SIZE.y,-HI_MIN.x*1024/HI_SIZE.x,-HI_MIN.y*512/HI_SIZE.y);g.globalCompositeOperation='lighter';g.lineJoin=g.lineCap='round';
  g.filter='blur(3px)';g.fillStyle='rgb(255,0,0)';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
- g.filter='blur(2px)';g.strokeStyle='rgb(255,0,0)';g.lineWidth=.68;
+ g.filter='blur(2px)';g.strokeStyle='rgb(255,0,0)';g.lineWidth=.6;
  for(const side of [-1,1]){g.beginPath();let on=false;for(let d=0;d<=route.total;d+=.5){const p=route.at(d,side*TRACK_OFFSET);if(p.x>62||p.x<-1){on=false;continue;}if(on)g.lineTo(p.x,p.z);else g.moveTo(p.x,p.z);on=true;}g.stroke();}
  g.filter='blur(1.5px)';g.strokeStyle='rgb(0,200,0)';g.lineWidth=.26;
  for(const r of RUTS){g.beginPath();r.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.stroke();}
@@ -104,7 +104,26 @@ export function createGroundDetail(half,driveway,sunDir){
     }castTexture.needsUpdate=true;
   }
   const paint=createTerrainPaint(half);Object.assign(uniforms,paint.uniforms);
-  return {uniforms,paint,setTrees,attach(material){material.onBeforeCompile=sh=>{
+  // The far hills: tan-grey grass, dark forest patches on the shadier and higher ground, rusty streaks, snow on the tops; colours from the May frames.
+  function attachHills(material){material.onBeforeCompile=sh=>{
+    sh.uniforms.patchMap=uniforms.patchMap;
+    sh.vertexShader='varying vec3 hillWorld;varying vec3 hillNormal;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nhillWorld=(modelMatrix*vec4(position,1.)).xyz;hillNormal=normal;');
+    sh.fragmentShader='uniform sampler2D patchMap;varying vec3 hillWorld;varying vec3 hillNormal;\n'+sh.fragmentShader.replace('#include <color_fragment>',`
+      vec2 hp=hillWorld.xz;vec3 hn=normalize(hillNormal);
+      vec4 n1=texture2D(patchMap,hp*.00009),n2=texture2D(patchMap,hp*.00037),n3=texture2D(patchMap,hp*.0017),n4=texture2D(patchMap,hp*.0071);
+      float h=hillWorld.y+1666.,noise=n1.r*.42+n2.g*.33+n3.b*.17+n4.a*.08;
+      vec3 c=mix(${shown('#a89b78')},${shown('#8f9a6e')},smoothstep(.4,.6,n2.r*.6+n3.g*.4));
+      c=mix(c,${shown('#8a8578')},smoothstep(.45,.65,n1.g));
+      float shady=clamp(.5-hn.x*.9+hn.z*-.2,0.,1.);
+      float forest=smoothstep(.5,.57,noise+shady*.13-.03+smoothstep(2500.,1800.,h)*-.04)*smoothstep(3050.,2700.,h);
+      c=mix(c,${shown('#3f5236')}*(.75+n4.r*.5),forest);
+      float rust=smoothstep(.68,.8,texture2D(patchMap,vec2(hp.x*.0052,hp.y*.0009)).r*.6+n2.a*.4)*(1.-forest);
+      c=mix(c,${shown('#9a6a50')},rust*.55);
+      c=mix(c,${shown('#f2f2f0')},smoothstep(2900.,3150.,h+(n3.r-.5)*200.));
+      diffuseColor.rgb=c*(.82+n4.b*.36);`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+      vec2 hillBump=(texture2D(patchMap,hillWorld.xz*.0031).rg-.5)*.55;normal=normalize(normal+(viewMatrix*vec4(hillBump.x,0.,hillBump.y,0.)).xyz);`);
+  };material.customProgramCacheKey=()=>'montana-far-hills-v1';}
+  return {uniforms,paint,setTrees,attachHills,attach(material){material.onBeforeCompile=sh=>{
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
@@ -159,7 +178,9 @@ export function createGroundDetail(half,driveway,sunDir){
       detailed=mix(detailed,dirt,road);
       float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
       // Beyond the painted ground the photo is a dry-season view: pull it toward the green, darker ridges.
-      vec3 distantLand=mix(${shown('#8f9068')},${shown('#6f8a4c')},clamp(aerialGreen+(broad.r-.5)*.5,0.,1.))*(.72+dot(diffuseColor.rgb,vec3(.8)));
+      float aerialLight=dot(diffuseColor.rgb,vec3(.33));
+      vec3 distantLand=mix(${shown('#a0a070')},${shown('#7d9a55')},clamp(aerialGreen+(broad.r-.5)*.6,0.,1.))*(.8+mid.r*.4);
+      distantLand=mix(${shown('#3f5236')},distantLand,smoothstep(.12,.28,aerialLight));
       diffuseColor.rgb=mix(distantLand,detailed,proximity);
       if(detailEnabled<.5)diffuseColor.rgb=distantLand;
       #endif
@@ -171,7 +192,7 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
       vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
       diffuseColor.rgb*=1.-baked.g*.42;
-      diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*1.4,0.,1.)*castStrength);`);
+      diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
   };material.customProgramCacheKey=()=> 'montana-ground-detail-v9';}};
 }
 export function rockGeometry(seed){

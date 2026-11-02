@@ -13,7 +13,7 @@ const FOOTPRINTS=[{x:8.78,z:-4.88,hx:11.2,hz:5.2,yaw:.15},{x:-30.73,z:-8.2,hx:4.
 export const STRAW_BUNCHES=[[-8.9,13.3,1.5],[-9.2,17.2,1.5],[-16.2,23.8,1.2],[-14.6,24.4,1],[-4,27,1.1],[20,14,.9]];
 const hash=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s);};
 const vnoise=(x,z)=>{const i=Math.floor(x),j=Math.floor(z),f=x-i,g=z-j,u=f*f*(3-2*f),v=g*g*(3-2*g),a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};
-function tuftGeometry(blades=7,segs=2,height=.3,width=.05,spread=.2){
+function tuftGeometry(blades=7,segs=2,height=.3,width=.042,spread=.22){
  const pos=[],nor=[],aH=[],idx=[];let seed=7;const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
  for(let b=0;b<blades;b++){const a=rnd()*6.283,d=Math.sqrt(rnd())*spread,bx=Math.cos(a)*d,bz=Math.sin(a)*d,turn=rnd()*6.283,h=height*(.65+.7*rnd()),bend=(.3+.4*rnd())*h,c=Math.cos(turn),s=Math.sin(turn),base=pos.length/3;
   for(let i=0;i<=segs;i++){const t=i/segs,w=width*(1-.82*t),x=t*t*bend,y=(2*(1-t)*t*.62+t*t)*h;for(const e of [-1,1]){pos.push(bx+c*w*e+s*x,y,bz-s*w*e+c*x);nor.push(0,1,0);aH.push(t);}}
@@ -48,7 +48,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
    diffuseColor.rgb=c;
    vec2 castUV=vRoot/(2.*castHalf)+.5;vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
    vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
-   diffuseColor.rgb*=1.-baked.g*.42;diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*1.4,0.,1.)*castStrength);`);
+   diffuseColor.rgb*=1.-baked.g*.42;diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
  };
  material.customProgramCacheKey=()=>'meadow-grass-v2';
  prepareShadow?.(material);
@@ -57,7 +57,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
   return polygonDistance(x,z)<-1&&roadCoverage(x,z)<.3;};
  function add(x,z,size,height,wet,straw){const k=Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,wet,straw,turn:R()*6.283,rank:R(),vary:R()});}
  const wetAt=(x,z)=>{const [t,r]=zone(x,z),n=(vnoise(x*.032,z*.032)-.5)*.6+(vnoise(x*.13,z*.13)-.5)*.3;return Math.max(0,Math.min(1,t*(r*.92+.08)+(1-t)*.36+n*(1-t*.45)));};
- const STEP=.62,E=150;
+ const STEP=.5,E=150;
  for(let gx=-E;gx<E;gx+=STEP)for(let gz=-E;gz<E;gz+=STEP){
   const x=gx+(R()-.5)*STEP*1.4-5,z=gz+(R()-.5)*STEP*1.4+10,centre=Math.hypot(x+5,z-12);if(centre>E)continue;
   const near=centre<62?1:Math.max(.16,1-(centre-62)/85),patch=vnoise(x*.09+3,z*.09)*.65+vnoise(x*.34,z*.34)*.35,dense=.25+1.25*Math.max(0,patch-.26);

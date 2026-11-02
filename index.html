@@ -150,6 +150,8 @@ import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
 import {TREE_KINDS,ASPEN_STANDS,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
+import {makeCloudSky} from './assets/sky/cloudSky.js';
+import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
@@ -195,11 +197,11 @@ function prepareShadowMaterial(m){if(shadowMaterials.has(m))return;shadowMateria
 const HAZE=new THREE.Color(0xc2d4e2);
 scene.background=HAZE.clone();
 scene.fog=new THREE.Fog(HAZE, 5000, 30000);          // only distant (>5km) fades; near scene stays clear
-const skyMat=new THREE.ShaderMaterial({side:THREE.BackSide, depthWrite:false, depthTest:false, fog:false,
-  uniforms:{zen:{value:new THREE.Color(0x2f6fbf)}, mid:{value:new THREE.Color(0x8fbfe6)}, hor:{value:HAZE.clone()}},
-  vertexShader:'varying vec3 vp; void main(){vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-  fragmentShader:'varying vec3 vp; uniform vec3 zen,mid,hor; void main(){float h=clamp(normalize(vp).y,0.0,1.0); vec3 c=mix(hor,mid,smoothstep(0.0,0.28,h)); c=mix(c,zen,smoothstep(0.22,0.8,h)); gl_FragColor=vec4(c,1.0);}'});
-const skyDome=new THREE.Mesh(new THREE.SphereGeometry(60000,24,14),skyMat); skyDome.renderOrder=-1000; scene.add(skyDome);
+// Drifting clouds on a dome that follows the camera; from Medium up (costly per pixel on the sky), a plain gradient below.
+const cloudSky=makeCloudSky({horizon:0xc6d6e2,zenith:0x3f7cc4,radius:50000});
+cloudSky.mesh.material.fragmentShader=cloudSky.mesh.material.fragmentShader.replace('#include <colorspace_fragment>','');   // the page's sky colours are already display colours
+cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.46});cloudSky.uniforms.cloudScale.value=2400;cloudSky.uniforms.cloudHeight.value=2200;cloudSky.uniforms.cloudSoft.value=.24;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
+const sunbeams=new Sunbeams(renderer,{strength:.75,color:0xfff0d6,threshold:.6,radius:.5,reach:1.1,edge:.15});
 
 // shared aerial texture
 const tex = new THREE.TextureLoader().load('./assets/'+M.coarse.aerial);
@@ -743,18 +745,10 @@ const lidarReady=(async()=>{
   const dj=await (await fetch('./assets/distant.json')).json();
   const dz=new Float32Array(await (await fetch('./assets/distant.bin')).arrayBuffer());
   const {W,H,span}=dj, hole=450;
-  function ramp(e){
-    const s=[[1500,0x4c5c3a],[1900,0x3c4c34],[2300,0x2a3d2c],[2650,0x34423a],[2900,0x5d6463],[3100,0xa9adb0],[3350,0xf4f4f4]];
-    for(let i=0;i<s.length-1;i++){const[a,ca]=s[i],[b,cb]=s[i+1];
-      if(e<=b){const u=Math.max(0,(e-a)/(b-a));
-        return[((ca>>16&255)+((cb>>16&255)-(ca>>16&255))*u)/255,((ca>>8&255)+((cb>>8&255)-(ca>>8&255))*u)/255,((ca&255)+((cb&255)-(ca&255))*u)/255];}}
-    return[0.96,0.96,0.96];
-  }
-  const verts=new Float32Array(W*H*3), cols=new Float32Array(W*H*3), idx=[];
+  const verts=new Float32Array(W*H*3), idx=[];
   for(let j=0;j<H;j++)for(let i=0;i<W;i++){
     const x=(i/(W-1)-0.5)*span, z=-((0.5-j/(H-1))*span), e=dz[j*W+i], k=(j*W+i)*3;
     verts[k]=x; verts[k+1]=(e-gmin)-3; verts[k+2]=z;      // -3 so it tucks just under the detailed terrain
-    const c=ramp(e); cols[k]=c[0]; cols[k+1]=c[1]; cols[k+2]=c[2];
   }
   for(let j=0;j<H-1;j++)for(let i=0;i<W-1;i++){
     const cx=((i+0.5)/(W-1)-0.5)*span, cz=-((0.5-(j+0.5)/(H-1))*span);
@@ -763,9 +757,9 @@ const lidarReady=(async()=>{
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(verts,3));
-  g.setAttribute('color',new THREE.BufferAttribute(cols,3));
   g.setIndex(idx); g.computeVertexNormals();
-  const mesh=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1,metalness:0}));
+  const hillMaterial=new THREE.MeshStandardMaterial({roughness:1,metalness:0});groundDetail.attachHills(hillMaterial);
+  const mesh=new THREE.Mesh(g,hillMaterial);
   mesh.renderOrder=-1; scene.add(mesh);
 })();
 
@@ -1137,7 +1131,7 @@ try{const mode=localStorage.getItem('montanaShadowQuality');if(['auto','off','2'
 $('shadowQuality').onchange=()=>{configureShadows();try{localStorage.setItem('montanaShadowQuality',$('shadowQuality').value);}catch(e){}};
 function applyQuality(level){
   qualityLevel=level;const q=QUALITY_LEVELS[level];configureShadows();
-  propertyNature.setQuality(level,q.density);meadow.setQuality(level);
+  propertyNature.setQuality(level,q.density);meadow.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;
   treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);
@@ -1266,10 +1260,10 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);
   landscapeLayer?.update(cam);
   if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
-  tickWind(dt);updateTreeShadows();
+  tickWind(dt);updateTreeShadows();cloudSky.update(cam,dt);
   const v=new THREE.Vector3(0,0,-1).project(cam);
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
-  renderer.render(scene,cam);
+  renderer.render(scene,cam);if(qualityLevel>=3)sunbeams.render(cam,SUN_DIR);
   frames++; if(now-fpsT>=300){const fps=frames*1000/(now-fpsT);
     statsEl.innerHTML=`${QUALITY_LEVELS[qualityLevel].name}${quality.mode==='auto'?' (auto)':''} · ${fps.toFixed(0)} fps · ${(1000/fps).toFixed(1)} ms<br>${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(0)}k tris`;
     frames=0; fpsT=now;}
