@@ -575,7 +575,8 @@
     "#17110e",
     "#d9d8d0",
     "#343f45",
-    "#47423e"
+    "#47423e",
+    "#262422"
   ],
   "palTex": [
     "wood",
@@ -1387,6 +1388,42 @@
       "d": 0.3,
       "mat": 14,
       "floor": 1
+    },
+    {
+      "type": "box",
+      "name": "Entry porch ceiling",
+      "x": -33.75,
+      "y": 9.15,
+      "z": 6.3,
+      "w": 3.2,
+      "h": 0.2,
+      "d": 12,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "disc",
+      "name": "Entry pad centre",
+      "x": -34.4,
+      "y": 0.12,
+      "z": 6.5,
+      "w": 3.6,
+      "h": 0.06,
+      "d": 3.6,
+      "mat": 17,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "White unit behind the entry",
+      "x": -26,
+      "y": 4,
+      "z": -0.8,
+      "w": 3.8,
+      "h": 7,
+      "d": 1.2,
+      "mat": 14,
+      "floor": 0
     }
   ],
   "origin": [
