@@ -143,7 +143,7 @@ import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
-import { buildHouse } from './assets/house-model.js?v=40';
+import { buildHouse } from './assets/house-model.js?v=41';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
 import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
@@ -430,68 +430,104 @@ function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps,dir=1){
   }
   if(concM)box(g,1.6,0.12,1.8,endX+sign*0.9,endY-0.06,z0,concM);
 }
+const cabinTextures={};
+function cabinTexture(kind){ // fine board, deck and rib maps for the code-built cabin (feet-based UVs)
+  if(cabinTextures[kind])return cabinTextures[kind];
+  const S=512,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d');let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  x.fillStyle='#eee';x.fillRect(0,0,S,S);
+  if(kind==='board'){for(let i=0;i<3;i++){const v=225+rnd()*25|0;x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(i*S/3,0,S/3,S);x.fillStyle='rgba(30,20,10,.5)';x.fillRect(i*S/3,0,10,S);x.fillStyle='rgba(255,255,255,.2)';x.fillRect(i*S/3+10,0,3,S);}}
+  else if(kind==='deck'){for(let i=0;i<4;i++){const v=205+rnd()*40|0;x.fillStyle=`rgb(${v},${v},${v})`;x.fillRect(0,i*S/4,S,S/4);x.fillStyle='rgba(0,0,0,.5)';x.fillRect(0,i*S/4,S,8);}}
+  else for(let i=0;i<8;i++){x.fillStyle='rgba(0,0,0,.55)';x.fillRect(0,i*S/8+5,S,5);x.fillStyle='rgba(255,255,255,.45)';x.fillRect(0,i*S/8,S,5);}
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;t.colorSpace=THREE.SRGBColorSpace;return cabinTextures[kind]=t;
+}
+function cabinBoxUV(geo,w,h,d,tile){const uv=geo.attributes.uv,dims=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];for(let f=0;f<6;f++)for(let i=0;i<4;i++){const k=f*4+i;uv.setXY(k,uv.getX(k)*dims[f][0]/tile,uv.getY(k)*dims[f][1]/tile);}}
+function cabinScaleUV(geo,s){const uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*s,uv.getY(i)*s);}
 function makeCabin(){
-  const g=new THREE.Group();
-  const w=14*FT,d=16*FT,wh=2.5,rh=1.28,eave=0.58,DY=1.5,P=6*FT;   // DY = deck/floor height above grade, P = porch depth
-  const side=MAT(0xc49a55),shake=MAT(0xb98d4c),accent=MAT(0x7c2a22),roof=MAT(0x3a3438,.45,.35),
-        glass=MAT(0x28323b,.3),door=MAT(0x3a352f),logM=MAT(0x9c7b4f,.8),deckM=MAT(0xa88b63),deckRed=MAT(0x7a2f2c),
-        railM=MAT(0xb08d5c),pier=MAT(0x4a4038),conc=MAT(0xb8b4ab,.95);
-  for(const px of [-w/2+0.4,w/2-0.4]) for(const pz of [-d/2+0.4,d/2-0.4]) box(g,0.3,DY,0.3,px,DY/2,pz,pier);
-  box(g,w,wh,d,0,DY+wh/2,0,side);
-  box(g,w+0.06,1.0,d+0.06,0,DY+wh-0.5,0,shake);                        // shake band under eaves
-  // Carry the main ridge and roof planes forward over the porch. The left
-  // plane also reaches the widened deck; there is no separate front lean-to.
-  const dExt=3.05,deckLeft=-4.56,deckRight=4.13,deckRedTo=.8,deckFront=d/2+dExt;
-  const ridgeY=DY+wh+rh,pitch=rh/(w/2+eave),roofBack=-d/2,roofFront=d/2+2.26,porchFront=d/2+2.92;
-  const roofY=x=>ridgeY-Math.abs(x)*pitch;
-  function roofPlane(x0,x1){
-    const y0=roofY(x0),y1=roofY(x1),slope=Math.atan2(y1-y0,x1-x0);
-    const panel=box(g,Math.hypot(x1-x0,y1-y0),.14,roofFront-roofBack,(x0+x1)/2,(y0+y1)/2,(roofBack+roofFront)/2,roof);
-    panel.rotation.z=slope;
-  }
-  roofPlane(-w/2-eave,0);roofPlane(0,w/2+eave);
-  // The widened left porch continues the same left roof pitch, only over
-  // the porch: the shed-side stair run behind it stays uncovered.
-  {const x0=deckLeft-.3,x1=-w/2-eave,y0=roofY(x0),y1=roofY(x1);
-   box(g,Math.hypot(x1-x0,y1-y0),.14,porchFront-d/2,(x0+x1)/2,(y0+y1)/2,(porchFront+d/2)/2,roof).rotation.z=Math.atan2(y1-y0,x1-x0);}
-  {const s=new THREE.Shape();s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(0,rh);s.lineTo(-w/2,0);
-   const tri=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.1,bevelEnabled:false}),shake);
-   tri.position.set(0,DY+wh,d/2); g.add(tri);}                        // front gable infill
-  const zf=d/2+0.06;
-  box(g,.95,1.1,0.14,-.35,DY+1.45,zf,glass); box(g,1.75,1.25,0.07,-.35,DY+1.45,zf-0.02,accent);  // window + accent frame
-  box(g,.95,2.05,0.12,1.35,DY+1.03,zf,accent);                            // door
-  box(g,deckRedTo-deckLeft,.18,dExt,(deckLeft+deckRedTo)/2,DY-.09,d/2+dExt/2,deckRed);box(g,deckRight-deckRedTo,.18,dExt,(deckRedTo+deckRight)/2,DY-.09,d/2+dExt/2,deckM);
-  for(const x of [deckLeft+.18,deckRight-.18])box(g,.25,DY,.25,x,DY/2,deckFront-.2,pier);
-  // Log posts/header follow the roof's eave height; the gable above is open.
-  for(const x of [deckLeft+.12,-w/2+.12,deckRight-.12]){
-    const top=roofY(x)-.16,h=top-DY;
-    const post=new THREE.Mesh(new THREE.CylinderGeometry(.14,.16,h,7),logM);
-    post.position.set(x,DY+h/2,deckFront-.12);g.add(post);
-  }
-  function header(x0,x1){const y0=roofY(x0)-.16,y1=roofY(x1)-.16;
-    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,Math.hypot(x1-x0,y1-y0),7),logM);
-    beam.rotation.z=Math.atan2(y1-y0,x1-x0)-Math.PI/2;beam.position.set((x0+x1)/2,(y0+y1)/2,deckFront-.12);g.add(beam);}
-  header(deckLeft+.12,-w/2+.12);
-  {const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,w-.24,7),logM);beam.rotation.z=Math.PI/2;beam.position.set(0,roofY(w/2-.12)-.16,deckFront-.12);g.add(beam);}
-  railSeg(g,railM,deckLeft,deckFront,deckRight,deckFront,DY,1);
-  // Gates in both side rails keep the deck connected to both stairways.
-  const stairZ=d/2+dExt-0.96, stairWidth=.9;
-  railSeg(g,railM,deckLeft,d/2,deckLeft,deckFront,DY,1.0);
-  railSeg(g,railM,deckRight,d/2, deckRight,stairZ-stairWidth/2, DY,1.0);
-  railSeg(g,railM,deckRight,stairZ+stairWidth/2, deckRight,d/2+dExt, DY,1.0);
-
-  // Local +X points toward the garage. This is the concrete-pad flight.
-  const garageStairs=new THREE.Group();garageStairs.name='cabin-garage-stairs';g.add(garageStairs);
-  stairFlight(garageStairs,deckM,railM,conc,deckRight,stairZ,DY,stairWidth,.38,8,1);
-  // Opposite side: turn off the porch, then descend back along the cabin wall.
-  // The side landing is covered, but the wooden stairs have no roof or pad.
-  const landingX=-w/2-.55;
-  // The former small landing is now part of the full-width porch slab;
-  // keep its rear opening and the stair transform exactly where they were.
-  const shedStairs=new THREE.Group();shedStairs.name='cabin-shed-stairs';
-  shedStairs.position.set(landingX,0,d/2);shedStairs.rotation.y=Math.PI/2;g.add(shedStairs);
-  stairFlight(shedStairs,deckM,railM,null,0,0,DY,stairWidth,.38,8,1);
-  optimizeGroup(garageStairs);optimizeGroup(shedStairs);
+  // Dimensions in feet, local +z = front (east), +x = north. Heights are above the group origin.
+  // Body 14 x 16 ft, 6 ft porch; rail, post and picket counts are read from the drone frames.
+  const g=new THREE.Group(),F=FT;
+  const X0=-15.6,X1=13,WF=8,DF=14,DECK=5.6,EAVE=13.3,RIDGE=17.4,PITCH=.5,HW=7;
+  const mapped=(hex,pattern,feet,r=.95)=>{const m=new THREE.MeshStandardMaterial({color:hex,roughness:r,flatShading:false});const t=cabinTexture(pattern);m.map=t;return m;};
+  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x171316,'rib',0,.82),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x7d6238,.85),logPale=MAT(0x857c6c,.85),
+        post=MAT(0x634a2c,.9),rail=MAT(0x5f4f36,.95),railTop=MAT(0x74664e,.95),deckRed=mapped(0x571a1c,'deck'),deckGrey=mapped(0x6b5a46,'deck'),rim=MAT(0x5c4a2e,.95),
+        red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x5a5f66,.5),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
+        white=MAT(0xe6e2d6),blue=MAT(0x4e93b0),dark=MAT(0x1c2024);
+  const B=(w,h,d,x,y,z,mat)=>box(g,w*F,h*F,d*F,x*F,y*F,z*F,mat);
+  const uvBox=(w,h,d,x,y,z,mat,tile)=>{const m=B(w,h,d,x,y,z,mat);cabinBoxUV(m.geometry,w,h,d,tile);return m;};
+  // timber between two points; round for logs
+  const T=(a,b,th,mat,round)=>{const A=new THREE.Vector3(...a).multiplyScalar(F),C=new THREE.Vector3(...b).multiplyScalar(F),v=C.clone().sub(A),L=v.length();
+    const m=new THREE.Mesh(round?new THREE.CylinderGeometry(th*F/2,th*F/2,L,7):new THREE.BoxGeometry(th*F,L,th*F),mat);m.position.copy(A).add(C).multiplyScalar(.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());g.add(m);return m;};
+  // walls, corner logs
+  uvBox(HW*2,EAVE-DECK+.5,16,0,(DECK+EAVE+.5)/2,0,side,4);
+  B(HW*2-1,DECK,15,0,DECK/2,0,MAT(0x3a3026));
+  {const s=new THREE.Shape();s.moveTo(-HW*F,0);s.lineTo(HW*F,0);s.lineTo(0,(RIDGE-EAVE-.6)*F);s.closePath();
+   for(const z of [WF,-WF-.1]){const m=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:.1*F,bevelEnabled:false}),side);cabinScaleUV(m.geometry,1/(F*4));m.position.set(0,(EAVE+.5)*F,z*F);g.add(m);}}
+  for(const x of [-HW,HW])T([x,DECK,WF+.05],[x,EAVE,WF+.05],.6,log,true);
+  // main roof: ridge from z=-11.3 to +12.1, overhangs the eaves by 1.2 ft
+  const zB=-11.3,zF=12.1,run=HW+1.2,fall=run*PITCH;
+  const slope=(sgn,x0,x1,y0,y1,za,zb,mat=roof)=>{const pos=[],uv=[],q=[[x0,y0,za],[x1,y1,za],[x1,y1,zb],[x0,y0,zb]],len=Math.hypot(x1-x0,y1-y0);
+    const U=[[za,0],[za,len],[zb,len],[zb,0]];for(const i of [0,1,2,0,2,3,0,2,1,0,3,2]){pos.push(q[i][0]*F,q[i][1]*F+.04,q[i][2]*F);uv.push(U[i][0]/8,U[i][1]/8);}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
+  slope(1,0,run,RIDGE,RIDGE-fall,zB,zF);slope(-1,0,-run,RIDGE,RIDGE-fall,zB,zF);
+  B(.8,.14,zF-zB,0,RIDGE+.05,(zB+zF)/2,fascia);
+  // low porch roof: nearly flat from the south eave out past the deck
+  const pY=RIDGE-fall,pX=-16.5,pY1=12.7;
+  slope(-1,-run,pX,pY,pY1,WF-.2,DF+.4);
+  for(const [a,b] of [[[-run,pY-.2,DF+.4],[pX,pY1-.2,DF+.4]],[[pX,pY1-.2,WF-.2],[pX,pY1-.2,DF+.4]]])T(a,b,.3,fascia);
+  // eave fascia + pale rake boards on the front gable
+  for(const sgn of [-1,1]){T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,zF],.25,fascia);
+    T([0,RIDGE-.25,zF],[sgn*run,RIDGE-fall-.25,zF],.25,fascia);T([0,RIDGE-.55,WF+.2],[sgn*HW,EAVE+.25,WF+.2],.4,rake);T([0,RIDGE-.25,zB],[sgn*run,RIDGE-fall-.25,zB],.25,fascia);}
+  // skylight on the south slope, 2 x 4 ft
+  {const t=Math.atan(PITCH),sk=new THREE.Group();sk.position.set(-3.6*F,(RIDGE-3.6*PITCH+.14)*F,2.8*F);sk.rotation.z=t;
+   const a=new THREE.Mesh(new THREE.BoxGeometry(2.3*F,.22*F,4.3*F),white);const b=new THREE.Mesh(new THREE.BoxGeometry(1.9*F,.06*F,3.9*F),glass);b.position.y=.12*F;sk.add(a,b);g.add(sk);sk.updateMatrix();
+   for(const m of [a,b]){m.geometry.applyMatrix4(new THREE.Matrix4().compose(m.position,m.quaternion,m.scale));m.position.set(0,0,0);m.geometry.applyMatrix4(sk.matrix);g.add(m);}g.remove(sk);}
+  // front wall: door north of the window, red shutters, curtains, signs, antlers, picture
+  const zW=WF+.08;
+  B(5.2,3.9,.1,-2.4,DECK+4.1,zW,glass);              // window
+  B(5.6,.3,.25,-2.4,DECK+6.1,zW,red);B(5.6,.3,.35,-2.4,DECK+2.1,zW+.05,red);
+  B(.9,3.9,.14,-4.2,DECK+4.1,zW+.04,curtain);B(.9,3.9,.14,-.7,DECK+4.1,zW+.04,curtain);
+  B(2.2,4.6,.16,-6.1,DECK+4.1,zW+.02,red);B(1.5,4.6,.16,1.1,DECK+4.1,zW+.02,red);
+  {const m=new THREE.Mesh(new THREE.CylinderGeometry(.55*F,.55*F,.05*F,14),dark);m.rotation.x=Math.PI/2;m.position.set(-6.1*F,(DECK+4.3)*F,(zW+.14)*F);g.add(m);}
+  B(1,.75,.06,1.1,DECK+4.3,zW+.13,blue);
+  B(3.5,7,.1,4.3,DECK+3.45,zW,doorRed);B(2.5,6.5,.08,4.3,DECK+3.25,zW+.07,doorGlass);B(2.9,.25,.14,4.3,DECK+6.7,zW+.08,doorRed);
+  for(const x of [-.9,.0,.9])T([3.6+x*0+x,DECK+1,zW+.13],[3.6+x+.9,DECK+5,zW+.13],.03,dark);
+  B(1.7,2.1,.1,-.4,14.6,zW+.05,dark);B(1.25,1.65,.06,-.4,14.6,zW+.11,blue);
+  // antler above the window, resting on the front log
+  const AY=13.5,AZ=DF-.4;
+  for(const [a,b] of [[[-2.9,AY,AZ],[.3,AY+.15,AZ]],[[-2.9,AY,AZ],[-3.7,AY+1.9,AZ]],[[-2,AY,AZ],[-1.3,AY-1,AZ]],[[-.8,AY+.05,AZ],[-.3,AY-1.1,AZ]],[[.3,AY+.15,AZ],[.9,AY+.5,AZ]]])T(a,b,.2,white,true);
+  // deck frame: red south of the door line, weathered north of it; 2 x 12 rim
+  const SPLIT=2.6;
+  uvBox(SPLIT-X0,.2,DF-WF,(X0+SPLIT)/2,DECK-.1,(WF+DF)/2,deckRed,.5);
+  uvBox(X1-SPLIT,.2,DF-WF,(SPLIT+X1)/2,DECK-.1,(WF+DF)/2,deckGrey,.5);
+  B(X1-X0+.3,1,.2,(X0+X1)/2,DECK-.65,DF,rim);B(.2,1,DF-WF,X0,DECK-.65,(WF+DF)/2,rim);B(.2,1,DF-WF,X1,DECK-.65,(WF+DF)/2,rim);
+  // 5 log posts under the front rim, plus 2 at the back of the deck and a block pier
+  for(const x of [X0+.4,-6.3,-2.4,6.7,X1-.4])T([x,-3,DF-.3],[x,DECK-1,DF-.3],.65,post,true);
+  for(const x of [X0+.4,X1-.4])T([x,-3,WF+.4],[x,DECK-1,WF+.4],.55,post,true);
+  B(2,DECK+2,2,4,DECK/2-1.5,WF+.2,block);
+  // porch-roof posts: SE corner, one at 30 percent, north end; one at the back of the south deck
+  for(const [x,z,top] of [[X0+.3,DF-.3,12.5],[-6.3,DF-.3,13.1],[6.7,DF-.3,13.1],[X0+.3,WF+.8,12.5]])T([x,DECK,z],[x,top,z],.45,post,true);
+  // horizontal log across the front, overhanging north; short log on the south run
+  T([-9.5,13.15,DF-.1],[9.6,13.15,DF-.1],.5,logPale,true);
+  T([X0+.3,12.45,DF-.3],[-6.3,12.45,DF-.3],.35,log,true);
+  // rail runs: posts, top rail, pickets at about 10 in
+  const run2=(xa,za,xb,zb,n,yA=DECK,yB=DECK,thick=true)=>{const H=3,L=Math.hypot(xb-xa,zb-za);
+    T([xa,yA+H,za],[xb,yB+H,zb],.28,railTop);T([xa,yA+H-.5,za],[xb,yB+H-.5,zb],.16,rail);if(yA===yB)T([xa,yA+.3,za],[xb,yB+.3,zb],.16,rail);
+    for(const t of [0,1]){const x=xa+(xb-xa)*t,z=za+(zb-za)*t,y=yA+(yB-yA)*t;if(thick)T([x,y,z],[x,y+H+.1,z],.38,rail);}
+    for(let i=1;i<=n;i++){const t=i/(n+1),x=xa+(xb-xa)*t,z=za+(zb-za)*t,y=yA+(yB-yA)*t;T([x,y+.05,z],[x,y+H-.1,z],.16,rail);}};
+  run2(X0,DF,-6.3,DF,11);run2(-6.3,DF,6.7,DF,15);run2(6.7,DF,X1,DF,7);             // front: 3 sections
+  run2(X0,WF+.6,X0,DF,6);                                                           // south end
+  run2(X0,WF+.6,X0+2.2,WF+.6,2);run2(-11,WF+.6,-HW,WF+.6,4);                        // back of the south deck, stair gap between
+  run2(HW,WF,X1,WF,6);run2(X1,WF,X1,10.8,2);                                        // north deck back rail and return
+  // north stair: 8 treads, 8 risers, 2 stringers, 2 end posts + 10 pickets each side, pad at the foot
+  const N=8,SW=3.2,RIS=DECK/N,TR=.98,SZ=(10.8+DF)/2;
+  for(let i=0;i<N;i++){const x=X1+TR*(i+.5),y=DECK-RIS*(i+1);B(TR+.1,.14,SW,x,y+.07,SZ,deckGrey);}
+  for(const z of [10.8,DF]){T([X1,DECK-.3,z],[X1+TR*N,-.2,z],.7,rim);run2(X1,z,X1+TR*N,z,10,DECK,RIS*.5);}
+  B(4.5,.25,3.6,X1+TR*N+2,0,SZ,conc);
+  // south back stair down along the wall (hidden in every frame: kept simple)
+  for(let i=0;i<N;i++)B(3,.14,TR,-9.5,DECK-RIS*(i+1)+.07,WF+.2-TR*(i+.5),deckGrey);
+  for(const x of [-11,-8])T([x,DECK-.3,WF+.2],[x,-.2,WF+.2-TR*N],.6,rim);
+  // shutters and rails end here; wall lamps
+  B(.5,.9,.3,5.8,DECK+6.1,zW+.1,dark);B(.5,.9,.3,X0+1.2,11.5,DF-.3,dark);
   return g;
 }
 
@@ -1224,7 +1260,7 @@ const landscapeReady=(async()=>{
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   // Apply authored transforms after the scatter baseline to preserve existing
   // landscape object IDs. Keep per-axis scale and the full Euler rotation.
-  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-38.99,125.7,37.7],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.748368197928784,126.79592067395072,43.12914611137401],"rotation":[0,1.6406094968746698,0],"scale":[0.7901327877800801,1,0.8610203444559691]}];
+  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-37.985,125.7,37.665],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.6,127.55,45.2],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
   for(const [i,rec] of placed.entries()){
     const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];

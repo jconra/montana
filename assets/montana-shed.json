@@ -3,35 +3,36 @@
     {
       "outline": [
         [
-          -5,
-          -4
+          -4,
+          -3.5
         ],
         [
-          5,
-          -4
+          4,
+          -3.5
         ],
         [
-          5,
-          4
+          4,
+          3.5
         ],
         [
-          -5,
-          4
+          -4,
+          3.5
         ]
       ],
-      "h": 7,
+      "h": 8.3,
       "walls": [],
       "openings": [
         {
           "on": "outline",
           "edge": 2,
-          "off": 3.5,
-          "w": 3,
-          "y0": 0,
-          "y1": 6.5,
-          "type": "door",
-          "closed": true,
-          "mat": 0
+          "off": 2,
+          "w": 2,
+          "y0": 4.3,
+          "y1": 6.3,
+          "type": "window",
+          "split": [
+            1
+          ]
         }
       ],
       "mats": {
@@ -50,35 +51,89 @@
     {
       "x": 0,
       "z": 0,
-      "w": 10,
-      "d": 8,
-      "base": 7,
+      "w": 8,
+      "d": 7,
+      "base": 8.25,
       "style": "gable",
-      "pitch": 0.55,
+      "pitch": 0.14,
       "mat": 1,
       "gableMat": 0,
       "flipRidge": true,
-      "raiseWalls": false
+      "overhang": 0.5,
+      "rake": 0.5,
+      "fasciaMat": 5,
+      "fasciaH": 0.35
     }
   ],
-  "details": [],
+  "details": [
+    {
+      "type": "box",
+      "name": "Stone skirt",
+      "x": 0,
+      "y": 0.4,
+      "z": 0,
+      "w": 8.8,
+      "h": 1.2,
+      "d": 7.8,
+      "mat": 4
+    },
+    {
+      "type": "box",
+      "name": "Moss patch",
+      "x": -1.2,
+      "y": 8.95,
+      "z": 1.2,
+      "w": 2.4,
+      "h": 0.08,
+      "d": 1.6,
+      "mat": 6,
+      "rotation": [
+        8,
+        0,
+        0
+      ]
+    },
+    {
+      "type": "box",
+      "name": "Moss patch",
+      "x": 1.6,
+      "y": 8.95,
+      "z": -1.3,
+      "w": 2,
+      "h": 0.08,
+      "d": 1.4,
+      "mat": 6,
+      "rotation": [
+        -8,
+        0,
+        0
+      ]
+    }
+  ],
   "stairs": [],
   "palette": [
-    "#c49a55",
-    "#4a4d51",
+    "#a98c4c",
+    "#2c2b24",
     "#858275",
-    "#d5d1c4"
+    "#d5d1c4",
+    "#6f6a5e",
+    "#141414",
+    "#2f3a20"
   ],
   "palTex": [
-    "wood",
-    "metal",
+    "vboard",
+    "rib",
+    "",
+    "",
+    "stone",
     "",
     ""
   ],
   "colors": {
-    "wall": "#c49a55",
-    "roof": "#4a4d51",
-    "trim": "#d5d1c4"
+    "wall": "#a98c4c",
+    "roof": "#2c2b24",
+    "trim": "#6a5a44"
   },
-  "windowFrames": true
+  "windowFrames": true,
+  "frameW": 0.15
 }
