@@ -243,7 +243,7 @@ export function imposterMaterial(bake, { sunDir = new THREE.Vector3(0.5, 1, 0.3)
   const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.lights, THREE.UniformsLib.fog, { soften: { value: soften },
     atlas: { value: null }, atlasN: { value: null }, grid: { value: bake.grid }, hemi: { value: bake.hemi ? 1 : 0 },
     radius: { value: bake.radius }, halfW: { value: bake.halfW }, halfH: { value: bake.halfH }, centre: { value: bake.centre.clone() }, sunDir: { value: sunDir.clone().normalize() },
-    blend: { value: blend ? 1 : 0 }, blendDist: { value: 400 }, parallax: { value: 0 }, halfWc: { value: bake.halfW }, halfHc: { value: bake.halfH }, ambient: { value: 0.45 }, glowLight: { value: glow }, sheen: { value: sheen }, shadowNudge: { value: 0 }, lowSun: { value: 0 }, lowSunK: { value: 0.7 }, useDepth: { value: depth ? 1 : 0 }, useShadow: { value: shadows ? 1 : 0 },   // (lowSunK 0.7: a wood at 190 m matched its models within 3% from the sun's side and against it, sun 3-8° up)
+    blend: { value: blend ? 1 : 0 }, blendDist: { value: 400 }, parallax: { value: 0 }, halfWc: { value: bake.halfW }, halfHc: { value: bake.halfH }, ambient: { value: 0.45 }, glowLight: { value: glow }, sheen: { value: sheen }, shadowNudge: { value: 0.8 }, lowSun: { value: 0 }, lowSunK: { value: 0.7 }, useDepth: { value: depth ? 1 : 0 }, useShadow: { value: shadows ? 1 : 0 },   // (lowSunK 0.7: a wood at 190 m matched its models within 3% from the sun's side and against it, sun 3-8° up)
     viewDirOverride: { value: new THREE.Vector3(0, 1, 0) }, useOverride: { value: 0 },
     calmCol: { value: new THREE.Color(0.3, 0.4, 0.15) }, calmFrom: { value: 60 }, calmTo: { value: 250 }, calmAmt: { value: 0 },
     landShade: { value: null }, landShadeSize: { value: 1600 }, landShadeK: { value: new THREE.Vector4() },
@@ -312,7 +312,7 @@ export function imposterMaterial(bake, { sunDir = new THREE.Vector3(0.5, 1, 0.3)
         {
           float shadow = 1.0;
           #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-          if (useShadow > 0.5) shadow = getShadow(directionalShadowMap[0], directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius, vDirectionalShadowCoord[0] + vShadowToCam * (useDepth > 0.5 ? off : 0.0) + vShadowToSun * vRadius * shadowNudge);   // (shadowNudge: a fraction of the radius toward the sun. 0: measured against the models from five sides of four woods, it matches them best, lower crowns included; 0.25 left far woods 10-15% lighter)
+          if (useShadow > 0.5) shadow = getShadow(directionalShadowMap[0], directionalLightShadows[0].shadowMapSize, directionalLightShadows[0].shadowBias, directionalLightShadows[0].shadowRadius, vDirectionalShadowCoord[0] + vShadowToCam * (useDepth > 0.5 ? off : 0.0) + vShadowToSun * vRadius * shadowNudge);   // (shadowNudge: a fraction of the radius toward the sun. Below about 0.7 a lone plant's flat shadow caster cuts through its own quad and draws a hard diagonal across it; woods come out somewhat lighter for it, measured 10-15% at 0.25)
           if (useShadow > 0.5 && shadowRange > 0.0) shadow = mix(shadow, edgeShade, smoothstep(edgeFrom, edgeTo, length(vLand - shadowAt.xz) / shadowRange + edgeHash(floor(vLand * 4.0)) * edgeJitter));   // (near the shadows' edge: eased into the even shade, as the models are: round, each tree its own start)
           #endif
           shadow *= landSun;

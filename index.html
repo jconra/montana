@@ -155,6 +155,7 @@ import {roadCoverage,DRIVE_LINE} from './assets/driveway-measured.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
 import {inCentralArea} from './assets/central-rocks.mjs';
 import {loadSageModel} from './assets/sagebrush.js';
+import {buildShrubSpecies,SAGE_FORMS,sageFormOf} from './assets/forest/shrubs.js';
 import {makeCloudSky} from './assets/sky/cloudSky.js';
 import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
@@ -274,7 +275,7 @@ function heightAt(x,z){
 const pondLevel=preparePond(tiles,heightAt);
 let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
-let landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
+let landscapeCatalog=new Map(),landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 
 // ---- building models ----------------------------------------------------
 const placed=[];
@@ -675,7 +676,7 @@ function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65
 let treeAssetsSettled=false,lidarSettled=false;
 let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
-let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9;
+let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});}
 function treeTint(kind,id,tint){
@@ -690,7 +691,7 @@ const treeAssetsReady=(async()=>{
   try{
     treeSpecies=await buildTreeSpecies();
     // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
-    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:50,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
+    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:16,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
       sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;
@@ -728,6 +729,15 @@ function buildTreesFrom(n){
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
     const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:treeWide(asset,id,h)});}
   buildTreeMesh();
+}
+// Shrubs are a forest of their own: their own short mesh circle and budget, so they never take a tree's place near the camera.
+function buildShrubs(){
+  if(!shrubForest||!landscapeRecords)return;
+  const density=Math.max(.35,QUALITY_LEVELS[qualityLevel].density),fixed=[];
+  for(const o of landscapeRecords){const shrub=landscapeCatalog.get(o.asset)?.shrub;if(!shrub||(!landscapeAuthored.has(o.id)&&treeHash(o.id,8)>density))continue;
+    const a=treeHash(o.id,9),b=treeHash(o.id,10),t=o.tint??1;
+    fixed.push({id:o.id,x:o.x,z:o.z,offset:o.offset,sp:shrub(o),scale:o.scale[1],wide:(o.scale[0]+o.scale[2])/2/o.scale[1],yaw:o.rotation[1],lean:o.rotation[0],tint:new THREE.Color(t*(.96+.08*a),t*(.97+.05*b),t*(.96+.1*(1-a)))});}
+  shrubForest.setFixed(fixed);
 }
 function addInst(geo,mat,list){
   if(!list.length) return;
@@ -871,7 +881,7 @@ function applyVex(v){
     _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
     im.instanceMatrix.needsUpdate=true;}
   if(marker) marker.position.y=heightAt(marker.position.x,marker.position.z)+2;
-  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);landscape?.refresh();}else if(trees.length)buildTreeMesh();
+  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);buildShrubs();landscape?.refresh();}else if(trees.length)buildTreeMesh();
 }
 
 // ---- tap to inspect + move marker --------------------------------------
@@ -1179,7 +1189,7 @@ function applyQuality(level){
   propertyNature.setQuality(level,q.density);meadow.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;
-  treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);
+  treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);shrubBudget={distance:[14,22,30,36,44][level],meshes:[40,80,120,160,220][level],blendDist:[0,40,60,90,120][level],depth:false};shrubForest?.setBudget(shrubBudget);buildShrubs();
   renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
   for(const {im,list} of groundMeshes){
     const isRock=rockGeos.includes(im.geometry);
@@ -1222,6 +1232,11 @@ const landscapeReady=(async()=>{
   function asset(key,label,parts,scale){catalog.set(key,{label,parts,defaults:{asset:key,x:0,z:0,offset:0,rotation:[0,0,0],scale,tint:1}});}
   for(const v of treeSpecies)asset('tree/'+v.name,v.label,v.parts,[v.defaultHeight,v.defaultHeight,v.defaultHeight]);
   rockGeos.forEach((geometry,i)=>asset('rock/'+[11,27,43,61][i],'Rock '+(i+1),[{geometry,material:rockMat}],[.8,.68,.8]));
+  let shrubSpecies=null;
+  try{shrubSpecies=buildShrubSpecies();
+    shrubForest=new Forest(renderer,scene,{species:shrubSpecies,fixed:[],heightAt,grid:8,cell:128,imposterAt:36,band:5,ahead:.5,spread:.5,nearCap:240,nearBudget:160,shadows:true,wind:true,sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
+    if(shrubBudget)shrubForest.setBudget(shrubBudget);await shrubForest.loaded;
+  }catch(e){console.warn('Shrubs could not load, using the plain sage',e);shrubForest=null;shrubSpecies=null;}
   try{const near=await loadCentralRocks();for(const [name,part] of near){const entry=catalog.get('rock/'+name);if(entry)entry.nearParts=[part];}}catch(error){console.warn('Central rock set unavailable:',error);}
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
@@ -1245,6 +1260,12 @@ const landscapeReady=(async()=>{
   }
   // The shrubs scattered here were generic broadleaf models that read as dark twigs; the same placements now draw the sage model.
   if(propertyNature.models.sage.length)for(const key of ['bush/broadleaf','bush/evergreen'])if(catalog.has(key))catalog.get(key).parts=propertyNature.models.sage;
+  // With the shrub forest up, every sage record is drawn by it: each form by its own id, plain sage by the form its id and height pick.
+  if(shrubSpecies){
+    for(const key of ['bush/sage','bush/broadleaf','bush/evergreen'])if(catalog.has(key)){const entry=catalog.get(key);entry.parts=shrubSpecies[0].parts;entry.shrub=o=>sageFormOf(o.id,o.scale[1]);}
+    shrubSpecies.forEach((sp,i)=>{asset('bush/'+sp.name.replace('_','-'),sp.label,sp.parts,[sp.defaultHeight,sp.defaultHeight,sp.defaultHeight]);catalog.get('bush/'+sp.name.replace('_','-')).shrub=()=>i;});
+  }
+  landscapeCatalog=catalog;
   // Dense sage on the dry slope and at road edges and foundations, and small pale rocks across the hillside; new ids, invented placements.
   {const k=rng(7719),free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25;
    if(propertyNature.models.sage.length){const put=(n,x,z,s)=>{if(free(x,z))base.push(row('sage2:'+n,'bush/sage',{x,z,r:k()*6.283,tint:.88+k()*.24},[s*(.9+k()*.3),s,s*(.9+k()*.3)]));};
@@ -1268,16 +1289,16 @@ const landscapeReady=(async()=>{
   const bridge={heightAt,
     apply(records,authored){
       if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();propertyNature.detachProps();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
-      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);buildTreesFrom(+$('treeN').value);
+      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);buildTreesFrom(+$('treeN').value);buildShrubs();
     },
     hide(id){
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
-      forest?.setHidden(id);
+      forest?.setHidden(id);shrubForest?.setHidden(id);
     },
     terrainChanged(){propertyNature.reanchor();meadow.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
-    visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
+    visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[]),...(shrubForest?landscapeRecords.filter(o=>landscapeCatalog.get(o.asset)?.shrub).map(o=>o.id):[])]);},
   };
   const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
     enter(){endDrive({preserveView:true});dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();setPanel(false);},
@@ -1320,7 +1341,7 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   photoMatch.applyRoll();
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);
   landscapeLayer?.update(cam);
-  if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
+  if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);shrubForest?.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
   tickWind(dt);updateTreeShadows();cloudSky.update(cam,dt);
   const v=new THREE.Vector3(0,0,-1).project(cam);
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
