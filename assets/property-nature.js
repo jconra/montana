@@ -203,9 +203,10 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  // Ground clutter measured on the May mosaic and by rays from solved frames.
  [[tarp(0x4a9fd0,3,1.2),-6.6,33.5,-.42,'tarp-blue','Blue tarp'],[tarp(0xa89e8e,2,1.4),-9.7,35,-.3,'tarp-pale','Pale tarp'],[tarp(0x3f7fb0,3.6,.8),-7.1,35.9,-.05,'tarp-dark','Blue tarp, folded'],
   [lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
-  [board(3.5,.1),-3.5,-2.1,.05,'pole-entry','Pole by the entry'],[board(2.8,.1,0x8b7355),-3.7,.05,0,'pole-entry-2','Pole by the entry'],
-  [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
+    [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
+ // The two pale poles by the entry, measured on the drone mosaic. They lie along the slope: a straight piece levelled at its middle would dip under the ground and show as dashes.
+ [[2.9,.065,-3.45,-2.05,.05,'pole-entry'],[4.7,.06,-4.55,.2,0,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]);mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);g.children.forEach(m=>{m.position.y=r*.9+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});
  place(rootCellar(),{x:-7.28,z:-4.67},.03,'prop:root-cellar','Root cellar door');
  {const g=cellarTimbers(),p=place(g,{x:-7,z:-6},0,'prop:cellar-timbers','Old timbers');g.position.y=125.3;props.at(-1).baseY=125.3;}
  {const g=new THREE.Group();log(g,2.8,.13,[0,.12,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x:-27.5,z:17.5},.97,'prop:log-west','Downed log');}
@@ -219,11 +220,11 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  const waterMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:wind},vertexShader:'varying vec3 waterWorld;void main(){waterWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(waterWorld,1.);}',fragmentShader:`uniform float time;varying vec3 waterWorld;
  void main(){vec2 p=waterWorld.xz;vec2 ripple=vec2(sin(p.x*2.1+p.y*.83+time*.9)+sin(p.x*.7-p.y*2.4-time*.65),cos(p.y*1.8+p.x*.6+time*.7))*.025;
  vec3 normal=normalize(vec3(ripple.x,1.,ripple.y)),viewDir=normalize(cameraPosition-waterWorld);
- float fresnel=pow(1.-max(dot(normal,viewDir),0.),3.);vec3 color=mix(vec3(.075,.14,.10),vec3(.36,.51,.60),.12+fresnel*.68);
+ float fresnel=pow(1.-max(dot(normal,viewDir),0.),3.);vec3 reflectDir=reflect(-viewDir,normal);vec3 sky=mix(vec3(.72,.76,.74),vec3(.2,.38,.62),smoothstep(.02,.6,reflectDir.y));vec3 color=mix(vec3(.018,.05,.038),sky,.1+fresnel*.82);
  float ripples=.55*sin(p.x*16.7+p.y*4.1+sin(p.y*.63+time*.12)*1.7+time*1.5)+.3*sin(p.x*24.3+p.y*5.9+sin(p.x*.21)*2.-time*.9);
  color+=vec3(.006,.009,.010)*ripples;
  float glint=pow(max(dot(reflect(normalize(vec3(1.,-1.3,.6)),normal),viewDir),0.),100.);color+=vec3(.30,.29,.22)*glint;
- gl_FragColor=vec4(color,.88);
+ gl_FragColor=vec4(color,.94);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  }`});

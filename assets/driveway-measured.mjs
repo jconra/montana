@@ -3,9 +3,9 @@
 import {polygonDistance,smooth} from './property-layout.mjs';
 const pts=a=>a.map(([x,z])=>({x,z}));
 // Packed dirt: garage apron, the tight Y, the short arm toward camp fading out, and the strip to the entry room.
-export const DIRT_OUTLINE=pts([[-24,-8.4],[-20.5,-7.4],[-17.5,-5.6],[-14.5,-3.4],[-11.5,-1.9],[-8,-1.6],[-2.5,-1.6],[-2,.1],[-6.25,.9],[-3,2.6],[0,3.7],[0,6.4],[-3,6],[-6.25,5.6],[-10,5],[-12.5,5.1],[-14.7,6.25],[-15,9],[-14.4,11.25],[-13.6,13.75],[-15,16],[-17,18],[-20.6,19.5],[-22.8,18.75],[-22.2,15.6],[-21.6,12.5],[-20.6,8.75],[-19.4,5.6],[-18.75,3.4],[-20,1.25],[-23,0],[-26.25,-.6],[-28.4,-2.2]]);
-// Centre of the two-track, gate side first; ends on the apron.
-export const DRIVE_LINE=pts([[123.5,-36.3],[119,-32.5],[110,-28.8],[101,-26.5],[92,-21.3],[83,-14.5],[74,-9.3],[65,-4],[50,-.1],[40,1.2],[28.1,3.3],[18.75,4.5],[12.5,5.3],[6.25,5.7],[0,5.1],[-5,3.6],[-10,2.2],[-15,.5],[-20,-2.5],[-24,-5.5]]);
+export const DIRT_OUTLINE=pts([[-2.2,-1.7],[-8,-2.2],[-12,-3.5],[-15,-5.5],[-18,-7.5],[-20,-7],[-21,-4],[-21.8,-2],[-22.4,0.5],[-21,1.8],[-19.9,3.5],[-20.2,5.5],[-21,8],[-21.6,11],[-22.3,14],[-23,17.5],[-21.5,19.5],[-18,19],[-15.8,17.5],[-14.2,15],[-14.7,12],[-15,9.5],[-14.6,7.2],[-13,5.6],[-9,5],[-5,5.2],[0,5.9],[3,6.4],[3,3.7],[-1,3.2],[-4,2.2],[-6.5,0.6],[-2.5,0.4]]);
+// Centre of the two-track, gate side first, read from 390 solved July 2022 frames on LiDAR ground (every 3 m; a few stretches behind trees interpolated); ends on the apron.
+export const DRIVE_LINE=pts([[98.8,-101.7],[101.0,-99.6],[103.3,-97.6],[105.5,-95.5],[107.6,-93.4],[109.6,-91.1],[111.5,-88.9],[113.4,-86.8],[115.5,-84.8],[117.7,-82.7],[120.0,-80.7],[122.5,-78.7],[125.0,-76.2],[127.2,-73.2],[128.5,-69.9],[129.5,-66.8],[129.9,-63.4],[130.1,-60.4],[130.2,-57.4],[130.2,-54.2],[129.9,-50.8],[129.2,-47.7],[128.5,-44.6],[127.3,-41.5],[125.7,-38.8],[123.9,-36.1],[121.2,-34.5],[118.7,-33.0],[115.8,-32.3],[112.9,-31.4],[110.2,-30.5],[107.3,-30.0],[104.4,-29.5],[101.2,-28.9],[98.2,-27.6],[95.5,-26.1],[92.9,-24.5],[90.3,-22.7],[88.0,-20.7],[85.7,-18.7],[83.4,-16.9],[81.0,-15.2],[78.5,-13.6],[76.0,-12.1],[73.4,-10.6],[70.8,-9.1],[68.1,-7.6],[65.6,-6.2],[63.0,-5.2],[60.2,-4.6],[57.3,-4.0],[54.4,-3.3],[51.5,-2.7],[48.7,-2.2],[45.8,-1.8],[42.8,-1.2],[39.8,-0.7],[36.9,0.1],[33.9,0.7],[31.0,1.3],[28.1,1.8],[25.1,2.1],[22.1,2.5],[19.2,3.0],[16.2,3.5],[13.3,4.0],[10.4,4.4],[7.4,4.8],[4.5,4.9],[1.5,4.8],[-1.4,4.4],[-4.3,3.6],[-7.2,2.8],[-10.1,2.0],[-12.9,0.9],[-15.5,-0.3],[-18.0,-2.0],[-20.3,-3.8],[-22.7,-5.6]]);
 // Beyond the frames the old line was traced on the aerial, which sits about 4.5 m north of LiDAR along the whole measured part.
 export const AERIAL_ROAD_SHIFT=4.5;
 export const TRACK_OFFSET=.72;      // each wheel track from the centre
@@ -21,16 +21,15 @@ export const RUTS=[
  [[-18,-3.5],[-15.5,-2.6],[-12.6,-2.2],[-9.5,-.4]],
 ].map(pts);
 export function correctedDriveway(points){
- const join=points.findIndex(p=>Math.abs(p.x-126.1)<.01&&Math.abs(p.z+43.1)<.01);
- const head=join<0?[]:points.slice(0,join+1).map(p=>({x:p.x,z:p.z+AERIAL_ROAD_SHIFT}));
+ const head=points.map(p=>({x:p.x,z:p.z+AERIAL_ROAD_SHIFT})).filter(p=>p.z<DRIVE_LINE[0].z-4);
  return [...head,...DRIVE_LINE];
 }
 function lineDistance(x,z,line){let best=Infinity;for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz)));best=Math.min(best,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));}return best;}
-export const dirtCoverage=(x,z)=>x<-30||x>2||z<-10||z>21?0:smooth(-.35,.35,polygonDistance(x,z,DIRT_OUTLINE));
+export const dirtCoverage=(x,z)=>x<-30||x>4||z<-10||z>21?0:smooth(-.35,.35,polygonDistance(x,z,DIRT_OUTLINE));
 // 0..1: is this spot bare drive? Plants use it to stay off the wheel tracks; the short grass strip between them stays.
 export function roadCoverage(x,z){
  const dirt=dirtCoverage(x,z);if(dirt>=1||x<-30)return dirt;
- if(x>128||z<-60)return 0;
+ if(x>136||z<-107)return 0;
  const d=lineDistance(x,z,DRIVE_LINE);
  return Math.max(dirt,(1-smooth(TRACK_OFFSET+.3,TRACK_OFFSET+.55,d))*smooth(TRACK_OFFSET-.45,TRACK_OFFSET-.25,d));
 }
