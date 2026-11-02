@@ -304,6 +304,7 @@ export class Forest {
               sh.fragmentShader = 'uniform vec2 coverTexels; uniform float coverMip, coverFar;\n' + sh.fragmentShader.replace('#include <alphatest_fragment>', COVER_ALPHA).replace('#include <opaque_fragment>', COVER_OUT); }
           };
           mat.alphaToCoverage = cover;
+          if (cover) mat.extensions = { ...(mat.extensions || {}), derivatives: true };   // (WebGL1 needs asking; without it the leaf edge falls back to the plain clip)
           mat.customProgramCacheKey = () => 'forest-mesh' + (sp.spec ?? '') + (sp.upNormals ? '-up2' : '') + (sp.soften ? '-s' + sp.soften : '') + (sp.shape ? '-shape' : '') + (leafy ? `-leaf${under}-${glow}` : '') + (cover ? '-cover' : ''); mat.needsUpdate = true;
           if (this.wind) { m.geometry.computeBoundingBox(); swayMaterial(mat, Math.max(0.001, m.geometry.boundingBox.max.y), sp.sway ?? 1, '-' + (sp.sway ?? 1)); }
         }

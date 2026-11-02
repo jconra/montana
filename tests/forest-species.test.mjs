@@ -30,3 +30,5 @@ const state=new LandscapeState(base,assets,defaults.reference,r=>migrateTreeAsse
 for(const o of rows){const now=state.get(o.id);assert.ok(now,o.id);assert.deepEqual({...now,asset:0},{...o,asset:0},o.id);assert.ok(!LEGACY_TREE_ASSETS.has(now.asset),o.id);}
 assert.ok(state.export().objects.overrides.length===defaults.objects.overrides.length);
 console.log('Tree kinds, aspen stands, saved id migration and hand edits passed');
+// The first six kinds keep their places: saved lists and sp indices depend on the order.
+assert.deepEqual(TREE_KINDS.slice(0,6),['fir','spruce','fir_small','juniper','aspen','open_fir']);
