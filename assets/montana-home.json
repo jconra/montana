@@ -464,7 +464,8 @@
       "style": "gable",
       "pitch": 0.5,
       "raiseWalls": true,
-      "mat": 4
+      "mat": 4,
+      "flipRidge": true
     },
     {
       "x": 26.5,
