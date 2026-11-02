@@ -131,6 +131,7 @@
 <script type="module">
 import {correctedDriveway} from './assets/driveway-refinements.mjs';
 import {shadowSettings,fadeShadowEdges} from './assets/tree-shadows.mjs';
+import {weatherBuilding,setWeatherQuality} from './assets/building-weather.mjs';
 import * as THREE from 'three';
 // Keep the existing authored colors while upgrading the runtime.
 THREE.ColorManagement.enabled=false;
@@ -143,7 +144,7 @@ import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
-import { buildHouse } from './assets/house-model.js?v=41';
+import { buildHouse } from './assets/house-model.js?v=42';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
 import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
@@ -457,8 +458,9 @@ function makeCabin(){
   const g=new THREE.Group(),F=FT;
   const X0=-15.6,X1=13,WF=8,DF=14,DECK=5.6,EAVE=13.3,RIDGE=17.4,PITCH=.5,HW=7;
   const mapped=(hex,pattern)=>{const m=new THREE.MeshLambertMaterial({color:hex});const t=cabinTexture(pattern);m.map=t;return m;};
-  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x141319,'rib'),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x7d6238,.85),logPale=MAT(0x6e6556,1),
-        post=MAT(0x634a2c,.9),rail=MAT(0x4a3b29,1),railTop=MAT(0x564733,1),deckRed=mapped(0x571a1c,'deck'),deckGrey=mapped(0x6b5a46,'deck'),rim=MAT(0x463722,1),
+  const tag=(m,kind,wear,horiz)=>{m.userData.wx={kind,wear,horiz};return m;};
+  const side=tag(mapped(0x9c7a3e,'board'),'vboard'),roof=tag(mapped(0x141319,'rib'),'roofV'),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=tag(MAT(0x7d6238,.85),'rail',.22,true),logPale=tag(MAT(0x6e6556,1),'rail',.3,true),
+        post=tag(MAT(0x634a2c,.9),'rail',.28),rail=tag(MAT(0x6a5638,1),'rail',.42),railTop=tag(MAT(0x8a7858,1),'rail',.55,true),deckRed=tag(mapped(0x571a1c,'deck'),'deck'),deckGrey=tag(mapped(0x6b5a46,'deck'),'deck'),rim=tag(MAT(0x463722,1),'rail',.42,true),
         red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x26262a,1),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
         white=MAT(0xe6e2d6),blue=MAT(0x4e93b0),dark=MAT(0x1c2024);
   const B=(w,h,d,x,y,z,mat)=>box(g,w*F,h*F,d*F,x*F,y*F,z*F,mat);
@@ -478,7 +480,7 @@ function makeCabin(){
     const U=[[za,0],[za,len],[zb,len],[zb,0]];for(const i of [0,1,2,0,2,3,0,2,1,0,3,2]){pos.push(q[i][0]*F,q[i][1]*F+.04,q[i][2]*F);uv.push(U[i][0]/6,U[i][1]/6);}
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
   slope(1,0,run,RIDGE,RIDGE-fall,zB,zF);slope(-1,0,-run,RIDGE,RIDGE-fall,zB,zF);
-  B(.8,.14,zF-zB,0,RIDGE+.05,(zB+zF)/2,fascia);
+  B(.7,.1,zF-zB,0,RIDGE+.02,(zB+zF)/2,roof);
   // low porch roof: nearly flat from the south eave out past the deck
   const pY=RIDGE-fall,pX=-16.8,pY1=12.7;
   const pB=WF-4.2,pF=zF;                       // runs back into the valley beside the main roof; front edge continues the gable
@@ -566,11 +568,11 @@ function optimizeGroup(g){
 }
 let sel=null;   // last-placed structure, driven live by heading/size sliders
 function placeStructure(type,x,z,heading,scale){
-  const g=BUILD[type](); optimizeGroup(g); g.position.set(x,heightAt(x,z),z);
+  const g=BUILD[type](); optimizeGroup(g); weatherBuilding(THREE,g,type); g.position.set(x,heightAt(x,z),z);
   const rot=heading!==undefined?heading:+document.getElementById('head').value;
   const sc =scale  !==undefined?scale  :+document.getElementById('size').value;
   g.rotation.y=THREE.MathUtils.degToRad(rot); g.scale.setScalar(sc);
-  g.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;for(const m of (Array.isArray(o.material)?o.material:[o.material]))prepareShadowMaterial(m);}});
+  g.traverse(o=>{if(o.isMesh){o.castShadow=!o.material.userData?.noShadow;o.receiveShadow=true;for(const m of (Array.isArray(o.material)?o.material:[o.material]))prepareShadowMaterial(m);}});
   scene.add(g); const rec={group:g,x,z,type}; placed.push(rec); sel=rec; syncStructureSelect(); selectRec(rec); return rec;
 }
 // real placements from your layout (E,N,heading,scale); z = -N
@@ -1175,7 +1177,7 @@ function updateTreeShadows(){
 try{const mode=localStorage.getItem('montanaShadowQuality');if(['auto','off','2','3','4'].includes(mode))$('shadowQuality').value=mode;}catch(e){}
 $('shadowQuality').onchange=()=>{configureShadows();try{localStorage.setItem('montanaShadowQuality',$('shadowQuality').value);}catch(e){}};
 function applyQuality(level){
-  qualityLevel=level;const q=QUALITY_LEVELS[level];configureShadows();
+  qualityLevel=level;const q=QUALITY_LEVELS[level];configureShadows();setWeatherQuality(level);
   propertyNature.setQuality(level,q.density);meadow.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;

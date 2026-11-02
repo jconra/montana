@@ -12,7 +12,7 @@ import {clipRoofPolygon,roofOpeningPolygon,roofPanelGeometry} from './roof-panel
 // mats/mat are indices into palette. Wall groups & roof carry userData.surf for face-painting.
 // Legacy {blocks:[...]} and older {floors:[{shell}]} specs are auto-converted.
 
-export const VERSION = '41';   // shared with building-designer
+export const VERSION = '42';   // shared with building-designer
 
 // ---------- procedural surface textures ----------------------------------------------------------
 // Each pattern is a tileable GRAYSCALE luminance map; the swatch colour tints it (material.color
@@ -128,7 +128,7 @@ export function buildHouse(THREE, spec, opts){
     const key='T|'+hex+'|'+tex+'|'+(mode||'face'); if(matCache[key]) return matCache[key];
     const metal=(tex==='metal'),matte=(tex==='seam'||tex==='rib'||tex==='siding'||tex==='sidingw'||tex==='vboard');   // no specular term: a low sun turned these pale
     const m=matte?new THREE.MeshLambertMaterial({color:hex,side:THREE.DoubleSide}):new THREE.MeshStandardMaterial({color:hex,roughness:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
-    m.map=makeMap(THREE,tex,mode||'face'); matCache[key]=m; return m; };
+    m.map=makeMap(THREE,tex,mode||'face'); m.userData.wx=tex==='rib'||tex==='seam'?{kind:'roof'}:tex==='sidingw'?{kind:'hsiding',board:.3048}:tex==='siding'?{kind:'hsiding',board:.2032}:tex==='vboard'?{kind:'vboard'}:undefined; matCache[key]=m; return m; };
   const dormerCuts=[];
   const M=(v)=> (v&&v.isMaterial)?v:solid(v);                        // accept a material OR a hex colour
   const WALL_T=0.5;                                                  // wall thickness (~6", units = feet)
@@ -139,6 +139,11 @@ export function buildHouse(THREE, spec, opts){
   const glassMat=new THREE.MeshStandardMaterial({color:0x141a20,roughness:.25,metalness:.1,flatShading:true,transparent:true,opacity:.86});
   const doorMat=new THREE.MeshStandardMaterial({color:0x3a2c1e,roughness:.9,flatShading:true});
 
+  const streakMat=()=>{if(matCache.__streak)return matCache.__streak;
+    const c=document.createElement('canvas');c.width=128;c.height=64;const x=c.getContext('2d');let seed=98765;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+    for(let i=0;i<34;i++){const px=rnd()*128,w=1+rnd()*5,l=18+rnd()*46,grad=x.createLinearGradient(0,0,0,l);grad.addColorStop(0,`rgba(0,0,0,${.1+rnd()*.3})`);grad.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=grad;x.fillRect(px,0,w,l);}
+    const tx=new THREE.CanvasTexture(c);if('SRGBColorSpace'in THREE)tx.colorSpace=THREE.SRGBColorSpace;
+    const m=new THREE.MeshBasicMaterial({map:tx,transparent:true,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1});m.userData.noShadow=true;return matCache.__streak=m;};
   const mesh=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;};
   const box=(w,h,d,x,y,z,mat)=>mesh(new THREE.BoxGeometry(w,h,d),mat,x,y,z);
   const addTris=(verts,mat)=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
@@ -204,7 +209,13 @@ export function buildHouse(THREE, spec, opts){
           for(let r=1;r<rws;r++){const b=new THREE.Mesh(new THREE.BoxGeometry(gw,.06,.24),mull);b.position.set(lw/2,-lh/2+gy0+gh*r/rws,0);leaf.add(b);}
         }
         leaf.rotation.y=o.closed?0:-1.9; wg.add(leaf);
-      } else {                                                 // window: thin glass, sized JUST inside the frame opening and split around the mullion -> never intersects the frame
+      } else {
+        if(spec.windowStreaks!==false&&o.y0>1){                 // faint run marks below the sill
+          const sh=Math.min(1.7,o.y0-.05),sillDrop=o.casing!=null?(o.casingW??.45):FRAME_W;
+          const quad=new THREE.PlaneGeometry(o.b-o.a+FRAME_W,sh);
+          for(const zz of [t/2+.03,-t/2-.03]){const q=new THREE.Mesh(quad,streakMat());q.position.set((o.a+o.b)/2,o.y0-sillDrop-sh/2,zz);wg.add(q);}
+        }
+        // window: thin glass, sized JUST inside the frame opening and split around the mullion -> never intersects the frame
         const gi=0.09, gy0=o.y0+gi, gy1=o.y1-gi;
         const pane=(xa,xb)=>{ const gw=xb-xa, gh=gy1-gy0; if(gw>0.05&&gh>0.05){ const gm=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,0.05),glassMat); gm.position.set((xa+xb)/2,(gy0+gy1)/2,0); wg.add(gm); } };
         if(winFrames){ const mw=FRAME_W*0.55, W=o.b-o.a;
