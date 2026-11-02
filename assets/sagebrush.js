@@ -4,7 +4,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 // Keep the supplied Blender asset intact. Bake its object transforms once so
 // branches and leaf cards can share each shrub's instancing transform.
 export function loadSagebrush(){return loadBushModel('./models/sage.glb?v=c4f739d5','sagebrush');}
-export function loadBigBush(){return loadBushModel('./models/big-bush.glb','big-bush');}
+export function loadBigBush(){return loadBushModel('./models/big-bush.glb?v=bb3','big-bush');}
 async function loadBushModel(file,name){
  const {scene}=await new GLTFLoader().loadAsync(new URL(file,import.meta.url).href);
  scene.updateMatrixWorld(true);

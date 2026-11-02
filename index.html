@@ -131,7 +131,6 @@
 <script type="module">
 import {correctedDriveway} from './assets/driveway-refinements.mjs';
 import {shadowSettings,fadeShadowEdges} from './assets/tree-shadows.mjs';
-import {lodOffset,meshCoverage,approachCoverage,shadeCanopy} from './assets/tree-lod.mjs';
 import * as THREE from 'three';
 // Keep the existing authored colors while upgrading the runtime.
 THREE.ColorManagement.enabled=false;
@@ -145,7 +144,11 @@ import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=40';
-import {loadBigBush} from './assets/sagebrush.js?v=big-bush-1';
+import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
+import {Forest} from './assets/forest/forest.js';
+import {tickWind} from './assets/forest/wind.js';
+import {buildTreeSpecies} from './assets/forest/species.js';
+import {TREE_KINDS,ASPEN_STANDS,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createToolDock} from './assets/tool-dock.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
@@ -621,111 +624,29 @@ const pineFoliageGeo=(()=>{
 })();
 const pineFoliageMat=new THREE.MeshStandardMaterial({map:branchTex(),alphaTest:0.42,side:THREE.DoubleSide,roughness:1,metalness:0});
 function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65*65) return true; } return false; }
-// ---- photoreal ez-pines (baked from ez-tree → trees/*.json). Near = detailed (alpha-fade); far = billboard impostor ----
+// ---- the forest: tree kinds drawn near as meshes and far as octahedral imposters (assets/forest) ----
 let treeAssetsSettled=false,lidarSettled=false;
-let ezPines=null;      // [{name, bark:Geo, leaf:Geo, barkMat, leafMat}]; null until loaded
-let ezImpostor=null;   // {mat} — shared atlas with matching multi-view images for each model
-let impCamU=null, impHU=null, impYU=null;   // impostor shader uniforms: camera pos (per-frame facing) + size + y-offset (sliders)
-// LOD cross-fade band (m from camera): detailed dissolves OUT and billboard dissolves IN across F0→F1
-const _IGN='float _ign(vec2 p){return fract(52.9829189*fract(dot(p,vec2(0.06711056,0.00583715))));}';
-function addDitherFadeOut(mat){
-  mat.onBeforeCompile=sh=>{
-    sh.vertexShader='attribute float aCoverage;varying float vCoverage;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvCoverage=aCoverage;');
-    sh.fragmentShader='varying float vCoverage;\n'+_IGN+'\n'+sh.fragmentShader.replace('void main() {','void main() {\nif(_ign(gl_FragCoord.xy)>=vCoverage) discard;');
-  };
-  // Editor previews are non-instanced and should remain fully visible.
-  mat.defaultAttributeValues={...mat.defaultAttributeValues,aCoverage:[1]};
+let LOD_DIST=95;        // trees within this many m of the camera may be meshes
+let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
+let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9;
+const WEBGL2=renderer.capabilities.isWebGL2;
+function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});}
+function treeTint(kind,id,tint){
+  const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
+  // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
+  return kind==='aspen'?new THREE.Color(tint*(.84+.3*a),tint*(.94+.1*b),tint*(.78+.3*c)):new THREE.Color(tint*(.88+.2*a),tint*(.92+.14*b),tint*(.86+.26*c));
 }
 const treeAssetsReady=(async()=>{
   try{
-    const man=await (await fetch('./assets/trees/manifest.json?v=7')).json();
-    const tl=new THREE.TextureLoader(), texCache={};
-    const T=(u,srgb,noMip)=>{ const key=u+(noMip?'#nm':''); if(texCache[key]) return texCache[key];
-      const t=tl.load('./assets/trees/'+u); t.wrapS=t.wrapT=THREE.RepeatWrapping; if(srgb)t.colorSpace=THREE.SRGBColorSpace;
-      if(noMip){ t.generateMipmaps=false; t.minFilter=THREE.LinearFilter; }          // alpha-fade fix: no mip alpha shrink
-      t.anisotropy=8; texCache[key]=t; return t; };
-    const dec=(s)=>{const bin=atob(s);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;};
-    const f32=(s)=>new Float32Array(dec(s)), u32=(s)=>new Uint32Array(dec(s));
-    const mkGeo=(p)=>{const g=new THREE.BufferGeometry();
-      g.setAttribute('position',new THREE.BufferAttribute(f32(p.position),3));
-      g.setAttribute('normal',new THREE.BufferAttribute(f32(p.normal),3));
-      const uv=f32(p.uv); g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.setAttribute('uv2',new THREE.BufferAttribute(uv,2));
-      if(p.index) g.setIndex(new THREE.BufferAttribute(u32(p.index),1)); return g;};
-    const loaded=[];
-    for(const v of man.variants){ if(v.role==='mid'||v.role==='far') continue;      // skip the geo-LOD experiments; we use impostors for far
-      const d=await (await fetch('./assets/trees/'+v.file+'?v=7')).json(); const x=v.tex;
-      const barkMat=new THREE.MeshStandardMaterial({map:T(x.barkColor,true),normalMap:T(x.barkNormal),roughnessMap:T(x.barkRough),aoMap:T(x.barkAO),roughness:1,metalness:0});
-      const leafMat=new THREE.MeshStandardMaterial({map:T(x.leaf,true),alphaTest:v.alphaTest??0.4,side:THREE.DoubleSide,roughness:1,metalness:0});
-      leafMat.alphaToCoverage=true;   // MSAA-smoothed cutout: keeps needles from harshly vanishing, no mip-off shimmer
-      barkMat.vertexColors=leafMat.vertexColors=true; addDitherFadeOut(barkMat); addDitherFadeOut(leafMat);   // dissolve out as they approach the LOD hand-off
-      loaded.push({name:v.name, bark:shadeCanopy(THREE,mkGeo(d.branches)), leaf:shadeCanopy(THREE,mkGeo(d.leaves)), barkMat, leafMat}); }
-    const impMeta=await (await fetch('./assets/trees/tex/impostor_variants.json?v=canopy-occlusion-v1')).json();
-    for(const v of loaded){v.impostor=impMeta.frames[v.name];if(!v.impostor)throw new Error('Missing impostor for '+v.name);}
-    ezPines=loaded;
-    // Multi-view GPU billboard: model and rotation choose the atlas frame; fades against its matching mesh.
-    const impTex=await tl.loadAsync('./assets/trees/tex/'+impMeta.atlas+'?v='+encodeURIComponent(impMeta.lighting||impMeta.version));impTex.colorSpace=THREE.SRGBColorSpace;impTex.anisotropy=8;
-    const impMat=new THREE.MeshBasicMaterial({map:impTex,alphaTest:0.3,alphaToCoverage:true,side:THREE.DoubleSide,fog:true});
-    // Atlas already contains the main scene lighting; do not darken it again.
-    impMat.onBeforeCompile=(sh)=>{
-      sh.uniforms.uAtlas={value:new THREE.Vector3(impMeta.pixelsPerView/impMeta.size,impMeta.columns,impMeta.azimuthViews)};
-      sh.uniforms.uCam={value:new THREE.Vector3()}; impCamU=sh.uniforms.uCam;   // MeshBasicMaterial doesn't auto-refresh cameraPosition → feed it ourselves each frame
-      sh.uniforms.uHScale={value:1.0}; sh.uniforms.uYOff={value:0.0}; impHU=sh.uniforms.uHScale; impYU=sh.uniforms.uYOff;   // live billboard size + vertical offset (sliders)
-      sh.vertexShader=('uniform vec3 uAtlas;\nattribute vec2 aImpostorData;\nattribute float aDetail;\nuniform vec3 uCam;\nuniform float uHScale;\nuniform float uYOff;\nvarying float vDist;\nvarying float vDet;\n'+sh.vertexShader).replace('#include <project_vertex>', `
-        vec3 iC=(modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0)).xyz;
-        float sX=length(instanceMatrix[0].xyz), sY=length(instanceMatrix[1].xyz);
-        vec3 dir=normalize(uCam-iC);
-        vec3 horizontal=vec3(dir.x,0.0,dir.z);
-        if(length(horizontal)<0.0001)horizontal=vec3(0.0,0.0,1.0);
-        float yaw=atan(horizontal.x,horizontal.z)-aImpostorData.y;
-        float azimuth=mod(floor(yaw/6.28318530718*uAtlas.z+0.5),uAtlas.z);
-        float pitch=atan(dir.y,length(dir.xz));
-        float elevation=pitch>1.134464?2.0:(pitch>0.392699?1.0:0.0);
-        float frame=aImpostorData.x+elevation*uAtlas.z+azimuth;
-        #ifdef USE_MAP
-        vMapUv=vec2(mod(frame,uAtlas.y)*uAtlas.x,1.0-(floor(frame/uAtlas.y)+1.0)*uAtlas.x)+uv*uAtlas.x;
-        #endif
-        vec3 rgt=normalize(cross(vec3(0.0,1.0,0.0),horizontal));
-        vec3 up=normalize(cross(dir,rgt));
-        vec3 wp=iC + rgt*(position.x*sX*uHScale) + up*(position.y*sY*uHScale)+vec3(0.0,uYOff*sY,0.0);
-        vec4 mvPosition=viewMatrix*vec4(wp,1.0);
-        gl_Position=projectionMatrix*mvPosition; vDist=length(uCam-iC); vDet=aDetail;`);
-      sh.fragmentShader=('varying float vDist;\nvarying float vDet;\n'+_IGN+'\n'+sh.fragmentShader).replace('void main() {',
-        'void main() {\n  if(_ign(gl_FragCoord.xy)<vDet) discard;');   // complement of the detailed dissolve
-    };
-    ezImpostor={ mat:impMat };
-    if(trees.length) buildTreeMesh();                 // rebuild now that the photoreal pines are ready
-  }catch(e){ console.warn('ez-pines load failed, using fallback pine',e); }finally{treeAssetsSettled=true;}
+    treeSpecies=await buildTreeSpecies();
+    // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
+    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:120,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
+      sunDir:new THREE.Vector3(-1,1.3,-.6).normalize(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
+    if(treeBudget)forest.setBudget(treeBudget);
+    await forest.loaded;
+    if(trees.length)buildTreeMesh();
+  }catch(e){console.warn('Forest could not load, using the basic trees',e);forest=null;treeAssetsSettled=true;}
 })();
-const _impGeo=new THREE.PlaneGeometry(1,1);   // centered, fully camera-facing multi-view billboard
-const _UP=new THREE.Vector3(0,1,0), _XAX=new THREE.Vector3(1,0,0), _q=new THREE.Quaternion();
-const _zeroMat=new THREE.Matrix4().makeScale(0,0,0);            // collapse a hidden impostor instance
-function impMatrix(t){if(t.id===landscapeHidden)return _zeroMat;const h=t.h||10,frame=ezPines[t.variant].impostor;_o.position.set(t.x,t.gy+h*frame.centerY,t.z);_o.quaternion.identity();_o.scale.set(h*frame.span,h*frame.span,1);_o.updateMatrix();return _o.matrix;}
-function detailTreeMatrix(t){
-  if(t.id===landscapeHidden)return _zeroMat;
-  _o.position.set(t.x,t.gy!=null?t.gy:heightAt(t.x,t.z),t.z);
-  if(t.editorRotation)_o.rotation.set(...t.editorRotation);
-  else{_o.quaternion.setFromAxisAngle(_UP,t.r);if(t.lean){_q.setFromAxisAngle(_XAX,t.lean);_o.quaternion.premultiply(_q);}}
-  if(t.editorScale)_o.scale.set(...t.editorScale);else _o.scale.setScalar(t.h||t.s*6.4);
-  _o.updateMatrix();return _o.matrix;
-}
-// build one detailed InstancedMesh (bark or leaf) over a list; returns {im,list} (does NOT track in treeMeshes)
-function mkInstEz(geo,mat,list,capacity=list.length){
-  const im=new THREE.InstancedMesh(geo.clone(),mat,capacity);im.count=list.length;
-  for(let i=0;i<list.length;i++){const t=list[i];
-    im.setMatrixAt(i,detailTreeMatrix(t)); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
-  im.castShadow=im.receiveShadow=true;prepareShadowMaterial(mat);
-  im.customDepthMaterial=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking,map:mat.map,alphaTest:mat.alphaTest,side:THREE.DoubleSide});
-  addDitherFadeOut(im.customDepthMaterial);
-  im.geometry.setAttribute('aCoverage' ,new THREE.InstancedBufferAttribute(new Float32Array(capacity).map((_,i)=>list[i]?.coverage??1),1));
-  scene.add(im); return {im,list,capacity};
-}
-// pick a pine variant by real height: tall→pine_large, short→bushy (aspens are placed as groves, not here)
-function ezVariantFor(t){
-  const n=ezPines.map(v=>v.name), iL=n.indexOf('pine_large'), iB=n.indexOf('pine_bush');
-  const r=((t.id*2654435761)>>>0)/4294967296, h=t.h||10;
-  const idx = (h<=9) ? iB : (h>=16 ? iL : (r<0.5 ? iB : iL));
-  return (idx>=0 && idx<ezPines.length) ? idx : (t.id % ezPines.length);
-}
 // aspen groves (small, north-leaning, green) at the two spots he marked — scene coords x=E, z=-N
 const ASPEN_GROVES=[[-39.8, 10.8],[-6.1, 43.8]];
 // distance from a point to the driveway polyline (routePts), for zoning trees along the drive
@@ -745,7 +666,7 @@ function buildTreesFrom(n){
     const all=landscapeRecords.filter(o=>o.asset.startsWith('tree/')),lidar=all.filter(o=>o.id.startsWith('lidar:'));
     const count=Math.min(lidar.length,Math.round(lidar.length*n/Math.max(1,realXZ.length/3))),chosen=new Set();
     for(let i=0;i<count;i++)chosen.add(lidar[Math.floor(i*lidar.length/count)].id);
-    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],tint:o.tint,editorRotation:o.rotation,editorScale:o.scale}));
+    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,offset:o.offset,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],lean:o.rotation[0],tint:o.tint,wide:(o.scale[0]+o.scale[2])/2/o.scale[1],editorRotation:o.rotation,editorScale:o.scale}));
     buildTreeMesh();return;
   }
   const total=realXZ.length/3; n=Math.min(n,total);
@@ -755,7 +676,7 @@ function buildTreesFrom(n){
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
     if(inBuilding(rx,rz)||polygonDistance(rx,rz)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
-    trees.push({id:idx,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+R()*0.2),r:R()*Math.PI*2,tint:0.8+R()*0.35});}
+    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:1});}
   buildTreeMesh();
 }
 function addInst(geo,mat,list){
@@ -766,106 +687,41 @@ function addInst(geo,mat,list){
     im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
   scene.add(im); treeMeshes.push({im,list});
 }
-const DRIVE_W=20;          // driveway corridor half-width (m) → bushy pines line the drive
-// ---- dynamic camera-distance LOD: detailed pines swap to billboard impostors past LOD_DIST from the camera ----
-let LOD_DIST=95;        // trees within this many m (3D) of the camera get detailed geometry
-let MAX_DETAIL=60;      // hard cap on detailed trees (perf) — keep the nearest ones
-let impMesh=null, impDetailAttr=null;   // persistent impostor InstancedMesh over ALL trees (instance i ↔ trees[i]) + per-instance "has detailed twin" flag
-let detMeshes=[], groveMeshes=[];   // detailed pines (rebuilt on camera move) + aspen groves (always detailed)
-let detailSet=new Set();   // impostor instance indices currently cross-fading with a detailed twin
-function assignVariants(){   // decide each tree's detailed pine type once (driveway→bushy, near-build mix, else by height)
-  const iL=ezPines.findIndex(v=>v.name==='pine_large'), iB=ezPines.findIndex(v=>v.name==='pine_bush');
-  for(const t of trees){ const nb=isNearBuild(t.x,t.z), h=t.h||0;
-    if(t.asset){t.variant=ezPines.findIndex(v=>v.name===t.asset);continue;}
-    t.variant = (!nb && distDriveway(t.x,t.z)<DRIVE_W) ? (iB>=0?iB:0)
-              : nb ? ezVariantFor(t)
-              : (h<=9 ? (iB>=0?iB:0) : (iL>=0?iL:0));
-    t.lean=0; }
-}
-function buildGroves(){      // aspen groves — small, north-leaning, green; always detailed (few trees, fixed spots)
-  if(landscapeRecords)return; // edited groves use the same matching tree/impostor path
-  const iA=ezPines.findIndex(v=>v.name==='aspen'); if(iA<0) return;
+function buildGroves(){      // aspen groves and stands: planted spots, since bare thin aspens barely show in the LiDAR
+  if(landscapeRecords)return []; // edited groves use the same records as every other tree
   const list=[], g=rng(9001);
   for(const [cx,cz] of ASPEN_GROVES){ const nA=6+((g()*4)|0);
     for(let k=0;k<nA;k++){ const a=g()*6.283, rad=g()*6.2, x=cx+Math.cos(a)*rad, z=cz+Math.sin(a)*rad;
       list.push({x,z,gy:heightAt(x,z),h:4.2+g()*3.4,r:g()*6.283,tint:0.85+g()*0.22,lean:-(0.18+g()*0.12)}); } }
-  const v=ezPines[iA];
-  v.groveBark??=v.barkMat.clone();v.groveLeaf??=v.leafMat.clone();
-  groveMeshes.push(mkInstEz(v.bark,v.groveBark,list), mkInstEz(v.leaf,v.groveLeaf,list));
+  const s=rng(9107);
+  ASPEN_STANDS.forEach((stand,n)=>{for(let k=0,tries=0;k<stand.planted&&tries<400;tries++){
+    const a=s()*6.283,rad=Math.sqrt(s())*stand.r*.8,x=stand.x+Math.cos(a)*rad,z=stand.z+Math.sin(a)*rad;
+    if(inBuilding(x,z)||list.concat(trees).some(t=>(t.x-x)**2+(t.z-z)**2<9))continue;
+    list.push({id:`aspen:${n}:${k}`,x,z,gy:heightAt(x,z),h:stand.hMin+s()*(stand.hMax-stand.hMin),r:s()*6.283,tint:.9+s()*.2,lean:0});k++;}});
+  return list;
 }
+let groveList=[];
 function buildTreeMesh(){
   for(const {im} of treeMeshes){scene.remove(im); im.dispose();} treeMeshes=[];
-  for(const m of detMeshes){scene.remove(m.im); m.im.geometry.dispose();m.im.customDepthMaterial?.dispose(); m.im.dispose();} detMeshes=[];
-  for(const m of groveMeshes){scene.remove(m.im); m.im.geometry.dispose();m.im.customDepthMaterial?.dispose(); m.im.dispose();} groveMeshes=[];
-  if(impMesh){ scene.remove(impMesh);impMesh.geometry.dispose(); impMesh.dispose(); impMesh=null; } detailSet=new Set();
   const S=STYLES[treeStyle];
-  if(!(ezPines && ezPines.length && ezImpostor)){                   // fallback: old near/far split with the hand-made pine
+  if(!forest||!treeSpecies){                   // fallback: old near/far split with the hand-made pine
     const near=[], far=[];
     for(const t of trees) (isNearBuild(t.x,t.z)?near:far).push(t);
     addInst(S.geo,S.mat,far); addInst(treeGeoSpiky,treeMatSpiky,near); addInst(pineFoliageGeo,pineFoliageMat,near);
     return;
   }
-  assignVariants();
-  for(const t of trees){t.coverage=0;t.lodOffset=lodOffset(t.id);}
+  groveList=buildGroves();
+  const fixed=[];
+  for(const t of trees.concat(groveList)){
+    const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
+    fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint)});
+  }
   groundDetail.setTrees(trees);
-  impMesh=new THREE.InstancedMesh(_impGeo.clone(), ezImpostor.mat, trees.length);   // one billboard per tree, always present
-  impMesh.frustumCulled=false;
-  impDetailAttr=new THREE.InstancedBufferAttribute(new Float32Array(trees.length),1);   // shared continuous mesh coverage; billboard uses its complement
-  impMesh.geometry.setAttribute('aDetail',impDetailAttr);
-  const impostorData=new Float32Array(trees.length*2);
-  for(let i=0;i<trees.length;i++)impostorData.set([ezPines[trees[i].variant].impostor.firstFrame,trees[i].r],i*2);
-  impMesh.geometry.setAttribute('aImpostorData',new THREE.InstancedBufferAttribute(impostorData,2));
-  for(let i=0;i<trees.length;i++){ const t=trees[i]; impMesh.setMatrixAt(i,impMatrix(t)); impMesh.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint)); }
-  impMesh.instanceMatrix.needsUpdate=true; if(impMesh.instanceColor) impMesh.instanceColor.needsUpdate=true;
-  scene.add(impMesh);
-  buildGroves();
-  updateTreeLOD(true);
-}
-// Selection is throttled; coverage updates every frame. Departing meshes retain
-// their slot until invisible, so budget changes never force a visible pop.
-let lodTime=0,lodSelectTime=0,lodTargets=new Map();
-function updateTreeLOD(force){
-  if(!impMesh || !ezPines) return;
-  const now=performance.now()/1000,dt=Math.min(.1,now-lodTime);lodTime=now;
-  if(force||now-lodSelectTime>.15){
-    lodSelectTime=now;
-    const candidates=[];
-    for(let i=0;i<trees.length;i++){
-      const t=trees[i],frame=ezPines[t.variant].impostor;
-      const d=Math.hypot(t.x-cam.position.x,t.gy+t.h*frame.centerY-cam.position.y,t.z-cam.position.z);
-      const coverage=meshCoverage(d,LOD_DIST+t.lodOffset);
-      if(coverage>0)candidates.push({i,coverage,rank:d-t.lodOffset-(detailSet.has(i)?5:0)});
-    }
-    candidates.sort((a,b)=>a.rank-b.rank);
-    lodTargets=new Map(candidates.slice(0,MAX_DETAIL).map(c=>[c.i,c.coverage]));
-  }
-  let changed=false;
-  for(const i of detailSet){
-    const t=trees[i];t.coverage=approachCoverage(t.coverage,lodTargets.get(i)||0,dt);
-    if(t.coverage===0&&!lodTargets.has(i)){detailSet.delete(i);changed=true;}
-    impDetailAttr.setX(i,t.coverage);
-  }
-  for(const [i] of lodTargets){
-    if(detailSet.size>=MAX_DETAIL)break;
-    if(!detailSet.has(i)){trees[i].coverage=0;detailSet.add(i);changed=true;}
-  }
-  impDetailAttr.needsUpdate=true;
-  if(changed){
-    const buckets=ezPines.map(()=>[]);
-    for(const i of detailSet)buckets[trees[i].variant].push(trees[i]);
-    ezPines.forEach((v,i)=>{for(const part of ['bark','leaf']){
-      const list=buckets[i];let m=detMeshes.find(m=>m.variant===i&&m.part===part);
-      if(m&&m.capacity<list.length){scene.remove(m.im);m.im.geometry.dispose();m.im.customDepthMaterial?.dispose();m.im.dispose();detMeshes.splice(detMeshes.indexOf(m),1);m=null;}
-      if(!m&&list.length){m=mkInstEz(v[part],v[part+'Mat'],list,Math.max(MAX_DETAIL,list.length));m.variant=i;m.part=part;detMeshes.push(m);}
-      if(m){m.list=list;m.im.count=list.length;
-        list.forEach((t,j)=>{m.im.setMatrixAt(j,detailTreeMatrix(t));m.im.setColorAt(j,_c.setRGB(t.tint,t.tint,t.tint));m.im.geometry.attributes.aCoverage.setX(j,t.coverage);});
-        m.im.instanceMatrix.needsUpdate=true;if(m.im.instanceColor)m.im.instanceColor.needsUpdate=true;m.im.geometry.attributes.aCoverage.needsUpdate=true;m.im.computeBoundingSphere();
-      }
-    }});
-  }else for(const {im,list} of detMeshes){const a=im.geometry.attributes.aCoverage;list.forEach((t,i)=>a.setX(i,t.coverage));a.needsUpdate=true;}
+  forest.setFixed(fixed);
 }
 const lidarReady=(async()=>{
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
+  {const pts=[];for(let i=0;i<realXZ.length;i+=3)pts.push([realXZ[i],realXZ[i+1]-TREE_SHIFT_N]);neighboursAt=neighbourCounter(pts);}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
   sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
   buildTreesFrom(+sl.value);lidarSettled=true;
@@ -965,7 +821,7 @@ function applyVex(v){
     _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
     im.instanceMatrix.needsUpdate=true;}
   if(marker) marker.position.y=heightAt(marker.position.x,marker.position.z)+2;
-  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);landscape?.refresh();}
+  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);landscape?.refresh();}else if(trees.length)buildTreeMesh();
 }
 
 // ---- tap to inspect + move marker --------------------------------------
@@ -1266,13 +1122,13 @@ function applyQuality(level){
   propertyNature.setQuality(level,q.density);
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;
+  treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);
   renderer.setPixelRatio(Math.min(devicePixelRatio,q.pixelRatio));
   for(const {im,list} of groundMeshes){
     const isRock=rockGeos.includes(im.geometry);
     im.count=Math.ceil(list.length*(isRock?Math.max(.65,q.density):q.density));
     im.computeBoundingSphere();
   }
-  updateTreeLOD(true);
   $('qualityStatus').textContent=`${quality.mode==='auto'?'Auto · ':''}${q.name} · ${q.meshes} near trees · ${q.distance} m`;
 }
 const quality=new AdaptiveQuality(level=>{qualityTransition={level,time:0,applied:false};});
@@ -1303,11 +1159,11 @@ function updateQuality(seconds,dt){
 }
 const landscapeReady=(async()=>{
   await Promise.all([treeAssetsReady,lidarReady]);
-  if(!ezPines||!ezImpostor||!realXZ.length)throw Error('Tree models or placement data could not load.');
+  if(!treeSpecies||!realXZ.length)throw Error('Tree models or placement data could not load.');
   buildTreesFrom(realXZ.length/3); // stable full baseline, even if the density slider changed during loading
   const catalog=new Map(),base=[];
   function asset(key,label,parts,scale){catalog.set(key,{label,parts,defaults:{asset:key,x:0,z:0,offset:0,rotation:[0,0,0],scale,tint:1}});}
-  for(const v of ezPines){const h=v.name==='pine_large'?14:v.name==='aspen'?8:7;asset('tree/'+v.name,{pine_large:'Tall pine',pine_bush:'Bushy pine',aspen:'Aspen'}[v.name]||v.name,[{geometry:v.bark,material:v.barkMat},{geometry:v.leaf,material:v.leafMat}],[h,h,h]);}
+  for(const v of treeSpecies)asset('tree/'+v.name,v.label,v.parts,[v.defaultHeight,v.defaultHeight,v.defaultHeight]);
   rockGeos.forEach((geometry,i)=>asset('rock/'+[11,27,43,61][i],'Rock '+(i+1),[{geometry,material:rockMat}],[.8,.68,.8]));
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
@@ -1315,9 +1171,9 @@ const landscapeReady=(async()=>{
   try{const parts=await loadBigBush();asset('bush/big-bush','BigBush',parts,[2.95,2.95,2.95]);base.push({id:'bush:big-bush:sample',asset:'bush/big-bush',x:-15,z:27,offset:0,rotation:[0,0,0],scale:[2.95,2.95,2.95],tint:1});}catch(error){console.warn('Big bush unavailable:',error);}
   asset('prop/propane','Propane tank',propaneTank(),[1,1,1]);
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
-  for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+ezPines[t.variant].name,t,[t.h,t.h,t.h]));
-  const seenGroves=new Set();let groveId=0;
-  for(const entry of groveMeshes)for(const t of entry.list)if(!seenGroves.has(t)){seenGroves.add(t);base.push(row('grove:'+groveId++,'tree/aspen',t,[t.h,t.h,t.h],[t.lean||0,t.r,0]));}
+  for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+t.asset,t,[t.h*t.wide,t.h,t.h*t.wide]));
+  let groveId=0;
+  for(const t of groveList)base.push(row(t.id||'grove:'+groveId++,'tree/aspen',t,[t.h,t.h,t.h],[t.lean||0,t.r,0]));
   const seenGround=new Set();
   for(const entry of groundMeshes){const type=[...catalog].find(([key,a])=>!key.startsWith('tree/')&&a.parts.some(p=>p.geometry===entry.im.geometry))?.[0];if(!type)continue;
     for(const t of entry.list){const id=type+':'+t.x.toFixed(5)+':'+t.z.toFixed(5);if(seenGround.has(id))continue;seenGround.add(id);base.push(row(id,type,t,[t.s,t.s*(t.sy||1),t.s],[t.rx||0,t.r,0],t.dy||0));}
@@ -1341,16 +1197,14 @@ const landscapeReady=(async()=>{
     },
     hide(id){
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
-      for(const key of [old,id]){if(key==null)continue;const i=trees.findIndex(t=>t.id===key);if(i>=0&&impMesh){impMesh.setMatrixAt(i,impMatrix(trees[i]));impMesh.instanceMatrix.needsUpdate=true;}
-        for(const entry of detMeshes){const j=entry.list.findIndex(t=>t.id===key);if(j>=0){entry.im.setMatrixAt(j,detailTreeMatrix(entry.list[j]));entry.im.instanceMatrix.needsUpdate=true;entry.im.computeBoundingSphere();}}
-      }
+      forest?.setHidden(id);
     },
     terrainChanged(){propertyNature.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[])]);},
   };
-  const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,
+  const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
     enter(){endDrive({preserveView:true});dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();setPanel(false);},
     leave(){quality.reset(3);setPanel(true);},
   });
@@ -1382,16 +1236,17 @@ const landscapeReady=(async()=>{
 const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
 const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);});
 const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);toolDock?.open('photo');});
+const _treeLook=new THREE.Vector3();
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
   updateQuality(elapsed,dt);
   updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
   photoMatch.applyRoll();
-  if(impCamU) impCamU.value.copy(cam.position);     // keep billboards facing the camera (MeshBasic won't auto-update it)
   propertyNature.update(now/1000,cam);
   landscapeLayer?.update(cam);
-  updateTreeLOD();updateTreeShadows();                // swap detailed↔billboard by distance from the camera
+  if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
+  tickWind(dt);updateTreeShadows();
   const v=new THREE.Vector3(0,0,-1).project(cam);
   cmp.style.top=(26-v.y*20-8)+'px';cmp.style.left=(26+v.x*20-4)+'px';
   renderer.render(scene,cam);

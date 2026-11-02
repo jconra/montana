@@ -4,8 +4,8 @@ import {LandscapeState,EditHistory,brushVertices} from './landscape-state.mjs';
 
 const clone=o=>JSON.parse(JSON.stringify(o));
 const DRAFT_KEY='montanaLandscapeDraft:v1';
-export async function createLandscapeEditor({scene,camera,controls,canvas,fine,catalog,base,reference,bridge,getVex,enter,leave}){
- const state=new LandscapeState(base,catalog.keys(),reference),history=new EditHistory(),baseline=fine.baseY.slice();
+export async function createLandscapeEditor({scene,camera,controls,canvas,fine,catalog,base,reference,bridge,getVex,enter,leave,migrate=null}){
+ const state=new LandscapeState(base,catalog.keys(),reference,migrate),history=new EditHistory(),baseline=fine.baseY.slice();
  let published=state.export();
  const response=await fetch(new URL('./landscape-defaults.json',import.meta.url));
  if(!response.ok)throw Error('Published landscape defaults could not load.');
@@ -17,7 +17,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
   const res=await fetch(new URL('./property-refinement-edits.json',import.meta.url));
   if(res.ok){const edits=await res.json(),key='montanaReferenceEdits:v1';
    if(localStorage.getItem(key)!==edits.version){
-    if(restored){const objects=applyReferenceEdits(state,edits.changes),heights=applyReferenceHeights(state,edits.heights);if(objects||heights)localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));}
+    if(restored){const update=o=>o&&migrate?migrate(o):o,objects=applyReferenceEdits(state,edits.changes.map(c=>({...c,before:update(c.before),after:update(c.after)}))),heights=applyReferenceHeights(state,edits.heights);if(objects||heights)localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));}
     localStorage.setItem(key,edits.version);
    }
   }

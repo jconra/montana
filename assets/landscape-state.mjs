@@ -7,7 +7,9 @@ const canonical=o=>o&&typeof o==='object'?(Array.isArray(o)?o.map(canonical):Obj
 // Files contain a patch against the deterministic property, never GPU instance
 // indices or the currently visible LOD/density subset.
 export class LandscapeState{
- constructor(base,assets,reference){
+ // migrate: turns a saved record from an older export into the current form (renamed assets) before it is checked.
+ constructor(base,assets,reference,migrate=null){
+  this.migrate=migrate;
   this.base=new Map(base.map(o=>[o.id,copy(o)]));this.assets=new Set(assets);this.reference=copy(reference);
   this.overrides=new Map();this.added=new Map();this.removed=new Set();this.heights=new Map();
  }
@@ -17,6 +19,7 @@ export class LandscapeState{
  remove(id){if(this.base.has(id)){this.removed.add(id);this.overrides.delete(id);}else this.added.delete(id);}
  export(){return {format:LANDSCAPE_FORMAT,version:1,revision:LANDSCAPE_REVISION,reference:copy(this.reference),objects:{overrides:[...this.overrides.values()].map(copy),added:[...this.added.values()].map(copy),removed:[...this.removed]},terrain:{heights:[...this.heights].sort((a,b)=>a[0]-b[0])}};}
  validate(input){
+  if(this.migrate&&input?.objects&&Array.isArray(input.objects.overrides)&&Array.isArray(input.objects.added))input={...input,objects:{...input.objects,overrides:input.objects.overrides.map(this.migrate),added:input.objects.added.map(this.migrate)}};
   if(!input||input.format!==LANDSCAPE_FORMAT||input.version!==1||input.revision!==LANDSCAPE_REVISION)throw Error('This is not a compatible Montana landscape export.');
   if(JSON.stringify(canonical(input.reference))!==JSON.stringify(canonical(this.reference)))throw Error('This file uses a different terrain grid or map origin.');
   const obj=input.objects,terrain=input.terrain;
