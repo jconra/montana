@@ -637,7 +637,9 @@ function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbour
 function treeTint(kind,id,tint){
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
-  return kind==='aspen'?new THREE.Color(tint*(.84+.3*a),tint*(.94+.1*b),tint*(.78+.3*c)):new THREE.Color(tint*(.88+.2*a),tint*(.92+.14*b),tint*(.86+.26*c));
+  if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
+  // evergreens run between olive and blue-green, a few brighter young ones
+  const olive=a*a,lift=.82+.42*c;return new THREE.Color(tint*lift*(.86+.42*olive),tint*lift*(.92+.14*b),tint*lift*(1.08-.46*olive));
 }
 const treeAssetsReady=(async()=>{
   try{
@@ -657,7 +659,7 @@ function _pSeg(px,pz,ax,az,bx,bz){ const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1; le
 function distDriveway(x,z){ let m=1e9; for(let i=0;i<DRIVEWAY.length-1;i++){ const a=DRIVEWAY[i],b=DRIVEWAY[i+1]; const d=_pSeg(x,z,a.x,a.z,b.x,b.z); if(d<m)m=d; } return m; }
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 // real tree positions from LiDAR (trees.bin = Float32 x,z,height triples)
-let realXZ=new Float32Array(0);
+let realXZ=new Float32Array(0),fillTrees=[];
 const TREE_SHIFT_N=3;        // nudge all trees north to line up with the aerial (z = -N, so subtract)
 function inBuilding(x,z){                                          // LiDAR read building roofs as canopy — reject those
   for(const o of placed){ const r=o.type==='house'?11:o.type==='cabin'?9:8;
@@ -679,7 +681,7 @@ function buildTreesFrom(n){
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
     if(inBuilding(rx,rz)||polygonDistance(rx,rz)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
-    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:1});}
+    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});}
   buildTreeMesh();
 }
 function addInst(geo,mat,list){
@@ -701,6 +703,11 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
     const a=s()*6.283,rad=Math.sqrt(s())*stand.r*.8,x=stand.x+Math.cos(a)*rad,z=stand.z+Math.sin(a)*rad;
     if(inBuilding(x,z)||list.concat(trees).some(t=>(t.x-x)**2+(t.z-z)**2<9))continue;
     list.push({id:`aspen:${n}:${k}`,x,z,gy:heightAt(x,z),h:stand.hMin+s()*(stand.hMax-stand.hMin),r:s()*6.283,tint:.9+s()*.2,lean:0});k++;}});
+  // Canopy the tree list missed: peaks in the LiDAR returns with no tree near them (assets/trees-fill.json, measured).
+  fillTrees.forEach(([x,z,h],n)=>{const id='fill:'+n,asset=treeKindOf(id,x,z,h);list.push({id,asset,x,z,gy:heightAt(x,z),h,r:treeHash(id,5)*6.283,tint:.8+treeHash(id,6)*.35,lean:0,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});});
+  // Knee-high junipers dotting the dry slope, too small for the LiDAR to have found. Invented; the ids stay put by order.
+  {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
+   for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:'juniper',x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
   return list;
 }
 let groveList=[];
@@ -723,6 +730,7 @@ function buildTreeMesh(){
   forest.setFixed(fixed);
 }
 const lidarReady=(async()=>{
+  try{fillTrees=await (await fetch('./assets/trees-fill.json')).json();}catch(e){console.warn('Fill trees unavailable',e);}
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   {const pts=[];for(let i=0;i<realXZ.length;i+=3)pts.push([realXZ[i],realXZ[i+1]-TREE_SHIFT_N]);neighboursAt=neighbourCounter(pts);}
   const total=realXZ.length/3, sl=document.getElementById('treeN');
@@ -1183,7 +1191,7 @@ const landscapeReady=(async()=>{
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+t.asset,t,[t.h*t.wide,t.h,t.h*t.wide]));
   let groveId=0;
-  for(const t of groveList)base.push(row(t.id||'grove:'+groveId++,'tree/aspen',t,[t.h,t.h,t.h],[t.lean||0,t.r,0]));
+  for(const t of groveList)base.push(row(t.id||'grove:'+groveId++,'tree/'+(t.asset||'aspen'),t,[t.h*(t.wide||1),t.h,t.h*(t.wide||1)],[t.lean||0,t.r,0]));
   const seenGround=new Set();
   for(const entry of groundMeshes){const type=[...catalog].find(([key,a])=>!key.startsWith('tree/')&&a.parts.some(p=>p.geometry===entry.im.geometry))?.[0];if(!type)continue;
     for(const t of entry.list){const id=type+':'+t.x.toFixed(5)+':'+t.z.toFixed(5);if(seenGround.has(id))continue;seenGround.add(id);base.push(row(id,type,t,[t.s,t.s*(t.sy||1),t.s],[t.rx||0,t.r,0],t.dy||0));}
