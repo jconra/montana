@@ -878,7 +878,8 @@
       "glass": "#141e1e",
       "floor": 1,
       "apronMat": 11,
-      "apron": 0.9
+      "apron": 0.9,
+      "skyBase": 0.2
     },
     {
       "type": "chimney",
@@ -894,5 +895,6 @@
       "onRoof": 0
     }
   ],
-  "frameW": 0.2
+  "frameW": 0.2,
+  "glassAlpha": 0.9
 }

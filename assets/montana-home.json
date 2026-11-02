@@ -240,12 +240,12 @@
           "y1": 6.8,
           "type": "door",
           "closed": true,
-          "mat": 5,
+          "mat": 23,
           "lites": [
-            1,
-            1
+            2,
+            3
           ],
-          "liteFrom": 0.45,
+          "liteFrom": 0.5,
           "casing": 10,
           "casingW": 0.3
         },
@@ -576,7 +576,13 @@
     "#d9d8d0",
     "#343f45",
     "#47423e",
-    "#262422"
+    "#262422",
+    "#6e6c66",
+    "#08090a",
+    "#e6e6e0",
+    "#9fc9c0",
+    "#3a2418",
+    "#3e4347"
   ],
   "palTex": [
     "wood",
@@ -610,7 +616,8 @@
       "onRoof": 0,
       "glass": "#27323a",
       "apronMat": 15,
-      "apron": 1
+      "apron": 1,
+      "skyBase": 0.42
     },
     {
       "type": "skylight",
@@ -625,7 +632,8 @@
       "onRoof": 0,
       "glass": "#27323a",
       "apronMat": 15,
-      "apron": 1
+      "apron": 1,
+      "skyBase": 0.42
     },
     {
       "type": "chimney",
@@ -1343,26 +1351,14 @@
     },
     {
       "type": "box",
-      "name": "Entry porch lamp",
-      "x": -32.05,
-      "y": 6.3,
-      "z": 3,
-      "w": 0.12,
-      "h": 0.5,
-      "d": 0.35,
-      "mat": 14,
-      "floor": 0
-    },
-    {
-      "type": "box",
       "name": "West ridge end box",
-      "x": -25,
-      "y": 24.15,
+      "x": -25.2,
+      "y": 25.1,
       "z": 0,
-      "w": 1.8,
-      "h": 0.42,
-      "d": 1.6,
-      "mat": 14,
+      "w": 2.6,
+      "h": 0.14,
+      "d": 1.1,
+      "mat": 20,
       "floor": 0
     },
     {
@@ -1415,14 +1411,99 @@
     },
     {
       "type": "box",
-      "name": "White unit behind the entry",
-      "x": -26,
-      "y": 4,
-      "z": -0.8,
-      "w": 3.8,
-      "h": 7,
-      "d": 1.2,
-      "mat": 14,
+      "name": "Concrete retaining wall",
+      "x": -26.5,
+      "y": 4.15,
+      "z": -11,
+      "w": 5,
+      "h": 8.3,
+      "d": 0.7,
+      "mat": 18,
+      "floor": 0
+    },
+    {
+      "type": "beam",
+      "name": "Water pipe",
+      "from": [
+        -25.2,
+        0,
+        -11.8
+      ],
+      "to": [
+        -25.2,
+        8.5,
+        -11.8
+      ],
+      "w": 0.34,
+      "d": 0.34,
+      "round": true,
+      "mat": 20,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Trash can",
+      "x": -33.2,
+      "y": 2.4499999999999997,
+      "z": -0.2,
+      "w": 2,
+      "h": 4.1,
+      "d": 2.2,
+      "mat": 19,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Trash can lid",
+      "x": -33.2,
+      "y": 4.7,
+      "z": -0.2,
+      "w": 2.2,
+      "h": 0.2,
+      "d": 2.5,
+      "mat": 19,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "North foundation band",
+      "x": 0,
+      "y": 0.8,
+      "z": -12.12,
+      "w": 48.2,
+      "h": 1.6,
+      "d": 0.12,
+      "mat": 21,
+      "floor": 0
+    },
+    {
+      "type": "beam",
+      "name": "Downspout",
+      "from": [
+        -24.15,
+        15,
+        -12.2
+      ],
+      "to": [
+        -24.15,
+        1.2,
+        -12.2
+      ],
+      "w": 0.3,
+      "d": 0.3,
+      "mat": 22,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Round plaque",
+      "x": -32.3,
+      "y": 6.2,
+      "z": 8.4,
+      "w": 0.08,
+      "h": 0.9,
+      "d": 0.9,
+      "mat": 20,
       "floor": 0
     }
   ],
@@ -1430,5 +1511,6 @@
     0,
     0
   ],
-  "frameW": 0.17
+  "frameW": 0.17,
+  "glassAlpha": 0.5
 }
