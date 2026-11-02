@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {createRoute,POND_OUTLINE} from './property-layout.mjs';
 import {grassReclaim} from './driveway-refinements.mjs';
 import {campSurface} from './camp-approach.mjs';
-import {DIRT_OUTLINE,RUTS,TRACK_OFFSET} from './driveway-measured.mjs';
+import {DIRT_OUTLINE,TRACK_OFFSET} from './driveway-measured.mjs';
 const random=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 // Small repeatable detail maps; no remote texture dependencies.
 function surface(kind){
@@ -30,19 +30,11 @@ function patchNoise(){
  // straight to a data texture, not through the canvas: the fourth channel holds noise, not alpha
  const t=new THREE.DataTexture(im.data,S,S,THREE.RGBAFormat);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.generateMipmaps=true;t.needsUpdate=true;return t;
 }
-// Fine map of the drive around the buildings: red dirt and wheel tracks, green tyre ruts.
-const HI_MIN=new THREE.Vector2(-35,-14),HI_SIZE=new THREE.Vector2(96,48);
-function driveMap(route){
- const c=document.createElement('canvas');c.width=1024;c.height=512;const g=c.getContext('2d');g.fillStyle='black';g.fillRect(0,0,1024,512);
- g.setTransform(1024/HI_SIZE.x,0,0,512/HI_SIZE.y,-HI_MIN.x*1024/HI_SIZE.x,-HI_MIN.y*512/HI_SIZE.y);g.globalCompositeOperation='lighter';g.lineJoin=g.lineCap='round';
- g.filter='blur(3px)';g.fillStyle='rgb(255,0,0)';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
- g.filter='blur(2px)';g.strokeStyle='rgb(255,0,0)';g.lineWidth=.6;
- for(const side of [-1,1]){g.beginPath();let on=false;for(let d=0;d<=route.total;d+=.5){const p=route.at(d,side*TRACK_OFFSET);if(p.x>62||p.x<-1){on=false;continue;}if(on)g.lineTo(p.x,p.z);else g.moveTo(p.x,p.z);on=true;}g.stroke();}
- g.filter='blur(5px)';g.strokeStyle='rgb(0,120,0)';g.lineWidth=.42;
- for(const r of RUTS){g.beginPath();g.moveTo(r[0].x,r[0].z);for(let i=1;i<r.length-1;i++){const m={x:(r[i].x+r[i+1].x)/2,z:(r[i].z+r[i+1].z)/2};g.quadraticCurveTo(r[i].x,r[i].z,m.x,m.z);}const e=r[r.length-1];g.lineTo(e.x,e.z);g.stroke();}
- g.filter='none';const t=new THREE.CanvasTexture(c);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;
-}
-const ZONES_MIN=new THREE.Vector2(-110,-100),ZONES_SIZE=256;
+// Baked colour of the land (tools: ground bake): a fine map round the buildings, a wider one over the fine terrain tile. The coarse tile's map is the third.
+const HI_MIN=new THREE.Vector2(-70,-60),HI_SIZE=160,MID_HALF=250;
+function colourMap(file){const t=new THREE.TextureLoader().load(new URL(file,import.meta.url).href);t.generateMipmaps=true;t.minFilter=THREE.LinearMipmapLinearFilter;t.anisotropy=4;return t;}
+// A patch of real ground from a drone still, lightness variation only; the map holds the colour.
+function detailTile(file){const t=colourMap(file);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
 // Baked tree shadows round the buildings: red cast shadow (long, lumpy, away from the sun), green soft contact shade.
 const CAST_HALF=128;
 export function createGroundDetail(half,driveway,sunDir){
@@ -54,10 +46,12 @@ export function createGroundDetail(half,driveway,sunDir){
   // Green channel controls the lush corridor and meadow, red controls gravel.
   for(let i=0;i<=24;i++){const t=i/24;path(85-i*2.5,`rgb(0,${Math.round(t*t*(3-2*t)*255)},0)`);}
   g.fillStyle='#00e000';g.beginPath();g.ellipse(-8,28,36,28,-.2,0,Math.PI*2);g.fill();
-  g.strokeStyle='#00ff00';g.lineWidth=9;g.beginPath();POND_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.stroke();
-  // Outside the fine drive map: two wheel tracks only, the grass strip between them stays.
-  let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=60||route.at(d).z<-60)farEnd=d;
+  // Blue: the damp bank round the pond.
+  g.globalCompositeOperation='lighter';g.filter='blur(5px)';g.strokeStyle='#0000ff';g.lineWidth=3.2;g.beginPath();POND_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.stroke();g.filter='none';g.globalCompositeOperation='source-over';
+  // Red: the drive. The apron and arms as traced; two wheel tracks elsewhere, the grass strip between them stays.
+  let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=-2)farEnd=d;
   for(const side of [-1,1]){path(1.0,'#80ff00',side*TRACK_OFFSET,0,farEnd);path(.62,'#ffff00',side*TRACK_OFFSET,0,farEnd);}
+  g.fillStyle='#ff0000';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
   const pixels=g.getImageData(0,0,c.width,c.height),data=pixels.data;
@@ -65,8 +59,8 @@ export function createGroundDetail(half,driveway,sunDir){
   const top=Math.floor((-20-maskMin.y)/maskSize.y*c.height),bottom=Math.ceil((48-maskMin.y)/maskSize.y*c.height);
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
-    data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));data[i+2]=Math.round(s.lawn*255);
-    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));data[i+1]=Math.max(data[i+1],Math.round(reclaim*255));data[i+2]=Math.max(data[i+2],Math.round(reclaim*255));
+    data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));
+    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));data[i+1]=Math.max(data[i+1],Math.round(reclaim*255));
   }
   // Feather only moisture, preserving the narrow gravel wheel tracks.
   const green=document.createElement('canvas');green.width=green.height=c.width;const gg=green.getContext('2d'),gp=gg.createImageData(c.width,c.height);
@@ -75,8 +69,7 @@ export function createGroundDetail(half,driveway,sunDir){
   for(let i=0;i<data.length;i+=4)data[i+1]=sm[i];
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;
-  const zones=new THREE.TextureLoader().load(new URL('./ground-zones.png',import.meta.url).href);zones.generateMipmaps=false;zones.minFilter=THREE.LinearFilter;
-  const uniforms={detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},greenness:{value:.85},grassDetail:{value:surface(3)},soilDetail:{value:surface(0)},gravelDetail:{value:surface(1)},stoneDetail:{value:surface(2)},patchMap:{value:patchNoise()},driveHi:{value:driveMap(route)},hiMin:{value:HI_MIN},hiSize:{value:HI_SIZE},groundZones:{value:zones},zonesMin:{value:ZONES_MIN},zonesSize:{value:ZONES_SIZE}};
+  const uniforms={greenness:{value:.85},detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},patchMap:{value:patchNoise()},colourHi:{value:colourMap('./ground-colour-hi.jpg')},colourMid:{value:colourMap('./ground-colour-mid.jpg')},tileDry:{value:detailTile('./tile-dry.jpg')},tileGreen:{value:detailTile('./tile-green.jpg')},tileRoad:{value:detailTile('./tile-road.jpg')},hiMin:{value:HI_MIN},hiSize:{value:HI_SIZE},midHalf:{value:MID_HALF}};
   // Static soft canopy contact shadows: one small mask, no shadow-map pass.
   const shade=document.createElement('canvas');shade.width=shade.height=1024;
   const shadeContext=shade.getContext('2d'),shadeTexture=new THREE.CanvasTexture(shade);
@@ -101,6 +94,8 @@ export function createGroundDetail(half,driveway,sunDir){
       for(let i=0;i<n;i++){const f=(i+.5)/n,rad=Math.max(.5,w*(1.08-f*.85)*(.8+r()*.5)),px=t.x+sx*len*f+(r()-.5)*w*.5,pz=t.z+sz*len*f+(r()-.5)*w*.5,gr=c.createRadialGradient(px,pz,rad*.45,px,pz,rad);
         gr.addColorStop(0,'rgba(120,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,1)');c.fillStyle=gr;c.fillRect(px-rad,pz-rad,rad*2,rad*2);}
       const rad=Math.max(1.2,w*1.25),gr=c.createRadialGradient(t.x,t.z,0,t.x,t.z,rad);gr.addColorStop(0,'rgba(0,150,0,1)');gr.addColorStop(1,'rgba(0,0,0,1)');c.fillStyle=gr;c.fillRect(t.x-rad,t.z-rad,rad*2,rad*2);
+      // Fallen needles: a red-brown ring under each juniper, in lumps so it is never a clean circle.
+      if(String(t.asset||'').startsWith('juniper'))for(let i=0;i<6;i++){const a=r()*6.283,o=w*(.15+r()*.65),q=Math.max(.4,w*(.38+r()*.34)),px=t.x+Math.cos(a)*o,pz=t.z+Math.sin(a)*o,du=c.createRadialGradient(px,pz,q*.2,px,pz,q);du.addColorStop(0,'rgba(0,0,170,1)');du.addColorStop(1,'rgba(0,0,0,1)');c.fillStyle=du;c.fillRect(px-q,pz-q,q*2,q*2);}
     }castTexture.needsUpdate=true;
   }
   const paint=createTerrainPaint(half);Object.assign(uniforms,paint.uniforms);
@@ -112,11 +107,11 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 hp=hillWorld.xz;vec3 hn=normalize(hillNormal);
       vec4 n1=texture2D(patchMap,hp*.00009),n2=texture2D(patchMap,hp*.00037),n3=texture2D(patchMap,hp*.0017),n4=texture2D(patchMap,hp*.0071);
       float h=hillWorld.y+1666.,noise=n1.r*.42+n2.g*.33+n3.b*.17+n4.a*.08;
-      vec3 c=mix(${shown('#a89b78')},${shown('#8f9a6e')},smoothstep(.4,.6,n2.r*.6+n3.g*.4));
+      vec3 c=mix(${shown('#98906e')},${shown('#858c66')},smoothstep(.4,.6,n2.r*.6+n3.g*.4));
       c=mix(c,${shown('#8a8578')},smoothstep(.45,.65,n1.g));
       float shady=clamp(.5-hn.x*.9+hn.z*-.2,0.,1.);
-      float forest=smoothstep(.5,.57,noise+shady*.13-.03+smoothstep(2500.,1800.,h)*-.04)*smoothstep(3050.,2700.,h);
-      c=mix(c,${shown('#3f5236')}*(.75+n4.r*.5),forest);
+      float forest=smoothstep(.45,.52,noise+shady*.15-.03+smoothstep(2500.,1800.,h)*-.04)*smoothstep(3050.,2700.,h);
+      c=mix(c,${shown('#2c3530')}*(.75+n4.r*.5),forest);
       // Dirt and scree in streaks running down the fall line, not blotches.
       vec2 fall=normalize(hn.xz+vec2(1e-4)),across=vec2(-fall.y,fall.x);
       float streak=texture2D(patchMap,vec2(dot(hp,across)*.0041,dot(hp,fall)*.00035)).r*.7+n2.a*.3;
@@ -130,82 +125,50 @@ export function createGroundDetail(half,driveway,sunDir){
       c*=.82+n4.b*.36;
       // Air between the ridges: each layer further off goes bluer and paler.
       float air=1.-exp(-distance(cameraPosition,hillWorld)/8500.);
-      c=mix(c,${shown('#8a95a3')}*1.15,air*.82);
+      c=mix(c,${shown('#7a8594')}*1.1,air*.62);
       diffuseColor.rgb=c;`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
       vec2 hillBump=(texture2D(patchMap,hillWorld.xz*.0031).rg-.5)*.55;normal=normalize(normal+(viewMatrix*vec4(hillBump.x,0.,hillBump.y,0.)).xyz);`);
-  };material.customProgramCacheKey=()=>'montana-far-hills-v1';}
+  };material.customProgramCacheKey=()=>'montana-far-hills-v2';}
   return {uniforms,paint,setTrees,attachHills,attach(material){material.onBeforeCompile=sh=>{
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D driveHi;uniform vec2 hiMin;uniform vec2 hiSize;uniform sampler2D groundZones;uniform vec2 zonesMin;uniform float zonesSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader='float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
       // Light bounced round the meadow: shaded grass stays a living blue-green.
-      totalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12)*(1.-smoothstep(.3,.6,detailRoad));`).replace('#include <map_fragment>',`#include <map_fragment>
+      totalEmissiveRadiance+=diffuseColor.rgb*vec3(.09,.12,.1);`).replace('#include <map_fragment>',`#include <map_fragment>
       #ifdef USE_MAP
-      vec2 landUV=detailWorld.xz;vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 maskUV=vec2(localMask.x,1.-localMask.y);
-      vec3 coverage=texture2D(roadMask,maskUV).rgb;coverage*=step(0.,localMask.x)*step(localMask.x,1.)*step(0.,localMask.y)*step(localMask.y,1.);
-      vec4 broad=texture2D(patchMap,landUV*.0031),mid=texture2D(patchMap,landUV*.0094),fine=texture2D(patchMap,landUV*.041),tiny=texture2D(patchMap,landUV*.33);
-      // The drive: a soft mask read against fine noise makes a crisp, grass-nibbled edge.
-      float nibble=tiny.r*.6+fine.g*.4-.5;
-      vec2 hiLocal=(landUV-hiMin)/hiSize;vec3 hi=texture2D(driveHi,vec2(hiLocal.x,1.-hiLocal.y)).rgb*step(0.,hiLocal.x)*step(hiLocal.x,1.)*step(0.,hiLocal.y)*step(hiLocal.y,1.);
-      // The arm toward camp thins out into scattered gravel and worn grass rather than ending.
-      float tongue=(1.-step(-12.,landUV.x))*smoothstep(9.5,19.,landUV.y+(fine.r-.5)*7.+(tiny.g-.5)*3.);
-      float road=max(smoothstep(.34,.66,hi.r+nibble*.6-tongue*(.25+tiny.a*.95)),smoothstep(.3,.6,coverage.r+nibble*.35));
-      float rut=hi.g*1.6*(.6+tiny.b*.5);
-      float steep=smoothstep(.2,.62,1.-abs(normalize(detailNormal).y));
-      vec3 soil=texture2D(soilDetail,landUV*.45).rgb;
-      vec3 stone=texture2D(stoneDetail,landUV*.3).rgb;
-      vec3 gravel=texture2D(gravelDetail,landUV*.7).rgb;
-      vec3 blade=texture2D(grassDetail,landUV*.65).rgb;
-      float bladeVar=dot(blade,vec3(.6))/.33;
-      // Which ground is which: the May frames near the buildings, the aerial's own tint farther out; both broken up at several sizes.
-      vec2 zoneLocal=(landUV-zonesMin)/zonesSize;vec3 zone=texture2D(groundZones,vec2(zoneLocal.x,1.-zoneLocal.y)).rgb;
-      float zoneTrust=zone.b*step(0.,zoneLocal.x)*step(zoneLocal.x,1.)*step(0.,zoneLocal.y)*step(zoneLocal.y,1.);
-      float aerialGreen=clamp((diffuseColor.g-diffuseColor.r)*9.+.42,0.,1.);
-      float wet=mix(.06+aerialGreen*.42+coverage.g*.06,zone.r*.92+.08,zoneTrust);
-      float variety=mix(1.,.55,zoneTrust);
-      wet+=((broad.r-.5)*.9+(mid.g-.5)*.6)*variety+(fine.b-.5)*.32+(tiny.a-.5)*.14+(greenness-.85);
+      vec2 landUV=detailWorld.xz;
+      // The coarse tile's map holds the same colouring for the whole property.
+      vec3 farLand=diffuseColor.rgb/1.8;
+      vec2 midUV=(landUV+midHalf)/(2.*midHalf);vec2 hiUV=(landUV-hiMin)/hiSize;
+      vec2 midEdge=min(midUV,1.-midUV)*2.*midHalf,hiEdge=min(hiUV,1.-hiUV)*hiSize;
+      float inMid=smoothstep(0.,10.,min(midEdge.x,midEdge.y)),inHi=smoothstep(0.,6.,min(hiEdge.x,hiEdge.y));
+      vec3 near=mix(texture2D(colourMid,vec2(midUV.x,1.-midUV.y)).rgb,texture2D(colourHi,vec2(hiUV.x,1.-hiUV.y)).rgb,inHi);
+      vec4 mid=texture2D(patchMap,landUV*.0094),fine=texture2D(patchMap,landUV*.041),tiny=texture2D(patchMap,landUV*.33);
+      vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 inMask=step(vec2(0.),localMask)*step(localMask,vec2(1.));
+      vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
+      float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
+      // Past where the drone frames resolve the drive, the wheel tracks are drawn.
+      float drawn=road*max(smoothstep(84.,96.,landUV.x),1.-smoothstep(-66.,-58.,landUV.y));
+      near=mix(near,vec3(.67,.63,.56)*(.86+fine.r*.28),drawn*.9);
+      // Real ground from the drone stills, in two sizes so it does not repeat, by what the map says is here.
+      float close=1.-smoothstep(70.,300.,distance(cameraPosition,detailWorld));
+      vec2 w2=vec2(landUV.x*.8-landUV.y*.6,landUV.x*.6+landUV.y*.8);
+      vec3 dA=texture2D(tileDry,landUV/10.24).rgb,dB=texture2D(tileDry,w2/23.7).rgb,gA=texture2D(tileGreen,landUV/10.24).rgb,gB=texture2D(tileGreen,w2/17.3).rgb;
+      float greenish=smoothstep(-.01,.07,near.g-near.r);
+      vec3 grain=mix(dA*.65+dB*.35,gA*.65+gB*.35,greenish);
+      grain=mix(grain,texture2D(tileRoad,landUV/5.12).rgb,road);
+      near*=mix(vec3(1.),grain*2.,close);
+      near=pow(max(near,vec3(.0)),vec3(2.2))/1.8;
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
       vec4 moisture=texture2D(paintMoisture,paintUV),surfacePaint=texture2D(paintSurface,paintUV);
-      wet=mix(wet,mix(.12,.92,moisture.r),moisture.a*.85);
-      // dry straw, sage, yellow-green, fresh meadow, lush swale
-      vec3 grass=mix(${shown('#a8a070')},${shown('#8f9a70')},smoothstep(.12,.3,wet));
-      grass=mix(grass,${shown('#a0b050')},smoothstep(.3,.5,wet));
-      grass=mix(grass,${shown('#7aa83f')},smoothstep(.5,.72,wet));
-      grass=mix(grass,${shown('#4f8a35')},smoothstep(.76,1.,wet));
-      // a mown lawn is mottled rather than even: paler and darker drifts, thin spots
-      // Mown ground: mottled through several greens, mow stripes across the slope, the odd dry streak.
-      vec3 mottle=mix(${shown('#5c9e2e')},${shown('#86b53a')},smoothstep(.34,.66,mid.r*.5+fine.g*.5));
-      mottle=mix(mottle,${shown('#3f8a2a')},smoothstep(.54,.76,fine.b*.6+mid.b*.4));
-      mottle=mix(mottle,${shown('#b3ae55')},smoothstep(.66,.8,mid.a*.5+tiny.r*.5)*.55);
-      float mowBand=sin(dot(landUV,vec2(.46,.89))*2.6+sin(landUV.x*.11)*.8);
-      mottle*=1.+smoothstep(-.3,.3,mowBand)*.14-.07;
-      grass=mix(grass,mottle,clamp(coverage.b*1.3,0.,1.));
-      grass=mix(grass,grass*vec3(1.22,1.1,.72),smoothstep(.56,.74,mid.b*.5+fine.a*.5)*.7);
-      grass*=.68+bladeVar*.5;grass*=.9+tiny.g*.2;
-      vec3 dirtPatch=${shown('#8a7a5e')}*(.75+dot(soil,vec3(.5)));
-      float bare=smoothstep(.54,.72,fine.g*.6+tiny.g*.4)*(1.-smoothstep(.2,.56,wet));
-      vec3 land=mix(grass,dirtPatch,bare*.8);
-      land=mix(land,dirtPatch*.95,smoothstep(.15,.55,steep)*.7);
-      land=mix(land,stone*.8,smoothstep(.62,.8,steep));
-      vec3 detailed=land;
-      road=mix(road,surfacePaint.r,surfacePaint.a);
-      detailed=mix(detailed,grass,surfacePaint.a*(1.-surfacePaint.r));
-      // Dirt: grey-brown packed earth with gravel pockets, dark ruts pressed in.
-      vec3 dirt=mix(${shown('#9c9284')},${shown('#c2b7a6')},smoothstep(.3,.7,fine.r*.6+mid.a*.4));
-      dirt=mix(dirt,${shown('#a88a68')},smoothstep(.56,.76,fine.a)*.3);
-      dirt*=.92+dot(gravel,vec3(.75))*.8;
-      float pebbles=smoothstep(.74,.82,texture2D(patchMap,landUV*1.7).r);dirt=mix(dirt,${shown('#e0d6c4')},pebbles*.55);
-      dirt=mix(dirt,${shown('#857767')},clamp(rut,0.,1.)*.78);
-      detailed=mix(detailed,dirt,road);detailRoad=road;
-      float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
-      // Beyond the painted ground the photo is a dry-season view: pull it toward the green, darker ridges.
-      float aerialLight=dot(diffuseColor.rgb,vec3(.33));
-      vec3 distantLand=mix(${shown('#a0a070')},${shown('#7d9a55')},clamp(aerialGreen+(broad.r-.5)*.6,0.,1.))*(.8+mid.r*.4);
-      distantLand=mix(${shown('#3f5236')},distantLand,smoothstep(.12,.28,aerialLight));
-      diffuseColor.rgb=mix(distantLand,detailed,proximity);
-      if(detailEnabled<.5)diffuseColor.rgb=distantLand;
+      near=mix(near,mix(${shown('#a89d72')},${shown('#578c30')},moisture.r)*(.8+fine.r*.4),moisture.a*.85);
+      near=mix(near,mix(${shown('#7a9a48')},${shown('#b3a892')},surfacePaint.r)*(.8+fine.g*.4),surfacePaint.a);
+      near=mix(near,mix(${shown('#4e5536')},${shown('#6c7a3c')},fine.b)*(.8+tiny.g*.4),smoothstep(.15,.7,masks.b+(fine.r-.5)*.3)*.85);
+      float steep=smoothstep(.2,.62,1.-abs(normalize(detailNormal).y));
+      near=mix(near,${shown('#8a8275')}*(.8+fine.b*.4),smoothstep(.45,.8,steep));
+      diffuseColor.rgb=mix(farLand,near,inMid*detailEnabled);
       #endif
       vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
@@ -214,9 +177,10 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 castUV=detailWorld.xz/(2.*castHalf)+.5;
       vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
       vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
+      diffuseColor.rgb=mix(diffuseColor.rgb,${shown('#7a5a42')}*(.75+fine.a*.5),clamp(baked.b*1.5,0.,1.)*(.25+tiny.r*.45));
       diffuseColor.rgb*=1.-baked.g*.42;
       diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v10';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v11';}};
 }
 export function rockGeometry(seed,detail=2){
   const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);

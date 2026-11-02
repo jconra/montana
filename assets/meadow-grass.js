@@ -42,7 +42,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
    vTone=iTone;vH=aH;vRoot=iPos.xz;`);
   sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12);').replace('#include <color_fragment>',`
    float wet=vTone.x;vec4 moisture=texture2D(paintMoisture,vec2(vRoot.x/(2.*paintHalf)+.5,.5-vRoot.y/(2.*paintHalf)));wet=mix(wet,mix(.12,.92,moisture.r),moisture.a*.85);
-   vec3 c=mix(${shown('#a8a070')},${shown('#8f9a70')},smoothstep(.12,.3,wet));c=mix(c,${shown('#a0b050')},smoothstep(.3,.5,wet));c=mix(c,${shown('#7aa83f')},smoothstep(.5,.72,wet));c=mix(c,${shown('#4f8a35')},smoothstep(.76,1.,wet));
+   vec3 c=mix(${shown('#ab9a70')},${shown('#a2a06c')},smoothstep(.15,.36,wet));c=mix(c,${shown('#8c9a55')},smoothstep(.36,.52,wet));c=mix(c,${shown('#6f9440')},smoothstep(.52,.68,wet));c=mix(c,${shown('#567f34')},smoothstep(.68,.95,wet));
    c=mix(c,${shown('#c2b080')},vTone.y);
    c*=mix(.74,1.28,smoothstep(.0,1.,vH))*(.86+.28*fract(vTone.z*7.3));
    diffuseColor.rgb=c;
@@ -50,7 +50,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
    vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
    diffuseColor.rgb*=1.-baked.g*.42;diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
  };
- material.customProgramCacheKey=()=>'meadow-grass-v2';
+ material.customProgramCacheKey=()=>'meadow-grass-v3';
  prepareShadow?.(material);
  const shape=tuftGeometry(),cells=new Map();
  const clear=(x,z)=>{for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}
@@ -63,7 +63,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
   const near=centre<62?1:Math.max(.16,1-(centre-62)/85),patch=vnoise(x*.09+3,z*.09)*.65+vnoise(x*.34,z*.34)*.35,dense=.25+1.25*Math.max(0,patch-.26);
   if(R()>near*Math.min(1,dense))continue;if(!clear(x,z))continue;
   const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0,tallGrass:0},wet=wetAt(x,z),lawn=s.lawn;
-  const tall=(1-lawn)*(.7+patch*.6)*(.8+R()*.45),size=(1-lawn*.3)*(.9+R()*.5);
+  const tall=(1-lawn)*(.7+patch*.6)*(.8+R()*.45)*(.5+Math.pow(wet,1.5)*1.1),size=(1-lawn*.3)*(.9+R()*.5);
   const dryBunch=(1-lawn)*(wet<.42?1:.15)*(patch>.6?1:.3)*(R()<.1?1:0);
   if(dryBunch)add(x,z,1.5+R()*.7,1.5+R()*.5,wet,.72+R()*.28);
   else add(x,z,size,lawn>.5?.34+R()*.18:tall,wet,lawn<.3&&R()<.05?.5:0);
