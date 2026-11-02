@@ -18,7 +18,7 @@ function surface(kind){
 }
 // Linear working value that shows as `hex` on sunlit ground (the renderer encodes to sRGB; LIT is the light flat sunny ground gets).
 const LIT=1.8,lin=c=>c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);
-const shown=hex=>{const n=parseInt(hex.slice(1),16);return `vec3(${[n>>16&255,n>>8&255,n&255].map(v=>(lin(v/255)/LIT).toFixed(4)).join(',')})`;};
+export const shown=hex=>{const n=parseInt(hex.slice(1),16);return `vec3(${[n>>16&255,n>>8&255,n&255].map(v=>(lin(v/255)/LIT).toFixed(4)).join(',')})`;};
 // Tiling value noise, four independent channels, for the broad patches on the ground.
 function patchNoise(){
  const S=128,C=16,c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d'),im=g.createImageData(S,S),r=random(4242);
@@ -153,9 +153,9 @@ export function createGroundDetail(half,driveway,sunDir){
       road=mix(road,surfacePaint.r,surfacePaint.a);
       detailed=mix(detailed,grass,surfacePaint.a*(1.-surfacePaint.r));
       // Dirt: grey-brown packed earth with gravel pockets, dark ruts pressed in.
-      vec3 dirt=${shown('#ad9f8b')}*(.62+dot(gravel,vec3(.75))*.62);
-      dirt=mix(dirt,${shown('#c0b39f')},smoothstep(.5,.72,fine.r)*.5);
-      dirt=mix(dirt,${shown('#74685a')},clamp(rut,0.,1.)*.9);
+      vec3 dirt=${shown('#c8b8a0')}*(.7+dot(gravel,vec3(.75))*.62);
+      dirt=mix(dirt,${shown('#d6c8b2')},smoothstep(.5,.72,fine.r)*.5);
+      dirt=mix(dirt,${shown('#7d6f60')},clamp(rut,0.,1.)*.9);
       detailed=mix(detailed,dirt,road);
       float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
       // Beyond the painted ground the photo is a dry-season view: pull it toward the green, darker ridges.
