@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {applyCensusToObjects,censusRecord} from '../assets/plant-census.mjs';
+import {applyCensusToObjects,censusHandEdits,censusRecord} from '../assets/plant-census.mjs';
 import {LandscapeState} from '../assets/landscape-state.mjs';
 const ref={center:{lat:45,lon:-110},globalMin:1600,grid:{W:32,H:32,px:1}};
 const tree=id=>({id,asset:'tree/fir',x:1,z:1,offset:0,rotation:[0,.3,0],scale:[9,9,9],tint:1});
@@ -12,11 +12,17 @@ assert.equal(objects.overrides[0].tint,.7,'an edited record keeps its tint');ass
 assert.deepEqual(objects.added.map(o=>o.id).sort(),['added:census-L2','added:census-X1']);
 const data={...state.export(),objects};assert.doesNotThrow(()=>state.load(data));assert.equal(state.get('lidar:2'),null);assert.equal(state.get('lidar:3').x,1);
 assert.deepEqual(censusRecord({id:'X1',asset:'bush/sage',x:1,z:2,scale:[1,1,1]}),censusRecord({id:'X1',asset:'bush/sage',x:1,z:2,scale:[1,1,1]}),'stable between loads');
+// Hand edits: a moved census plant stays moved when the census is applied over a saved document, and a deleted one stays deleted.
+const fresh=applyCensusToObjects({overrides:[],added:[],removed:[]},census,state.base);
+assert.deepEqual(censusHandEdits(fresh,census,state.base),[],'an untouched document has no hand edits');
+const moved=JSON.parse(JSON.stringify(fresh));moved.overrides.find(o=>o.id==='lidar:1').x=99;moved.added=moved.added.filter(o=>o.id!=='added:census-X1');
+const keep=censusHandEdits(moved,census,state.base);assert.deepEqual(keep,['added:census-X1','lidar:1']);
+const again=applyCensusToObjects(moved,census,state.base,keep);assert.equal(again.overrides.find(o=>o.id==='lidar:1').x,99);assert.ok(!again.added.some(o=>o.id==='added:census-X1'));
 // The shipped file: unique plants, no plant both kept and removed, pending aspen untouched.
 const real=JSON.parse(readFileSync(new URL('../assets/plant-census.json',import.meta.url)));
 const ids=real.plants.map(p=>p.id),recs=real.plants.map(p=>p.record).filter(Boolean);
 assert.equal(new Set(ids).size,ids.length);assert.equal(new Set(recs).size,recs.length,'one plant per base record');
 assert.ok(recs.every(r=>!real.removed.includes(r)));
-for(const id of real.pending){assert.ok(!recs.includes(id)&&!real.removed.includes(id),id+' stays pending');}
+for(let i=9;i<=15;i++)assert.ok(real.removed.includes('grove:'+i),'the second aspen mark is gone');
 assert.ok(real.plants.every(p=>p.kind&&p.scale.every(s=>s>=.01&&s<=100)));
 console.log('plant census tests passed');

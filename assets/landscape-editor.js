@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {applyReferenceEdits,applyReferenceHeights} from './reference-edits.mjs?v=terrain-20261011';
 import {LandscapeState,EditHistory,brushVertices} from './landscape-state.mjs';
-import {applyCensusToObjects,loadCensus,CENSUS_KEY} from './plant-census.mjs';
+import {applyCensusToObjects,censusHandEdits,loadCensus,CENSUS_KEY} from './plant-census.mjs';
 
 const clone=o=>JSON.parse(JSON.stringify(o));
 const DRAFT_KEY='montanaLandscapeDraft:v1';
@@ -11,13 +11,16 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  const response=await fetch(new URL('./landscape-defaults.json',import.meta.url));
  if(!response.ok)throw Error('Published landscape defaults could not load.');
  const defaults=await response.json();let census=null;
- try{census=await loadCensus(new URL('./plant-census.json',import.meta.url));defaults.objects=applyCensusToObjects(defaults.objects,census,state.base);}catch(e){console.error('Plant census not applied:',e);}
+ try{census=await loadCensus(new URL('./plant-census.json',import.meta.url));defaults.objects=applyCensusToObjects(defaults.objects,census,state.base,defaults.censusKeep||[]);}catch(e){console.error('Plant census not applied:',e);}
+ let censusKeep=defaults.censusKeep||[];
+ // A saved or exported document says which census plants were edited by hand, so the census never undoes them.
+ const documentOut=()=>{const doc=state.export();if(census){censusKeep=censusHandEdits(doc.objects,census,state.base,censusKeep);doc.censusKeep=censusKeep;}return doc;};
  published=state.validate(defaults);state.load(published);
  let restored=false,saveWarning='';
  try{const draft=localStorage.getItem(DRAFT_KEY);if(draft){const saved=JSON.parse(draft);
   // A draft older than this census takes the census once; edits made after that are left alone.
-  if(census&&localStorage.getItem(CENSUS_KEY)!==census.revision){saved.objects=applyCensusToObjects(saved.objects,census,state.base);localStorage.setItem(DRAFT_KEY,JSON.stringify(saved));}
-  state.load(saved);restored=true;}
+  if(census&&localStorage.getItem(CENSUS_KEY)!==census.revision){saved.objects=applyCensusToObjects(saved.objects,census,state.base,saved.censusKeep||[]);localStorage.setItem(DRAFT_KEY,JSON.stringify(saved));}
+  state.load(saved);censusKeep=saved.censusKeep||censusKeep;restored=true;}
   if(census)localStorage.setItem(CENSUS_KEY,census.revision);}catch(e){saveWarning='Saved draft was not loaded: '+e.message;}
  // Merge this photo pass into older drafts without discarding newer user edits.
  try{
@@ -74,7 +77,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  function status(text){$('leStatus').textContent=text;}
  function geometryLocked(){return Boolean(mainLock?.checked||$('leLockGeometry')?.checked);}
  function requireGeometryUnlocked(){if(!geometryLocked())return true;status('Geometry is locked. Uncheck the lock control before editing.');return false;}
- function save(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(state.export()));saveWarning='';}catch(e){saveWarning='Browser draft could not be saved. Export JSON to keep your work.';}const count=state.overrides.size+state.added.size+state.removed.size;status(saveWarning||`Draft saved · ${count} object edits · ${state.heights.size} terrain vertices`);}
+ function save(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(documentOut()));saveWarning='';}catch(e){saveWarning='Browser draft could not be saved. Export JSON to keep your work.';}const count=state.overrides.size+state.added.size+state.removed.size;status(saveWarning||`Draft saved · ${count} object edits · ${state.heights.size} terrain vertices`);}
  function syncHistory(){$('leUndo').disabled=!history.undoStack.length;$('leRedo').disabled=!history.redoStack.length;}
  function applyHeights(){
   let changed=false;for(const i of new Set([...previousHeights.keys(),...state.heights.keys()])){const y=state.heights.get(i)??baseline[i];if(fine.baseY[i]!==y){fine.baseY[i]=y;fine.pos.setY(i,y*getVex());changed=true;}}
@@ -171,7 +174,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  $('leUndo').onclick=undo;$('leRedo').onclick=redo;
  $('leHouse').onclick=()=>{const y=bridge.heightAt(8,-8);camera.position.set(40,y+34,38);controls.target.set(8,y,-8);controls.update();if(mode==='terrain')showGrid(8,-8);};
  $('leTop').onclick=()=>{const p=controls.target,y=bridge.heightAt(p.x,p.z);camera.position.set(p.x,y+70,p.z+.01);controls.target.set(p.x,y,p.z);controls.update();};
- $('leExport').onclick=()=>{const blob=new Blob([JSON.stringify(state.export(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='montana-landscape-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status('Export downloaded. Send that JSON file to publish this layout.');};
+ $('leExport').onclick=()=>{const blob=new Blob([JSON.stringify(documentOut(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='montana-landscape-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status('Export downloaded. Send that JSON file to publish this layout.');};
  $('leImport').onclick=()=>$('leFile').click();$('leFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>12e6)throw Error('Import is limited to 12 MB.');const before=state.export(),data=JSON.parse(await file.text());state.load(data);history.push(before,state.export());selected=null;applyDocument();save();status('Imported landscape. '+(saveWarning||'Draft saved in this browser.'));}catch(error){status('Import failed: '+error.message);}e.target.value='';};
  $('leReset').onclick=()=>{if(!requireGeometryUnlocked())return;const before=state.export();state.load(published);history.push(before,state.export());selected=null;applyDocument();save();};
  function setActive(value){if(gesture)cancelGesture();active=value;if(!value)for(const listener of deactivateListeners)listener();panel.hidden=!value;setAdding(false);if(value){enter();showSelection();if(mode==='objects')showPreview();else{showGrid(controls.target.x,controls.target.z);showVertex();}bridge.hideBuildings($('leHideBuildings').checked);}else{clearPreview();points.visible=brush.visible=vertexMarker.visible=false;bridge.hideBuildings(false);controls.enabled=true;leave();}}
