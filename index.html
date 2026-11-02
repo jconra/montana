@@ -428,17 +428,17 @@ function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps,dir=1){
 }
 function makeCabin(){
   const g=new THREE.Group();
-  const w=6.5,d=7,wh=3.4,rh=3.0,eave=0.7,DY=1.3,P=2.6;   // DY = deck/floor height above grade, P = porch depth
-  const side=MAT(0xc9a86a),shake=MAT(0xbe9b66),accent=MAT(0x6b4a35),roof=MAT(0x2e3033,.45,.35),
-        glass=MAT(0x28323b,.3),door=MAT(0x3a352f),logM=MAT(0x9c7b4f,.8),deckM=MAT(0xa88b63),
-        railM=MAT(0x9c8358),pier=MAT(0x4a4038),conc=MAT(0xb8b4ab,.95);
+  const w=14*FT,d=16*FT,wh=2.5,rh=1.28,eave=0.58,DY=1.5,P=6*FT;   // DY = deck/floor height above grade, P = porch depth
+  const side=MAT(0xc49a55),shake=MAT(0xb98d4c),accent=MAT(0x7c2a22),roof=MAT(0x3a3438,.45,.35),
+        glass=MAT(0x28323b,.3),door=MAT(0x3a352f),logM=MAT(0x9c7b4f,.8),deckM=MAT(0xa88b63),deckRed=MAT(0x7a2f2c),
+        railM=MAT(0xb08d5c),pier=MAT(0x4a4038),conc=MAT(0xb8b4ab,.95);
   for(const px of [-w/2+0.4,w/2-0.4]) for(const pz of [-d/2+0.4,d/2-0.4]) box(g,0.3,DY,0.3,px,DY/2,pz,pier);
   box(g,w,wh,d,0,DY+wh/2,0,side);
   box(g,w+0.06,1.0,d+0.06,0,DY+wh-0.5,0,shake);                        // shake band under eaves
   // Carry the main ridge and roof planes forward over the porch. The left
   // plane also reaches the widened deck; there is no separate front lean-to.
-  const dExt=P+1.0,deckLeft=-w/2-1.1,deckRight=w/2,deckFront=d/2+dExt;
-  const ridgeY=DY+wh+rh,pitch=rh/(w/2+eave),roofBack=-d/2-eave,roofFront=deckFront+.3;
+  const dExt=3.05,deckLeft=-4.56,deckRight=4.13,deckRedTo=.8,deckFront=d/2+dExt;
+  const ridgeY=DY+wh+rh,pitch=rh/(w/2+eave),roofBack=-d/2,roofFront=d/2+2.26,porchFront=d/2+2.92;
   const roofY=x=>ridgeY-Math.abs(x)*pitch;
   function roofPlane(x0,x1){
     const y0=roofY(x0),y1=roofY(x1),slope=Math.atan2(y1-y0,x1-x0);
@@ -449,14 +449,14 @@ function makeCabin(){
   // The widened left porch continues the same left roof pitch, only over
   // the porch: the shed-side stair run behind it stays uncovered.
   {const x0=deckLeft-.3,x1=-w/2-eave,y0=roofY(x0),y1=roofY(x1);
-   box(g,Math.hypot(x1-x0,y1-y0),.14,roofFront-d/2,(x0+x1)/2,(y0+y1)/2,(roofFront+d/2)/2,roof).rotation.z=Math.atan2(y1-y0,x1-x0);}
+   box(g,Math.hypot(x1-x0,y1-y0),.14,porchFront-d/2,(x0+x1)/2,(y0+y1)/2,(porchFront+d/2)/2,roof).rotation.z=Math.atan2(y1-y0,x1-x0);}
   {const s=new THREE.Shape();s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(0,rh);s.lineTo(-w/2,0);
    const tri=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.1,bevelEnabled:false}),shake);
    tri.position.set(0,DY+wh,d/2); g.add(tri);}                        // front gable infill
   const zf=d/2+0.06;
-  box(g,1.8,1.3,0.14,-0.6,DY+1.7,zf,glass); box(g,2.1,1.6,0.07,-0.6,DY+1.7,zf-0.02,accent);  // window + accent frame
-  box(g,1.0,2.1,0.12,1.9,DY+1.05,zf,door);                            // door
-  box(g,deckRight-deckLeft,.18,dExt,(deckLeft+deckRight)/2,DY-.09,d/2+dExt/2,deckM);
+  box(g,.95,1.1,0.14,-.35,DY+1.45,zf,glass); box(g,1.75,1.25,0.07,-.35,DY+1.45,zf-0.02,accent);  // window + accent frame
+  box(g,.95,2.05,0.12,1.35,DY+1.03,zf,accent);                            // door
+  box(g,deckRedTo-deckLeft,.18,dExt,(deckLeft+deckRedTo)/2,DY-.09,d/2+dExt/2,deckRed);box(g,deckRight-deckRedTo,.18,dExt,(deckRedTo+deckRight)/2,DY-.09,d/2+dExt/2,deckM);
   for(const x of [deckLeft+.18,deckRight-.18])box(g,.25,DY,.25,x,DY/2,deckFront-.2,pier);
   // Log posts/header follow the roof's eave height; the gable above is open.
   for(const x of [deckLeft+.12,-w/2+.12,deckRight-.12]){
@@ -471,14 +471,14 @@ function makeCabin(){
   {const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,w-.24,7),logM);beam.rotation.z=Math.PI/2;beam.position.set(0,roofY(w/2-.12)-.16,deckFront-.12);g.add(beam);}
   railSeg(g,railM,deckLeft,deckFront,deckRight,deckFront,DY,1);
   // Gates in both side rails keep the deck connected to both stairways.
-  const stairZ=d/2+dExt-0.62, stairWidth=.9;
+  const stairZ=d/2+dExt-0.96, stairWidth=.9;
   railSeg(g,railM,deckLeft,d/2,deckLeft,deckFront,DY,1.0);
-  railSeg(g,railM,w/2,d/2, w/2,stairZ-stairWidth/2, DY,1.0);
-  railSeg(g,railM,w/2,stairZ+stairWidth/2, w/2,d/2+dExt, DY,1.0);
+  railSeg(g,railM,deckRight,d/2, deckRight,stairZ-stairWidth/2, DY,1.0);
+  railSeg(g,railM,deckRight,stairZ+stairWidth/2, deckRight,d/2+dExt, DY,1.0);
 
   // Local +X points toward the garage. This is the concrete-pad flight.
   const garageStairs=new THREE.Group();garageStairs.name='cabin-garage-stairs';g.add(garageStairs);
-  stairFlight(garageStairs,deckM,railM,conc,w/2,stairZ,DY,stairWidth,.38,8,1);
+  stairFlight(garageStairs,deckM,railM,conc,deckRight,stairZ,DY,stairWidth,.38,8,1);
   // Opposite side: turn off the porch, then descend back along the cabin wall.
   // The side landing is covered, but the wooden stairs have no roof or pad.
   const landingX=-w/2-.55;
@@ -877,7 +877,7 @@ const lidarReady=(async()=>{
   const dz=new Float32Array(await (await fetch('./assets/distant.bin')).arrayBuffer());
   const {W,H,span}=dj, hole=450;
   function ramp(e){
-    const s=[[1500,0x3f5a2f],[1900,0x50632f],[2300,0x6b6a45],[2650,0x776a55],[2900,0x8a8378],[3100,0xb9b4ab],[3350,0xf4f4f4]];
+    const s=[[1500,0x4c5c3a],[1900,0x3c4c34],[2300,0x2a3d2c],[2650,0x34423a],[2900,0x5d6463],[3100,0xa9adb0],[3350,0xf4f4f4]];
     for(let i=0;i<s.length-1;i++){const[a,ca]=s[i],[b,cb]=s[i+1];
       if(e<=b){const u=Math.max(0,(e-a)/(b-a));
         return[((ca>>16&255)+((cb>>16&255)-(ca>>16&255))*u)/255,((ca>>8&255)+((cb>>8&255)-(ca>>8&255))*u)/255,((ca&255)+((cb&255)-(ca&255))*u)/255];}}
@@ -1361,7 +1361,7 @@ const landscapeReady=(async()=>{
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   // Apply authored transforms after the scatter baseline to preserve existing
   // landscape object IDs. Keep per-axis scale and the full Euler rotation.
-  const buildingDefaults=[{"id":"house:0","position":[4.489372202246411,124.62653236010635,-8.517824259527908],"rotation":[0,0.19421528822354897,0],"scale":[0.9112938043186102,1.0610667620906467,1.0297057220009869]},{"id":"garage:1","position":[-30.64494139875715,124.36310325316515,-9.220906974485542],"rotation":[0,1.114458820671212,0],"scale":[0.9633850621992515,0.9594592022294427,0.7786427647288722]},{"id":"cabin:2","position":[-40.233423059803286,125.78628629416681,34.98448568117447],"rotation":[-3.141592653589793,1.5293853665916681,-3.141592653589793],"scale":[0.8227600306984285,0.6804262076904117,0.6804262076904117]},{"id":"shed:3","position":[-42.748368197928784,126.79592067395072,43.12914611137401],"rotation":[0,1.6406094968746698,0],"scale":[0.7901327877800801,1,0.8610203444559691]}];
+  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-38.99,125.7,37.7],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.748368197928784,126.79592067395072,43.12914611137401],"rotation":[0,1.6406094968746698,0],"scale":[0.7901327877800801,1,0.8610203444559691]}];
   for(const [i,rec] of placed.entries()){
     const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];

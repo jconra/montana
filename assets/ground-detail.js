@@ -92,19 +92,26 @@ export function createGroundDetail(half,driveway){
       grassWeight=mix(grassWeight,.93,moisture.a);
       road=mix(road,surfacePaint.r,surfacePaint.a);
       grassWeight=mix(grassWeight,.95,surfacePaint.a*(1.-surfacePaint.r));
+      // Open slopes run drier than the lawn and meadow: broad tan patches, greener wherever moisture or the lawn says so.
+      float slopeDry=(1.-coverage.g)*(1.-moisture.a)*(1.-coverage.b)*smoothstep(.3,.75,.5+.3*sin(landUV.x*.13+sin(landUV.y*.09)*1.7)+.2*sin(landUV.y*.19-landUV.x*.05));
+      grass=mix(grass,vec3(dot(grass,vec3(.5)))*vec3(1.28,1.12,.72),slopeDry*.62);
+      grass=mix(vec3(dot(grass,vec3(.33))),grass,1.08);
       vec3 land=mix(soil,grass,grassWeight);
       land*=.88+patches*.24;
       vec3 detailed=mix(land,stone,steep*.7);
       detailed=mix(diffuseColor.rgb,detailed,.9);
       detailed=mix(detailed,gravel,road*.94);
       float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
-      diffuseColor.rgb=mix(diffuseColor.rgb,detailed,detailEnabled*proximity);
+      // Beyond the painted ground the photo is a dry-season view: pull it toward the green, darker ridges.
+      vec3 distantLand=mix(vec3(dot(diffuseColor.rgb,vec3(.33))),diffuseColor.rgb,.7)*vec3(.6,.74,.58);
+      diffuseColor.rgb=mix(distantLand,detailed,proximity);
+      if(detailEnabled<.5)diffuseColor.rgb=distantLand;
       #endif
       vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
       diffuseColor.rgb*=1.-canopy*.75;`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v6';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v7';}};
 }
 export function rockGeometry(seed){
   const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);
