@@ -66,6 +66,24 @@ function lumber(pieces,color=0x9c8a6c){const g=new THREE.Group(),R=rng(77),m=mat
 function brushPile(){const g=new THREE.Group(),R=rng(303),m=mat(0x6b5a43),d=mat(0x4a3f30);for(let i=0;i<34;i++){const a=R()*6.283,l=1.4+R()*1.6,c=new THREE.Mesh(new THREE.CylinderGeometry(.018,.045,l,5),R()<.5?m:d);c.position.set(Math.cos(a)*R()*.9,.12+R()*.55,Math.sin(a)*R()*.9);c.rotation.set((R()-.5)*1.1,R()*6.28,Math.PI/2+(R()-.5)*.8);g.add(c);}mergeGroup(g);return g;}
 function pedestal(w,h,d,color){const g=new THREE.Group();box(g,[w,h,d],[0,h/2,0],mat(color));box(g,[w*1.1,.04,d*1.1],[0,h+.02,0],mat(color));mergeGroup(g);return g;}
 function board(len,w,color=0xc4ad80){const g=new THREE.Group();box(g,[len,.05,w],[0,.04,0],mat(color));mergeGroup(g);return g;}
+// The root cellar's outer door, built new and tidy: a framed plank door lying on the slope, measured by triangulating its outline in two drone frames
+// (about 1.2 x 1.85 m, rising 26 degrees to the north), with the plain pale threshold panel at its lower end. Local +z runs downhill; y is from the ground at its centre.
+function rootCellar(){const g=new THREE.Group(),R=rng(1417),W=1.2,L=1.85,frame=mat(0x5f4a33),strap=mat(0x3a342e);
+ const door=new THREE.Group();door.position.set(0,.04,0);door.rotation.x=Math.atan(.49);g.add(door);
+ const n=7;for(let i=0;i<n;i++)box(door,[W/n-.01,.05,L],[(i-(n-1)/2)*W/n,.03,0],mat([0x7c6549,0x735d43,0x846c4f][Math.floor(R()*3)]));
+ for(const z of [-.62,.1])box(door,[W-.04,.03,.12],[0,.07,z],frame);
+ for(const x of [-.34,.34])box(door,[.05,.012,.42],[x,.09,-.62-.02],strap);
+ for(const x of [-1,1])box(door,[.13,.14,L+.26],[x*(W/2+.065),.03,0],frame);
+ for(const z of [-1,1])box(door,[W+.26,.14,.13],[0,.03,z*(L/2+.065)],frame);
+ box(door,[.66,.03,.85],[0,.075,.42],mat(0xbdb8ac));
+ door.traverse(o=>{if(o.isMesh)o.updateMatrix();});door.updateMatrix();
+ for(const m of [...door.children]){m.applyMatrix4(door.matrix);g.add(m);}g.remove(door);
+ mergeGroup(g);return g;}
+// The old timbers lying just above the door, measured; left as they are.
+function cellarTimbers(){const g=new THREE.Group(),beam=mat(0x8a7a64),O=new THREE.Vector3(-7,125.3,-6);
+ const add=(x0,y0,z0,x1,y1,z1,r)=>{const a=new THREE.Vector3(x0,y0,z0).sub(O),d=new THREE.Vector3(x1,y1,z1).sub(O).sub(a),m=new THREE.Mesh(new THREE.CylinderGeometry(r*.9,r,d.length(),7),beam);m.position.copy(a).addScaledVector(d,.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.clone().normalize());g.add(m);};
+ add(-7.96,125.08,-5.76,-5.97,125.21,-5.67,.09);add(-7.86,125.6,-6.54,-6.1,125.64,-6.41,.08);add(-7.5,125.5,-6.75,-6,125.58,-6.6,.07);
+ g.children.forEach(m=>m.updateMatrix());mergeGroup(g);return g;}
 function grassGeometry(seed,reed=false){
  const R=rng(seed),positions=[],colors=[],indices=[];
  const add=(x,y,z,c)=>{positions.push(x,y,z);colors.push(...c);};
@@ -164,7 +182,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   // Trim after generating the stable scatter: changing this footprint must not
   // renumber the sagebrush objects in existing exported landscape edits.
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
-    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(roadCoverage(t.x,t.z)>.3||correctedRoute.nearest(t.x,t.z).distance<.5||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
+    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(Math.abs(t.x+7.28)<1&&Math.abs(t.z+4.67)<1.2||roadCoverage(t.x,t.z)>.3||correctedRoute.nearest(t.x,t.z).distance<.5||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
       if(chunk.kind!=='grass')return s.lawn<.3;
       // Open ground now has the meadow grass; these full tufts stay only in the marked tall patches and reclaimed corners.
       if(!t.tallPatch&&!(t.s>=.8&&grassReclaim(t.x,t.z)>.5)&&s.tallGrass<.1)return false;
@@ -184,10 +202,12 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),{x:-9.3,z:37.3},-.3,'prop:wood','Firewood heap');
  // Ground clutter measured on the May mosaic and by rays from solved frames.
  [[tarp(0x4a9fd0,3,1.2),-6.6,33.5,-.42,'tarp-blue','Blue tarp'],[tarp(0xa89e8e,2,1.4),-9.7,35,-.3,'tarp-pale','Pale tarp'],[tarp(0x3f7fb0,3.6,.8),-7.1,35.9,-.05,'tarp-dark','Blue tarp, folded'],
-  [lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.5,-6.5,.8,'brush-house','Brush heap'],
-  [board(2.1,1.2,0x7d5f42),-7.4,-4.7,1.5,'door-slab','Old door panel'],[board(1,.7,0xe6e2d8),-7.3,-4.1,1.5,'white-panel','White panel'],[board(3.5,.1),-3.5,-2.1,.05,'pole-entry','Pole by the entry'],[board(2.8,.1,0x8b7355),-3.7,.05,0,'pole-entry-2','Pole by the entry'],
+  [lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
+  [board(3.5,.1),-3.5,-2.1,.05,'pole-entry','Pole by the entry'],[board(2.8,.1,0x8b7355),-3.7,.05,0,'pole-entry-2','Pole by the entry'],
   [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
+ place(rootCellar(),{x:-7.28,z:-4.67},.03,'prop:root-cellar','Root cellar door');
+ {const g=cellarTimbers(),p=place(g,{x:-7,z:-6},0,'prop:cellar-timbers','Old timbers');g.position.y=125.3;props.at(-1).baseY=125.3;}
  {const g=new THREE.Group();log(g,2.8,.13,[0,.12,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x:-27.5,z:17.5},.97,'prop:log-west','Downed log');}
  // Loose logs beside the upper pit, measured from solved drone cameras.
  [[1.76,.15,-6.59,21.27,.49],[.95,.17,-5.3,23.22,1.45]].forEach(([len,r,x,z,yaw],i)=>{const g=new THREE.Group();log(g,len,r,[0,r*.8,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x,z},yaw,`prop:loose-log:${i}`,`Loose log ${i+1}`);});
