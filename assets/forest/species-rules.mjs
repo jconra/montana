@@ -26,12 +26,14 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
  if(neighbours<=11){if(h<=7)return r<.7?'juniper':'fir_small';if(h<=13)return r<.45?'juniper':r<.8?'open_fir':'fir_small';return r<.45?'fir':r<.8?'open_fir':'spruce';}
  if(h<=6)return r<.45?'juniper':'fir_small';
  if(h<=13)return r<.75?'fir_small':'spruce';
+ // A few dead silver snags stand in the deep forest.
+ if(treeHash(id,21)<.045)return 'snag';
  return r<.55?'fir':'spruce';
 }
 // How wide a tree stands for its height: big firs are narrower for their height than young ones; tall junipers are columns, small ones round.
 export function treeWide(kind,id,h){const r=treeHash(id,4);
  if(kind==='juniper'){const t=Math.max(0,Math.min(1,(h-4)/4));return (1.15+r*.45)*(1-t)+(.6+r*.26)*t;}
- return (.78+r*.35)*Math.min(1,Math.sqrt(13/Math.max(1,h)));
+ return (1.25+r*.55)*Math.min(1,Math.pow(13/Math.max(1,h),.25));
 }
 
 // A saved record naming an old pine takes the kind its position calls for. Everything else about it stays.
@@ -47,4 +49,11 @@ export function toneTint(kind,tone){
  if(typeof tone!=='string'||!/^#[0-9a-f]{6}$/i.test(tone))return null;
  const ref=TONE_REF[kind]||'#4c5c32',ch=(h,i)=>Math.pow(parseInt(h.substr(1+i*2,2),16)/255,2.2);
  return [0,1,2].map(i=>Math.max(.35,Math.min(2.2,ch(tone,i)/Math.max(.002,ch(ref,i)))));
+}
+
+// Evergreen tones as the frames show them, tree to tree: yellow-olive, olive, grey-green, blue-grey, a rusty one now and then. r g b multipliers over the model's own colour.
+export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
+export function evergreenTone(id,juniper=false){
+ const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.22?0:a<.5?1:a<.78?2:a<.94?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.78:.68)+b*.34;
+ return [t[0]*lift,t[1]*lift,t[2]*lift];
 }

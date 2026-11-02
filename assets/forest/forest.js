@@ -7,6 +7,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bakeImposterSteps, imposterMaterial } from './imposter.js';
 import { swayMaterial } from './wind.js';
 import { shapeFoliage, SHAPE_DEFAULTS } from './foliage.js';
+import { gradeLand } from '../land-grade.mjs';
 
 // a thin tree filled out: each leaf card (four corners in a row, as ez-tree makes them) grown about its middle, and `copies`
 // copies of each added, turned about the upright through its middle and nudged out from the trunk, so the crown fills in
@@ -259,7 +260,7 @@ export class Forest {
       geo.instanceCount = 0;
       let glow = 0, sheen = 0; sp.root.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (m.lightMap) glow = Math.max(glow, m.lightMapIntensity); if (m.isMeshStandardMaterial) sheen = Math.max(sheen, (1 - m.metalness) * (sp.spec ?? (sp.upNormals ? 0.25 : 1))); } });      // (a tree with its own even light, as the low-poly pines have: its far versions get it too; drawn with MeshStandardMaterial: its far versions get the same faint sheen)
       const mat = imposterMaterial(sp.bake, { sunDir: this.sunDir, blend: true, depth: !this.light, shadows: this.shadows, soften: sp.soften || 0, wind: this.wind ? (sp.sway ?? 1) : 0, glow, sheen });
-      if (this.calm) for (const [k, v] of Object.entries(this.calm)) mat.uniforms[k].value = v;
+      gradeLand(mat); if (this.calm) for (const [k, v] of Object.entries(this.calm)) mat.uniforms[k].value = v;
       Object.assign(mat.uniforms, this.landU, this.edgeU);
       mat.uniforms.blendDist.value = this.blendDist ?? 300; if (this.useDepth !== undefined) mat.uniforms.useDepth.value = this.useDepth ? 1 : 0;
       const imposter = new THREE.Mesh(geo, mat); imposter.frustumCulled = false; imposter.castShadow = this.shadows; imposter.customDepthMaterial = mat.userData.depthMaterial;
@@ -275,6 +276,7 @@ export class Forest {
         // sunlight through the outer leaves when you look toward the sun
         const leafy = !!(sp.shape && o.geometry.attributes.aSky), under = sp.shape?.under ?? SHAPE_DEFAULTS.under, glow = sp.shape?.glow ?? SHAPE_DEFAULTS.glow;
         for (const mat of [].concat(m.material)) {
+          gradeLand(mat);
           const cover = !!(sp.coverage && mat.alphaTest > 0 && mat.map && mat.map.image);   // (leaf cards drawn with alpha to coverage: see COVER_ALPHA)
           mat.onBeforeCompile = (sh) => {
             Object.assign(sh.uniforms, this.landU, this.edgeU);

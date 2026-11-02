@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import {polygonDistance} from './property-layout.mjs';
 import {roadCoverage} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
+import {gradeLand} from './land-grade.mjs';
 const CHUNK=24,RADIUS=[28,42,58,78,100],DENSITY=[.25,.45,.7,.9,1];
 const FOOTPRINTS=[{x:8.78,z:-4.88,hx:11.2,hz:5.2,yaw:.15},{x:-30.73,z:-8.2,hx:4.6,hz:4.6,yaw:1.16},{x:-38.99,z:37.7,hx:3.2,hz:4,yaw:1.6},{x:-42.75,z:43.13,hx:1.6,hz:1.6,yaw:1.64},{x:-7.28,z:-4.67,hx:.9,hz:1.2,yaw:.03}];
 const hash=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s);};
@@ -17,8 +18,8 @@ const floats=s=>new Float32Array(bytes(s).buffer);
 // One clump of curved blades; one metre across at size 1.
 function tuft({blades,height,width,spread,seed}){
  const pos=[],aH=[],idx=[];let s=seed;const rnd=()=>((s=(s*16807)%2147483647)/2147483647);
- for(let b=0;b<blades;b++){const a=rnd()*6.283,d=Math.sqrt(rnd())*spread,bx=Math.cos(a)*d,bz=Math.sin(a)*d,turn=rnd()*6.283,h=height*(.6+.75*rnd()),bend=(.25+.5*rnd())*h,c=Math.cos(turn),n=Math.sin(turn),base=pos.length/3;
-  for(let i=0;i<=2;i++){const t=i/2,w=width*(1-.85*t),x=t*t*bend,y=(2*(1-t)*t*.62+t*t)*h;for(const e of [-1,1]){pos.push(bx+c*w*e+n*x,y,bz-n*w*e+c*x);aH.push(t);}}
+ for(let b=0;b<blades;b++){const a=rnd()*6.283,d=Math.sqrt(rnd())*spread,bx=Math.cos(a)*d,bz=Math.sin(a)*d,face=rnd()*6.283,lean=(rnd()-.5)*1.1,h=height*(.6+.75*rnd()),bend=(.5+.6*rnd())*h,c=Math.cos(face),n=Math.sin(face),lx=Math.cos(lean),lz=Math.sin(lean),base=pos.length/3;
+  for(let i=0;i<=2;i++){const t=i/2,w=width*(1-.85*t),x=t*t*bend,y=(2*(1-t)*t*.62+t*t)*h;for(const e of [-1,1]){pos.push(bx+c*w*e+lx*x,y,bz-n*w*e+lz*x);aH.push(t);}}
   for(let i=0;i<2;i++){const q=base+i*2;idx.push(q,q+1,q+3,q,q+3,q+2);}}
  return geometry(pos,null,null,aH,idx);
 }
@@ -45,7 +46,7 @@ export async function loadPlantFillMap(){
 export async function createPlantFill({scene,heightAt,fill}){
  const {data,at}=fill,wind={value:0},far={value:58};let seed=20261102;const R=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
  const models=await (await fetch(new URL('./models/fill-plants.json',import.meta.url))).json();
- const material=new THREE.MeshLambertMaterial({side:THREE.DoubleSide,vertexColors:true});material.name='plant-fill';
+ const material=gradeLand(new THREE.MeshLambertMaterial({side:THREE.DoubleSide,vertexColors:true}));material.name='plant-fill';
  material.onBeforeCompile=sh=>{
   Object.assign(sh.uniforms,{fillTime:wind,fillFar:far});
   sh.vertexShader=`attribute float aH;attribute vec3 iPos;attribute vec4 iTurn;attribute vec3 iCol;uniform float fillTime,fillFar;varying vec3 vFill;\n`+sh.vertexShader.replace('#include <begin_vertex>',`
@@ -59,7 +60,7 @@ export async function createPlantFill({scene,heightAt,fill}){
   sh.fragmentShader=`varying vec3 vFill;\n`+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n diffuseColor.rgb*=vFill;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.12,.18,.12);');
  };
  material.customProgramCacheKey=()=>'plant-fill-v2';
- const shapes={lush:tuft({blades:14,height:.4,width:.03,spread:.32,seed:11}),dry:tuft({blades:7,height:.18,width:.022,spread:.2,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
+ const shapes={lush:tuft({blades:20,height:.36,width:.015,spread:.42,seed:11}),dry:tuft({blades:9,height:.16,width:.013,spread:.26,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
  const inWater=(x,z)=>{let c=false;const w=data.water;for(let i=0,j=w.length-1;i<w.length;j=i++)if((w[i][1]>z)!==(w[j][1]>z)&&x<(w[j][0]-w[i][0])*(z-w[i][1])/(w[j][1]-w[i][1])+w[i][0])c=!c;return c;};
  const road=data.road,nearRoad=(x,z)=>{for(let i=1;i<road.length;i++){const a=road[i-1],b=road[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));if(Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<1.3)return true;}return false;};
  const clear=(x,z)=>{if(nearRoad(x,z))return false;for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}return polygonDistance(x,z)<-.6&&!inWater(x,z)&&roadCoverage(x,z)<.3;};
