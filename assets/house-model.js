@@ -1,4 +1,6 @@
 import {clipRoofPolygon,roofOpeningPolygon,roofPanelGeometry} from './roof-panels.mjs';
+import {boardTile,stoneTile} from './wood-sheet.mjs';
+import {makeGlass} from './glass.mjs';
 
 // Shared house builder — used by the designer's live preview and by the terrain scene.
 // Polygon-footprint spec (no more rectangular "shell"):
@@ -33,7 +35,7 @@ export const TEX_LIST = [
 ];
 const ROOF_FEET={metal:8,seam:32/3,rib:6};   // feet per tile on roof panels; each tile holds 8 seams
 const TEX_REPEAT={siding:[1,1],sidingw:[1,1],vboard:[1,1],seam:[1,1],rib:[1,1],wood:[2,2],plaster:[4,4],metal:[3,4],brick:[3,3],stone:[3,3],shingle:[4,4]}; // tiles per face (0..1 UV geometry)
-const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:4,shingle:2,siding:4,sidingw:4,vboard:4};                          // feet per tile (world-UV geometry, e.g. floor slabs)
+const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:2.3,shingle:2,siding:4,sidingw:4,vboard:4};                          // feet per tile (world-UV geometry, e.g. floor slabs)
 function _rng(seed){ let s=(seed>>>0)||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function _rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function paintTex(ctx,id,S){
@@ -46,19 +48,16 @@ function paintTex(ctx,id,S){
       ctx.fillStyle='rgba(30,20,10,0.5)'; ctx.fillRect(0,p*ph,S,2); }                                   // plank seam
   } else if(id==='siding'||id==='sidingw'){                                  // near-white so the swatch colour reads true
     const courses=id==='sidingw'?4:6, ph=S/courses;
-    for(let p=0;p<courses;p++){ const base=232+Math.floor(rnd()*14); ctx.fillStyle=`rgb(${base},${base},${base})`; ctx.fillRect(0,p*ph,S,ph);
-      ctx.fillStyle='rgba(0,0,0,.2)'; ctx.fillRect(0,p*ph,S,Math.max(2,S/128));
-      ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fillRect(0,p*ph+Math.max(2,S/128),S,1); }
+    boardTile(ctx,S,courses,false);
+    for(let p=0;p<courses;p++){ ctx.fillStyle='rgba(0,0,0,.2)'; ctx.fillRect(0,p*ph,S,Math.max(2,S/128)); ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fillRect(0,p*ph+Math.max(2,S/128),S,1); }
   } else if(id==='vboard'){
-    const boards=3, pw=S/boards;
-    for(let p=0;p<boards;p++){ const base=226+Math.floor(rnd()*20); ctx.fillStyle=`rgb(${base},${base},${base})`; ctx.fillRect(p*pw,0,pw,S);
-      ctx.fillStyle='rgba(0,0,0,.42)'; ctx.fillRect(p*pw-S/48,0,S/128,S); ctx.fillRect(p*pw+S/48,0,S/128,S);
-      ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(p*pw-S/48,0,S/24,S); }
+    const boards=3, pw=S/boards; boardTile(ctx,S,boards,true);
+    for(let p=0;p<boards;p++){ ctx.fillStyle='rgba(0,0,0,.42)'; ctx.fillRect(p*pw-S/48,0,S/128,S); ctx.fillRect(p*pw+S/48,0,S/128,S); ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(p*pw-S/48,0,S/24,S); }
   } else if(id==='seam'||id==='rib'){
     ctx.fillStyle='rgb(238,238,238)'; ctx.fillRect(0,0,S,S);
     const seams=8, sw=S/seams;
     for(let i=0;i<seams;i++){ const x=i*sw+1;
-      ctx.fillStyle='rgba(0,0,0,.85)'; ctx.fillRect(x+Math.max(2,S/170),0,Math.max(3,S/100),S);     // shadow side
+      ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(x+Math.max(2,S/170),0,Math.max(2,S/220),S);     // shadow side
       ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(x,0,Math.max(2,S/170),S);                  // lit edge
       ctx.fillStyle='rgba(0,0,0,.14)'; ctx.fillRect(x+sw/2,0,Math.max(2,S/256),S); }                // faint rib between the seams
   } else if(id==='plaster'){
@@ -78,9 +77,7 @@ function paintTex(ctx,id,S){
     for(let r=0;r<rows;r++){ const off=(r%2)*bw/2;
       for(let c=-1;c<5;c++){ const b=150+Math.floor(rnd()*40); ctx.fillStyle=`rgb(${b},${b},${b})`; ctx.fillRect(c*bw+off+1.5,r*bh+1.5,bw-3,bh-3); } }
   } else if(id==='stone'){
-    ctx.fillStyle='rgb(105,105,105)'; ctx.fillRect(0,0,S,S);
-    for(let i=0;i<26;i++){ const b=140+Math.floor(rnd()*55); ctx.fillStyle=`rgb(${b},${b},${b})`;
-      _rr(ctx,rnd()*S,rnd()*S,S*0.12+rnd()*S*0.16,S*0.1+rnd()*S*0.14,4); ctx.fill(); ctx.strokeStyle='rgba(55,55,55,0.4)'; ctx.stroke(); }
+    stoneTile(ctx,S);
   } else if(id==='shingle'){
     ctx.fillStyle='rgb(118,118,118)'; ctx.fillRect(0,0,S,S);
     const rows=6, rh=S/rows, cols=6, cw=S/cols;
@@ -136,7 +133,7 @@ export function buildHouse(THREE, spec, opts){
   const winFrames = !!spec.windowFrames;                            // optional trim frame around each window
   const roofMat=new THREE.MeshStandardMaterial({color:defRoof,roughness:.6,metalness:.3,flatShading:true,side:THREE.DoubleSide});
   const trimMat=new THREE.MeshStandardMaterial({color:defTrim,roughness:1,flatShading:true,side:THREE.DoubleSide});
-  const glassMat=new THREE.MeshStandardMaterial({color:0x141a20,roughness:.25,metalness:.1,flatShading:true,transparent:true,opacity:.86});
+  const glassMat=makeGlass(THREE,{alpha:spec.glassAlpha??.5});
   const doorMat=new THREE.MeshStandardMaterial({color:0x3a2c1e,roughness:.9,flatShading:true});
 
   const streakMat=()=>{if(matCache.__streak)return matCache.__streak;
@@ -416,9 +413,12 @@ export function buildHouse(THREE, spec, opts){
       const pm=new THREE.Mesh(pg, it.mat); pm.position.set(p[0], y+h/2, p[1]); g.add(pm); });   // inherit the partition's material so it matches when painted
   });
   if(!opts.noRoof){ if(spec.roof && spec.roof.style && spec.roof.style!=='none') roof(F[F.length-1].outline, acc, spec.roof);   // legacy whole-house roof (new designs use a roof piece instead)
+    const skyCuts=(spec.roofPieces||[]).map(()=>[]);
+    (spec.details||[]).forEach(d=>{if(d.type!=='skylight'||d.onRoof==null||!spec.roofPieces?.[d.onRoof])return;const mt=roofMetrics(spec.roofPieces[d.onRoof]),c=Math.cos(Math.atan(mt.slope));
+      skyCuts[d.onRoof].push(mt.along?{x:d.x,z:d.z,w:d.w,d:d.d*c}:{x:d.x,z:d.z,w:d.w*c,d:d.d});});
     const okPiece=rp=> rp.w>0.5&&rp.d>0.5&&isFinite(rp.x)&&isFinite(rp.z)&&isFinite(rp.base||0)&&isFinite(rp.pitch??0.5);
     (spec.roofPieces||[]).forEach((rp,pi)=>{ if(okPiece(rp))   // every roof (incl. the main house) is one of these
-      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:rp.holes,overhang:rp.overhang,rake:rp.rake,rise:rp.rise,fasciaMat:rp.fasciaMat,fasciaH:rp.fasciaH}, {pi}); });
+      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:[...(rp.holes||[]),...skyCuts[pi]],overhang:rp.overhang,rake:rp.rake,rise:rp.rise,fasciaMat:rp.fasciaMat,fasciaH:rp.fasciaH}, {pi}); });
     // raise the walls sitting under a roof piece up into its underside (opt-in, gable pieces)
     (spec.roofPieces||[]).forEach(rp=>{ if(!rp.raiseWalls||!okPiece(rp)||(rp.style||'gable')!=='gable') return;
       const rw=rp.w, rd=rp.d, {along,span,rise,run}=roofMetrics(rp), base=rp.base||0;
@@ -464,13 +464,13 @@ export function buildHouse(THREE, spec, opts){
       for(const x of [-w/2,w/2]){part(.22,.22,dep,x,h,0,rail);part(.16,.16,dep,x,.4,0,rail);for(let z=-dep/2;z<dep/2;z+=.55)part(.08,h,.08,x,h/2,z,rail);}
     }else if(d.type==='archedWindow'){
       const shape=new THREE.Shape();shape.moveTo(-w/2,-h/2);shape.lineTo(w/2,-h/2);shape.absellipse(0,-h/2,w/2,h,0,Math.PI,false);shape.closePath();
-      const glass=glassMat.clone();glass.transparent=false;glass.opacity=1;
-      dg.add(new THREE.Mesh(new THREE.ShapeGeometry(shape,24),glass));
+      dg.add(new THREE.Mesh(new THREE.ShapeGeometry(shape,24),glassMat));
       const points=shape.getPoints(32).map(p=>new THREE.Vector3(p.x,p.y,.05)),curve=new THREE.CatmullRomCurve3(points,true);
       dg.add(new THREE.Mesh(new THREE.TubeGeometry(curve,64,.10,6,true),material));
     }else if(d.type==='skylight'){
-      const pale=d.glass?new THREE.MeshStandardMaterial({color:d.glass,roughness:.3,flatShading:true}):glassMat;
-      part(w+.3,h,dep+.3,0,0,0,swatchMat(d.mat,defTrim));part(w,.04,dep,0,h/2+.025,0,pale);
+      const cm=swatchMat(d.mat,defTrim),cb=.2;   // curb round an opening cut in the roof, so the glass is a real window
+      part(cb,h,dep+.3,-(w+.3-cb)/2,0,0,cm);part(cb,h,dep+.3,(w+.3-cb)/2,0,0,cm);part(w+.3-2*cb,h,cb,0,0,-(dep+.3-cb)/2,cm);part(w+.3-2*cb,h,cb,0,0,(dep+.3-cb)/2,cm);
+      part(w,.04,dep,0,h/2-.05,0,glassMat);
       if(d.apronMat!=null){const am=swatchMat(d.apronMat,defTrim),len=d.apron??1,y=-h/2+.04;   // flashing apron on the downslope side
         if(seatAlong)part(w+.7,.06,len,0,y,sg*(dep/2+len/2),am);else part(len,.06,dep+.7,sg*(w/2+len/2),y,0,am);}
     }else if(d.type==='railing'){                              // posts, top + bottom rails and balusters along one run

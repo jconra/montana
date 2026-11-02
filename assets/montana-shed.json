@@ -85,7 +85,7 @@
     "#2a2622",
     "#858275",
     "#d5d1c4",
-    "#6f6a5e",
+    "#c9c3b4",
     "#141414",
     "#2f3a20",
     "#3a2a1c"
@@ -105,5 +105,6 @@
     "trim": "#6a5a44"
   },
   "windowFrames": true,
-  "frameW": 0.2
+  "frameW": 0.2,
+  "glassAlpha": 1
 }

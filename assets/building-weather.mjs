@@ -1,133 +1,250 @@
-// Per-pixel weathering for the buildings: dust, streaks, sun fade, board and panel variation, and peeling paint.
-// World-space noise needs no UVs and never repeats on a wall, so it breaks up tiled siding and roof maps.
-// GLSL ES 1.0 only (WebGL1 safe). The work sits behind one uniform, so the lowest quality level skips it.
-const FT=.3048;
-let noiseTexture=null;
+// Per-pixel weathering for the buildings, worked out from world position and facing plus a four-channel noise texture:
+// paint chipping and edge wear, grain-following peel, run marks below drip edges, splash and a dirt band near the ground,
+// bevelled board edges. GLSL ES 1.0 (WebGL1 safe). One uniform switches it off at the lowest quality level.
+import {sharedTextures} from './wood-sheet.mjs';
 const amount={value:1};
-function makeNoise(THREE){
-  if(noiseTexture)return noiseTexture;
-  const S=256,data=new Uint8Array(S*S*4);
-  const lattice=[];let seed=1234567;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-  const layer=period=>{const g=new Float32Array(period*period);for(let i=0;i<g.length;i++)g[i]=rnd();return g;};
-  const sample=(g,period,u,v)=>{const x=u*period,y=v*period,x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0,sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy),at=(a,b)=>g[((b%period)*period)+(a%period)];
-    return (at(x0,y0)*(1-sx)+at(x0+1,y0)*sx)*(1-sy)+(at(x0,y0+1)*(1-sx)+at(x0+1,y0+1)*sx)*sy;};
-  const channels=[[4,8,16,32],[8,16,32,64],[16,32,64,128],[32,64,128,256]].map(ps=>ps.map(p=>[p,layer(p)]));
-  for(let y=0;y<S;y++)for(let x=0;x<S;x++)channels.forEach((c,ch)=>{let n=0,w=.5,t=0;for(const [p,g] of c){n+=sample(g,p,x/S,y/S)*w;t+=w;w*=.55;}data[(y*S+x)*4+ch]=Math.round(255*n/t);});
-  const t=new THREE.DataTexture(data,S,S,THREE.RGBAFormat);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.minFilter=THREE.LinearMipmapLinearFilter;t.magFilter=THREE.LinearFilter;t.generateMipmaps=true;t.needsUpdate=true;
-  return noiseTexture=t;
-}
-const KIND={plain:0,hsiding:1,roof:2,roofV:2,deck:3,rail:4,vboard:5};
-const VERT_PARS='varying vec3 vWxP;varying vec3 vWxL;varying vec3 vWxN;\n';
-const VERT_MAIN=`
-  vWxL=transformed;vWxP=(modelMatrix*vec4(transformed,1.)).xyz;vWxN=normalize((modelMatrix*vec4(objectNormal,0.)).xyz);`;
-const FRAG_PARS=`uniform sampler2D uWxNoise;uniform float uWxAmt,uWxEave,uWxBoard,uWxWear,uWxPanelV;varying vec3 vWxP;varying vec3 vWxL;varying vec3 vWxN;
-float wxSq(float v){return v*v;}
-float wxStretch(float n,float k){return clamp((n-.5)*k+.5,0.,1.);}
+const VERT_PARS=`varying vec3 vWxP;varying vec3 vWxL;varying vec3 vWxN;
+#ifdef W_BOX
+attribute vec4 aLocalTop;attribute vec4 aHalf;attribute vec4 aTintPaint;varying vec4 vLocalTop;varying vec4 vHalf;varying vec4 vTintPaint;
+#endif
 `;
-const FRAG_MAIN=`
-if(uWxAmt>.5){
-  vec3 wP=vWxP,wL=vWxL,wN=normalize(vWxN);
-  float wVert=1.-abs(wN.y),wAlong=dot(wP.xz,vec2(-wN.z,wN.x)),wH=wL.y;
-  vec2 wFlat=abs(wN.y)>.6?wP.xz:vec2(wAlong,wP.y);
-  vec4 wBig=texture2D(uWxNoise,wFlat*.043+.17);
-  vec4 wFine=texture2D(uWxNoise,wFlat*.61);
-  float wLum=dot(diffuseColor.rgb,vec3(.3,.59,.11));
-  vec3 wDust=vec3(.17,.135,.1);
-  float wSun=clamp(dot(wN,normalize(vec3(-.7,.45,.45))),0.,1.);
-  #if W_KIND==3
-    // Deck boards: red coat sun-baked and flaking to grey wood, worst on the north section and on the walked path.
-    float wX=wL.x/${FT},wZ=wL.z/${FT},wB=wX/.46,wId=floor(wB),wF=fract(wB);
-    float wGap=1.-smoothstep(.015,.055,min(wF,1.-wF));
-    float wBoard=texture2D(uWxNoise,vec2(wId*.173,.37)).r;
-    float wNorth=smoothstep(-3.,8.,wX);
-    float wPath=exp(-wxSq((wZ-10.8)/2.3))*smoothstep(0.,4.,wX);
-    float wDoor=exp(-(wxSq((wX-4.3)/3.)+wxSq((wZ-9.3)/2.)));
-    float wBench=exp(-(wxSq((wX+2.)/4.)+wxSq((wZ-10.)/2.)));
-    float wUndisturbed=smoothstep(12.2,13.8,wZ)*.22;
-    float wStep=smoothstep(13.,13.6,wX);
-    float wW=clamp(.26+.56*wNorth+.3*wPath+.28*wDoor+.16*wBench-wUndisturbed+(wBoard-.5)*.5+wStep*.2,0.,1.);
-    float wFlk=wxStretch(texture2D(uWxNoise,vec2(wB*.11+wId*.31,wZ*.09)).g,2.6)*.62+wxStretch(texture2D(uWxNoise,vec2(wB*.47,wZ*.31)).b,2.4)*.38;
-    float wPaint=1.-smoothstep(1.-wW-.025,1.-wW+.04,wFlk);
-    vec3 wRed=mix(vec3(.105,.012,.016),vec3(.2,.055,.05),smoothstep(.3,.8,wBig.g*.55+wBoard*.45+wNorth*.15));
-    wRed*=.85+.3*wFine.b;
-    float wGrain=texture2D(uWxNoise,vec2(wB*.9,wZ*.14+wId*.37)).b;
-    vec3 wWood=vec3(.215,.185,.15)*(.62+.62*wBoard+.5*(wGrain-.5))*(.9+.2*wBig.r);
-    diffuseColor.rgb=mix(wWood,wRed,wPaint);
-    diffuseColor.rgb*=1.-.72*wGap;
-    if(wN.y<.5)diffuseColor.rgb*=.8;
-    diffuseColor.rgb=mix(diffuseColor.rgb,wDust,.1*wBig.b*max(wN.y,0.));
-  #elif W_KIND==4
-    // Rails, rim boards and posts: brown stain baked off along the grain to silvery wood.
-    vec2 wG=abs(wN.y)>.6?wP.xz*1.15:(uWxPanelV>.5?vec2(wAlong*.42,wP.y*4.2):vec2(wAlong*4.2,wP.y*.42));
-    float wN1=wxStretch(texture2D(uWxNoise,wG*.42).g,2.5),wN2=wxStretch(texture2D(uWxNoise,wG*1.1).b,2.2);
-    float wPeel=smoothstep(1.-uWxWear-.05,1.-uWxWear+.08,wN1*.65+wN2*.35+max(wN.y,0.)*.22+(wBig.r-.5)*.3);
-    vec3 wStain=diffuseColor.rgb*(.82+.4*wFine.g);
-    vec3 wBare=vec3(.28,.25,.205)*(.72+.56*wN2);
-    diffuseColor.rgb=mix(wStain,wBare,wPeel);
-  #elif W_KIND==2
-    // Metal roof: panel-to-panel tone, long run marks and soft sun fade.
+const VERT_MAIN=`vWxL=transformed;vWxP=(modelMatrix*vec4(transformed,1.)).xyz;vWxP.y-=modelMatrix[3].y;vWxN=normalize((modelMatrix*vec4(objectNormal,0.)).xyz);
+#ifdef W_BOX
+vLocalTop=aLocalTop;vHalf=aHalf;vTintPaint=aTintPaint;
+#endif
+`;
+const FRAG_PARS=`uniform sampler2D uNoise;uniform float uWxOn,uPatchScale,uGrimeAmt,uStreakLen,uStreakScale,uSplashH,uGrimeSoft,uEdgeAmt,uEdgeWidth,uEdgeBreak,uPaintChip,uEdgeDark,uEdgeDarkW,uBevel,uLogRound,uEaveDark,uBleach,uDirtBand,uCornerDirt,uFixedTop,uWxBoard,uWxPanelV;uniform vec3 uGrimeColor,uMudColor,uShadeDir;
+varying vec3 vWxP;varying vec3 vWxL;varying vec3 vWxN;
+#ifdef W_BOX
+varying vec4 vLocalTop;varying vec4 vHalf;
+#define W_TINT
+varying vec4 vTintPaint;
+#endif
+float wxSq(float v){return v*v;}
+vec4 wTri(vec3 p,vec3 w){return texture2D(uNoise,p.zy)*w.x+texture2D(uNoise,p.xz)*w.y+texture2D(uNoise,p.xy)*w.z;}
+`;
+const FRAG_COLOUR=`
+float wPaintVisO=0.,wBareO=0.,wStreakO=0.,wRimHO=0.;
+if(uWxOn>.5){
+vec4 vWPosAO=vec4(vWxP,1.);
+
+vec3 wP = vWPosAO.xyz;
+vec3 wN = normalize(vWxN);   // the surface's facing, in the world
+vec3 wTw = wN * wN; wTw *= wTw; wTw /= (wTw.x + wTw.y + wTw.z);            // triplanar blend weights
+float wAO = vWPosAO.w;
+vec4 wBig = wTri(wP * uPatchScale, wTw);    // big soft patches (R), blotches (G)
+vec4 wFine = wTri(wP * 0.9, wTw);           // grit (B): 1.1 m to a repeat
+float wLum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+float wStreak = 0.0, wSplash = 0.0, wDirt = 0.0, wWear = 0.0, wBare = 0.0, wPaintVis = 0.0;
+float wEdge = 1.0, wRim = 0.0, wRimH = 0.0;
+// what kind of part this is, from the tint's fourth number: painted (1), a round log (2), mortar or chinking (3), a
+// stone laid in a wall (4), a roof shake (below 0: minus how much of it shows below the next course, metres)
+float wKind = 0.0;
+#ifdef W_TINT
+  wKind = vTintPaint.a;
+#endif
+float wIsPaint = step(0.5, wKind) * step(wKind, 1.5), wIsLog = step(1.5, wKind) * step(wKind, 2.5), wIsMortar = step(2.5, wKind) * step(wKind, 3.5), wIsLaid = step(3.5, wKind);
+float wShakeE = max(-wKind, 0.0), wSetBack = 0.0;
+
+
+  // ── EDGE WEAR ─ how far is this pixel from its box's nearest edge? (each corner knows where it sits in its box, so
+  // in between, the shader gets that exactly; of the three "distance to a side" numbers, one is ~0 (the face we are
+  // on), the next smallest is the distance to the nearest edge)
+  #ifdef W_BOX
+    vec3 wD = vHalf.xyz - abs(vLocalTop.xyz);
+    
+    float wMn = min(wD.x, min(wD.y, wD.z)), wMx = max(wD.x, max(wD.y, wD.z));
+    wEdge = wD.x + wD.y + wD.z - wMn - wMx;
+    float wTop = vLocalTop.w;
+    #ifdef W_BEVEL
+    {
+      // BEVELLED EDGES: the face's own two directions (drop the one it looks along: its distance is ~0), how far this
+      // pixel is from the edges along each, and a band that darkens toward them, curving in (brighter middle, darker
+      // rim, darkest in the corners). The same band is a height that drops toward the edge (wRimH, metres): the normal
+      // tilts over it, so the light catches a rounded edge without a single extra triangle.
+      // The band's inner line wanders a little (ragged), and it is measured from a rectangle with rounded corners, so
+      // the corners darken round, as on a worn stone or board.
+      vec2 wF, wFH, wFP;
+      if (wD.x <= wD.y && wD.x <= wD.z) { wF = wD.yz; wFH = vHalf.yz; wFP = vLocalTop.yz; }
+      else if (wD.y <= wD.z) { wF = wD.xz; wFH = vHalf.xz; wFP = vLocalTop.xz; }
+      else { wF = wD.xy; wFH = vHalf.xy; wFP = vLocalTop.xy; }
+      float wW = max(min(uEdgeDarkW, 0.6 * min(wFH.x, wFH.y)), 0.0005) * (0.8 + 0.4 * wFine.b);
+      if (wShakeE > 0.0) wW *= 0.5;                   // a shake: only a thin dark line along its sides (the gap)
+      float wQ = min(length(max(wW - wF, 0.0)) / wW, 1.0);
+      wRim = wQ * wQ;
+      wRimH = -0.5 * uBevel * wW * wRim;
+      // A LOG: round about its long axis (the longer of the face's two directions). Across it, the top and bottom
+      // quarter darken, and the normal tilts as if over a cylinder, so the light rolls round it. (Its ends are the round
+      // end-grain pictures.)
+      if (wIsLog > 0.5 && min(wFH.x, wFH.y) * 2.5 < max(wFH.x, wFH.y)) {
+        float wA = step(wFH.y, wFH.x);                 // 1: the face's second direction is the one round the log
+        float wHa = mix(wFH.x, wFH.y, wA), wPa = mix(wFP.x, wFP.y, wA) / max(wHa, 0.001);
+        wRim = max(wRim, 0.7 * smoothstep(0.76, 1.0, abs(wPa)));     // only the top and bottom eighth, softly
+        wRimH = -0.5 * uLogRound * wHa * wPa * wPa;
+      }
+      // MORTAR AND CHINKING: set back between the stones or logs, so no lit lip: a shadow line along its top under the
+      // stone or log over it, and otherwise its own light colour (from a distance a light web between the stones)
+      if (wIsMortar > 0.5) {
+        wRim = 0.0; wRimH = 0.0;
+        wSetBack = 0.06 + 0.5 * (1.0 - smoothstep(0.0, 0.03, vHalf.y - vLocalTop.y));
+      }
+      // A STONE LAID IN A WALL: its top is seen only down in the joint, under the stone above: shaded, never a lit ledge
+      if (wIsLaid > 0.5 && wD.y <= min(wD.x, wD.z) && vLocalTop.y > 0.0) wSetBack = 0.55;
+      // A LOG's top and bottom are seen only down in the gap to the next log: in shadow, never a lit sliver
+      if (wIsLog > 0.5 && wD.y <= min(wD.x, wD.z)) wSetBack = 0.7;
+    }
+    #endif
+  #else
+    float wTop = uFixedTop;
+  #endif
+  // a roof shake is open to the rain all over (the baked rain test is per corner, and would give each shake its own)
+  float wShakeButt = 0.0;
+  #ifdef W_BOX
+  if (wShakeE > 0.0) { wShakeButt = 1.0 - smoothstep(0.0, wShakeE * 0.9, vHalf.z - vLocalTop.z); }
+  #endif
+  float wWearT = 1.0 - wEdge / max(uEdgeWidth, 0.0005) + (wFine.g - 0.5) * 2.6 * uEdgeBreak;
+  wWear = smoothstep(0.35, 0.65, wWearT) * uEdgeAmt;
+
+  #ifdef W_TINT
+    // paint chips off a wider band than bare wood wears, and in random flecks where the noise is high
+    float wPainted = wIsPaint;
+    float wChipT = 1.0 - wEdge / max(uEdgeWidth * 0.8, 0.0005) + (wFine.b - 0.5) * 3.0 * uEdgeBreak;
+    float wChip = clamp(smoothstep(0.45, 0.6, wChipT) * uEdgeAmt + smoothstep(1.04 - uPaintChip * 0.4, 1.08 - uPaintChip * 0.4, wFine.b * 0.55 + wBig.g * 0.55) * step(0.001, uEdgeAmt), 0.0, 1.0);
+    vec3 wWood = diffuseColor.rgb * mix(vTintPaint.rgb, vec3(0.9, 0.82, 0.74), wPainted);
+    vec3 wPaint = vTintPaint.rgb * (0.9 + 0.45 * wLum);                  // the grain shows a little through the paint
+    #ifdef W_DECKWEAR
+    if (wKind > 1.2) {
+      // Sun-baked coat flaking away along the grain: worst to the north, on the walked path and by the door.
+      vec3 wLc = vWxL / 0.3048;
+      float wB = wLc.x / 0.46, wId = floor(wB);
+      float wBoard = texture2D(uNoise, vec2(wId * 0.173, 0.37)).r;
+      float wNorth = smoothstep(-3.0, 8.0, wLc.x);
+      float wPath = exp(-wxSq((wLc.z - 10.8) / 2.3)) * smoothstep(0.0, 4.0, wLc.x);
+      float wDoor = exp(-(wxSq((wLc.x - 4.3) / 3.0) + wxSq((wLc.z - 9.3) / 2.0)));
+      float wW = clamp(0.26 + 0.56 * wNorth + 0.3 * wPath + 0.28 * wDoor + (wBoard - 0.5) * 0.5 + smoothstep(13.0, 13.6, wLc.x) * 0.2, 0.0, 1.0);
+      float wFlk = clamp((texture2D(uNoise, vec2(wB * 0.11 + wId * 0.31, wLc.z * 0.09)).g - 0.5) * 2.6 + 0.5, 0.0, 1.0) * 0.62 + clamp((texture2D(uNoise, vec2(wB * 0.47, wLc.z * 0.31)).b - 0.5) * 2.4 + 0.5, 0.0, 1.0) * 0.38;
+      wChip = max(wChip, smoothstep(1.0 - wW - 0.025, 1.0 - wW + 0.04, wFlk));
+      wPaint = mix(wPaint * vec3(0.8), wPaint * vec3(1.15, 1.08, 1.05), smoothstep(0.3, 0.8, wBig.g * 0.55 + wBoard * 0.45));
+    }
+    #endif
+    wPaintVis = wPainted * (1.0 - wChip);
+    diffuseColor.rgb = mix(wWood, wPaint, wPaintVis);
+  #else
+    float wPainted = 0.0;
+  #endif
+  // worn bare edges: the grey, sun-baked surface rubbed through to lighter, fresher fibres
+  wBare = wWear * (1.0 - wPaintVis);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.4 + vec3(0.02, 0.014, 0.006), wBare);
+  // SUN-BLEACH on the logs: silver-grey streaks running along each log (noise stretched 8 to 1 along the wall), more of
+  // them on the upper courses and on the walls facing the sun
+  float wBl = 0.0;
+  if (wIsLog > 0.5 && uBleach > 0.0) {
+    float wAl = dot(wP.xz, vec2(-wN.z, wN.x));
+    float wBn = texture2D(uNoise, vec2(wAl * 0.18, wP.y * 1.45)).g * 0.7 + texture2D(uNoise, vec2(wAl * 0.5, wP.y * 4.0)).b * 0.3;
+    float wSunny = clamp(dot(wN, -uShadeDir) * 0.5 + 0.5, 0.0, 1.0);
+    wBl = smoothstep(0.56, 0.7, wBn + 0.1 * smoothstep(0.8, 3.0, wP.y) + 0.06 * wSunny) * uBleach;
+    float wL = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(wL) * vec3(1.08, 0.99, 0.86) * 1.4 + vec3(0.02, 0.016, 0.01), wBl);
+  }
+
+  // ── GRIME ─ rain runs off the roof edge and down the wall (streaks), splashes mud up from the ground (splash), and
+  // dirt gathers where the air is still (the tucked-in corners: low AO)
+  float wBelow = wTop - wP.y;                                              // metres under the drip edge
+  float wVert = 1.0 - abs(wN.y);                                           // 1 on walls, 0 on floors and roofs
+  float wAlong = dot(wP.xz, vec2(-wN.z, wN.x));                            // across the wall, metres
+  float wCol = texture2D(uNoise, vec2(wAlong * uStreakScale * 0.31, 0.53)).r;       // each column's own run length
+  float wSN = texture2D(uNoise, vec2(wAlong * uStreakScale, wP.y * 0.05)).g;       // noise stretched tall: streaks
+  float wFade = 1.0 - wBelow / max(uStreakLen * (0.25 + 1.5 * (wCol - 0.25)), 0.01);
+  float wCols = smoothstep(0.5 - uGrimeSoft, 0.5 + uGrimeSoft, (wSN - 0.5) * 2.6 + 0.5 + (wFade - 0.5) * 0.5);   // fbm sits near 0.5: stretch it
+  wStreak = max(wCols * smoothstep(0.0, 0.3, wFade), smoothstep(0.85, 1.0, wFade) * 0.6) * step(0.0, wFade) * step(-0.02, wBelow);
+  wStreak *= wVert * wVert * uGrimeAmt;
+  float wSplT = 1.0 - wP.y / max(uSplashH, 0.01);
+  wSplash = smoothstep(0.5 - uGrimeSoft, 0.5 + uGrimeSoft, wSplT * 0.95 + (wFine.b - 0.5) * 1.2 + (wBig.g - 0.5) * 0.8) * uGrimeAmt * (1.0 - 0.5 * max(wN.y, 0.0));
+  wDirt = clamp(uCornerDirt * smoothstep(0.12, 0.6, 1.0 - wAO) * (0.45 + wBig.b) * step(0.001, uGrimeAmt), 0.0, 1.0);
+  diffuseColor.rgb *= mix(vec3(1.0), uGrimeColor * 2.2, clamp(wStreak + wDirt * 0.8, 0.0, 1.0));
+  diffuseColor.rgb = mix(diffuseColor.rgb, uMudColor * (0.55 + 1.6 * wLum), wSplash * 0.85);
+  // the shade under an eave: the top 40-odd cm of a wall below the roof edge over it (a noisy lower line)
+  float wEave = (1.0 - smoothstep(0.0, 0.6 + 0.15 * wFine.g, wBelow)) * step(-0.03, wBelow) * wVert * wVert;
+  diffuseColor.rgb *= 1.0 - uEaveDark * wEave;
+  // the dirt band: the bottom 40-odd cm of everything standing on the ground (walls, piers, posts, barrels) darker and
+  // browner from splashed mud and damp, fading upward through noise
+  float wLowD = (1.0 - smoothstep(0.2, 0.85 + 0.4 * (wFine.g - 0.5), wP.y)) * (1.0 - 0.6 * max(wN.y, 0.0));
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(0.5, 0.44, 0.37), wLowD * uDirtBand);
+
+  // the bevelled edges darken whatever is on top (as a real rounded edge would, turned away from the light)
+  diffuseColor.rgb *= 1.0 - uEdgeDark * wRim;
+  diffuseColor.rgb *= 1.0 - wSetBack;
+  #ifdef W_BOX
+  if (wShakeE > 0.0) {
+    // A ROOF SHAKE: the next course up lies over it from wShakeE above its butt; just below that line, the course's
+    // shadow, dark at the line and fading out over 9 cm (the dark band that makes a roof read as rows); and at the butt
+    // a ragged dark lip
+    float wFromButt = vHalf.z - vLocalTop.z;
+    // (higher up, under the course, seen only through a gap, it eases off: a gap shows shadow, not a black hole)
+    float wRow = smoothstep(wShakeE - 0.09, wShakeE - 0.005, wFromButt) * (1.0 - 0.45 * smoothstep(wShakeE + 0.03, wShakeE + 0.15, wFromButt));
+    float wLip = 1.0 - smoothstep(0.0, 0.01 + 0.025 * wFine.b, wFromButt);
+    diffuseColor.rgb *= (1.0 - 0.7 * wRow) * (1.0 - 0.4 * wLip);
+  }
+  #endif
+
+  
+#ifdef W_KIND
+  #if W_KIND==2
     #ifdef USE_MAP
       float wPC=(uWxPanelV>.5?vMapUv.y:vMapUv.x)*2.,wPI=floor(wPC);
       float wAl=uWxPanelV>.5?vMapUv.x:vMapUv.y;
-      float wPanel=texture2D(uWxNoise,vec2(wPI*.211,.71)).r;
-      diffuseColor.rgb*=.8+.42*wPanel;
-      float wRun=wxStretch(texture2D(uWxNoise,vec2(wPC*.9,wAl*.05)).g,2.8);
-      diffuseColor.rgb*=1.-.2*smoothstep(.56,.85,wRun);
+      diffuseColor.rgb*=.8+.42*texture2D(uNoise,vec2(wPI*.211,.71)).r;
+      diffuseColor.rgb*=1.-.2*smoothstep(.56,.85,clamp((texture2D(uNoise,vec2(wPC*.9,wAl*.05)).g-.5)*2.8+.5,0.,1.));
     #endif
-    float wFade=smoothstep(.42,.72,wBig.r)*(.45+.55*wSun);
-    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(wLum)*vec3(1.2,1.16,1.22)+vec3(.012,.011,.013),.5*wFade);
-    diffuseColor.rgb=mix(diffuseColor.rgb,wDust*.42,.16*smoothstep(.5,.8,wFine.g));
+    float wSunF=clamp(dot(wN,normalize(vec3(-.7,.45,.45))),0.,1.);
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(wLum)*vec3(1.2,1.16,1.22)+vec3(.012,.011,.013),.5*smoothstep(.42,.72,wBig.r)*(.45+.55*wSunF));
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.07,.057,.042),.16*smoothstep(.5,.8,wFine.g));
+  #elif W_KIND==1
+    float wCo=floor(wP.y/uWxBoard),wEnd=floor((wAlong+wCo*1.7)/3.7);
+    diffuseColor.rgb*=.76+.5*texture2D(uNoise,vec2(wCo*.137+wEnd*.073,wEnd*.19+.3)).r;
+  #elif W_KIND==5
+    diffuseColor.rgb*=.8+.4*texture2D(uNoise,vec2(floor(wAlong/.406)*.137,.3)).r;
   #else
-    #if W_KIND==1
-      // Lap siding: every course its own tone, changing where a board ends.
-      float wCo=floor(wH/uWxBoard),wEnd=floor((wAlong+wCo*1.7)/3.7);
-      float wT=texture2D(uWxNoise,vec2(wCo*.137+wEnd*.073,wEnd*.19+.3)).r;
-      diffuseColor.rgb*=.76+.5*wT;
-    #elif W_KIND==5
-      float wBd=floor(wAlong/.406),wT=texture2D(uWxNoise,vec2(wBd*.137,.3)).r;
-      diffuseColor.rgb*=.8+.4*wT;
-      diffuseColor.rgb*=.9+.2*wxStretch(texture2D(uWxNoise,vec2(wAlong*2.4,wP.y*.14)).b,2.);
-    #else
-      float wT=wBig.r;
-      diffuseColor.rgb*=.86+.28*wBig.g;
-      if(wN.y>.5)diffuseColor.rgb=mix(diffuseColor.rgb,wDust*1.6,.32*smoothstep(.35,.7,wBig.b)+.1*wFine.g);
-    #endif
-    diffuseColor.rgb*=.92+.16*wFine.b;
-    #if W_KIND==1||W_KIND==5
-      // Sun fade on faces that take the low sun.
-      diffuseColor.rgb=mix(diffuseColor.rgb,vec3(wLum)*1.25+.008,.22*wSun*smoothstep(.35,.7,wBig.r));
-      // Run marks below the eave.
-      float wBelow=uWxEave-wH;
-      float wColN=texture2D(uWxNoise,vec2(wAlong*.17,.53)).r;
-      float wS=wxStretch(texture2D(uWxNoise,vec2(wAlong*.62,wP.y*.05)).g,2.6);
-      float wRunD=clamp(1.-wBelow/(.6+3.2*wColN),0.,1.)*smoothstep(-1.6,0.,wBelow);
-      diffuseColor.rgb*=1.-.42*wVert*smoothstep(.45,.75,wS)*wRunD;
-    #endif
-    // Dust and splash near the ground.
-    float wLow=1.-smoothstep(.05,.55+.55*wFine.g,wH);
-    diffuseColor.rgb=mix(diffuseColor.rgb,wDust*(.7+.5*wFine.b),.42*wLow*wVert*smoothstep(.25,.6,wFine.r+.25*wLow));
+    diffuseColor.rgb*=.86+.28*wBig.g;
+    if(wN.y>.5)diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.27,.216,.16),(.32*smoothstep(.35,.7,wBig.b)+.1*wFine.g)*smoothstep(.03,.2,wLum));
   #endif
+#endif
+
+wPaintVisO=wPaintVis;wBareO=wBare;wStreakO=wStreak;wRimHO=wRimH;
 }
 `;
-function patch(THREE,material,kind,props){
-  const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
-  const u={uWxNoise:{value:makeNoise(THREE)},uWxAmt:amount,uWxEave:{value:props.eave??4},uWxBoard:{value:props.board??.2},uWxWear:{value:props.wear??.45},uWxPanelV:{value:props.panelV?1:0}};
-  material.onBeforeCompile=function(shader,renderer){
-    previous.call(this,shader,renderer);Object.assign(shader.uniforms,u);
-    shader.vertexShader=VERT_PARS+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>'+VERT_MAIN);
-    shader.fragmentShader=`#define W_KIND ${KIND[kind]}\n`+FRAG_PARS+shader.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>'+FRAG_MAIN);
-  };
-  material.customProgramCacheKey=()=>key+'-wx-'+kind;material.needsUpdate=true;
+const FRAG_ROUGH=`
+roughnessFactor=mix(roughnessFactor,.62,wPaintVisO*.8);
+roughnessFactor=mix(roughnessFactor,.55,wBareO*.6);
+`;
+const FRAG_NORMAL=`
+normal=normalize(mix(normal,nonPerturbedNormal,wPaintVisO*.7));
+{vec3 wdx=dFdx(-vViewPosition),wdy=dFdy(-vViewPosition);float whx=dFdx(wRimHO),why=dFdy(wRimHO);
+vec3 wr1=cross(wdy,normal),wr2=cross(normal,wdx);float wdet=dot(wdx,wr1);
+normal=normalize(abs(wdet)*normal-sign(wdet)*(whx*wr1+why*wr2));}
+`;
+const col=(THREE,h)=>new THREE.Color(h);
+const LOOKS={
+ house:{uFixedTop:4.72,uGrimeAmt:.45},garage:{uFixedTop:5.6,uGrimeAmt:.22,uStreakLen:1.2},cabin:{uFixedTop:4.05,uGrimeAmt:.55},shed:{uFixedTop:2.85,uGrimeAmt:.6}};
+const KIND={plain:0,hsiding:1,roof:2,roofV:2,vboard:5};
+function patch(THREE,m,type,o){
+  const T=sharedTextures(THREE),box=!!o.box,defs={...(m.defines||{})};
+  if(box){defs.W_BOX='';defs.W_BEVEL='';defs.W_DECKWEAR='';}
+  else defs.W_KIND=KIND[o.kind||'plain'];
+  m.defines=defs;
+  const look=LOOKS[type]||{};
+  const u={uNoise:{value:T.noise},uWxOn:amount,uPatchScale:{value:1/5.6},uGrimeAmt:{value:box?.7:look.uGrimeAmt},uStreakLen:{value:look.uStreakLen??2.2},uStreakScale:{value:14/8},uSplashH:{value:.5},uGrimeSoft:{value:.2},uEdgeAmt:{value:box?1:0},uEdgeWidth:{value:.014},uEdgeBreak:{value:.75},uPaintChip:{value:o.chip??.75},uEdgeDark:{value:.5},uEdgeDarkW:{value:.03},uBevel:{value:.6},uLogRound:{value:.55},uEaveDark:{value:.15},uBleach:{value:.5},uDirtBand:{value:box?.5:.45},uCornerDirt:{value:0},uFixedTop:{value:look.uFixedTop??4},uWxBoard:{value:o.board??.2},uWxPanelV:{value:o.kind==='roofV'?1:0},uGrimeColor:{value:col(THREE,'#5e574d')},uMudColor:{value:col(THREE,'#5a4430')},uShadeDir:{value:new THREE.Vector3(0,0,-1)}};
+  const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
+  m.onBeforeCompile=function(s,r){previous.call(this,s,r);Object.assign(s.uniforms,u);
+    s.vertexShader=VERT_PARS+s.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+VERT_MAIN);
+    let f=FRAG_PARS+s.fragmentShader.replace('#include <map_fragment>','#include <map_fragment>\n'+FRAG_COLOUR);
+    if(box)f=f.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n'+FRAG_ROUGH).replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n'+FRAG_NORMAL);
+    s.fragmentShader=f;};
+  m.customProgramCacheKey=()=>key+'-wx2-'+(box?'box':o.kind||'plain');m.needsUpdate=true;
 }
-const EAVES={house:4.72,garage:5.6,cabin:4.05,shed:2.85};
-// Every opaque material of a placed building gets its kind from userData.wx, or the plain treatment.
 export function weatherBuilding(THREE,group,type){
   const done=new Set();
   group.traverse(o=>{if(!o.isMesh)return;for(const m of Array.isArray(o.material)?o.material:[o.material]){
-    if(done.has(m)||m.transparent||m.userData.wxDone)continue;done.add(m);m.userData.wxDone=true;
-    const w=m.userData.wx||{kind:'plain'};
-    patch(THREE,m,w.kind,{eave:EAVES[type],board:w.board,wear:w.wear,panelV:w.kind==='roofV'||w.horiz});
-  }});
+    if(done.has(m)||m.transparent||m.userData.wxDone)continue;done.add(m);m.userData.wxDone=true;patch(THREE,m,type,m.userData.wx||{});}});
 }
-// The lowest quality level skips the weathering work.
 export function setWeatherQuality(level){amount.value=level>=1?1:0;}

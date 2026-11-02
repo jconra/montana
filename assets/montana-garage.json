@@ -894,5 +894,6 @@
       "onRoof": 0
     }
   ],
-  "frameW": 0.2
+  "frameW": 0.2,
+  "glassAlpha": 0.9
 }
