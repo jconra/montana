@@ -12,7 +12,7 @@ import {clipRoofPolygon,roofOpeningPolygon,roofPanelGeometry} from './roof-panel
 // mats/mat are indices into palette. Wall groups & roof carry userData.surf for face-painting.
 // Legacy {blocks:[...]} and older {floors:[{shell}]} specs are auto-converted.
 
-export const VERSION = '40';   // shared with building-designer
+export const VERSION = '41';   // shared with building-designer
 
 // ---------- procedural surface textures ----------------------------------------------------------
 // Each pattern is a tileable GRAYSCALE luminance map; the swatch colour tints it (material.color
@@ -25,9 +25,14 @@ export const TEX_LIST = [
   {id:'brick',   name:'Brick'},
   {id:'stone',   name:'Stone'},
   {id:'shingle', name:'Shingle'},
+  {id:'siding',  name:'Lap siding (fine even courses)'},
+  {id:'vboard',  name:'Vertical board and batten'},
+  {id:'seam',    name:'Standing-seam metal (16 in panels)'},
+  {id:'rib',     name:'Ribbed metal (9 in ribs)'},
 ];
-const TEX_REPEAT={wood:[2,2],plaster:[4,4],metal:[3,4],brick:[3,3],stone:[3,3],shingle:[4,4]}; // tiles per face (0..1 UV geometry)
-const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:4,shingle:2};                          // feet per tile (world-UV geometry, e.g. floor slabs)
+const ROOF_FEET={metal:8,seam:32/3,rib:6};   // feet per tile on roof panels; each tile holds 8 seams
+const TEX_REPEAT={siding:[1,1],vboard:[1,1],seam:[1,1],rib:[1,1],wood:[2,2],plaster:[4,4],metal:[3,4],brick:[3,3],stone:[3,3],shingle:[4,4]}; // tiles per face (0..1 UV geometry)
+const TEX_FEET  ={wood:4,plaster:6,metal:3,brick:2,stone:4,shingle:2,siding:4,vboard:4};                          // feet per tile (world-UV geometry, e.g. floor slabs)
 function _rng(seed){ let s=(seed>>>0)||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function _rr(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function paintTex(ctx,id,S){
@@ -38,6 +43,22 @@ function paintTex(ctx,id,S){
       for(let i=0;i<44;i++){ const y=p*ph+rnd()*ph, a=0.04+rnd()*0.06; ctx.strokeStyle=`rgba(70,50,30,${a})`; ctx.lineWidth=1;
         ctx.beginPath(); ctx.moveTo(0,y); ctx.bezierCurveTo(S*0.33,y+(rnd()-0.5)*5,S*0.66,y+(rnd()-0.5)*5,S,y); ctx.stroke(); }
       ctx.fillStyle='rgba(30,20,10,0.5)'; ctx.fillRect(0,p*ph,S,2); }                                   // plank seam
+  } else if(id==='siding'){                                                  // near-white so the swatch colour reads true
+    const courses=6, ph=S/courses;
+    for(let p=0;p<courses;p++){ const base=232+Math.floor(rnd()*14); ctx.fillStyle=`rgb(${base},${base},${base})`; ctx.fillRect(0,p*ph,S,ph);
+      ctx.fillStyle='rgba(0,0,0,.34)'; ctx.fillRect(0,p*ph,S,Math.max(2,S/128));
+      ctx.fillStyle='rgba(255,255,255,.1)'; ctx.fillRect(0,p*ph+Math.max(2,S/128),S,1); }
+  } else if(id==='vboard'){
+    const boards=3, pw=S/boards;
+    for(let p=0;p<boards;p++){ const base=226+Math.floor(rnd()*20); ctx.fillStyle=`rgb(${base},${base},${base})`; ctx.fillRect(p*pw,0,pw,S);
+      ctx.fillStyle='rgba(0,0,0,.42)'; ctx.fillRect(p*pw-S/48,0,S/128,S); ctx.fillRect(p*pw+S/48,0,S/128,S);
+      ctx.fillStyle='rgba(255,255,255,.14)'; ctx.fillRect(p*pw-S/48,0,S/24,S); }
+  } else if(id==='seam'||id==='rib'){
+    ctx.fillStyle='rgb(238,238,238)'; ctx.fillRect(0,0,S,S);
+    const seams=8, sw=S/seams;
+    for(let i=0;i<seams;i++){ const x=i*sw+1;
+      ctx.fillStyle='rgba(0,0,0,.8)'; ctx.fillRect(x+Math.max(2,S/170),0,Math.max(2,S/170),S);     // shadow side
+      ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(x,0,Math.max(2,S/170),S); }                // lit edge
   } else if(id==='plaster'){
     ctx.fillStyle='rgb(236,236,236)'; ctx.fillRect(0,0,S,S);   // light base so a white tint reads near-white
     const n=Math.floor(S*S*0.45); for(let i=0;i<n;i++){ const x=rnd()*S,y=rnd()*S, v=rnd()<0.5?60:255, a=0.012+rnd()*0.016; ctx.fillStyle=`rgba(${v},${v},${v},${a})`; ctx.fillRect(x,y,2,2); }
@@ -72,9 +93,9 @@ export function texThumb(id,size){ size=size||40; const cv=document.createElemen
   const ctx=cv.getContext('2d'); paintTex(ctx,id||'',size); return cv.toDataURL(); }
 const _texCache={};
 function makeMap(THREE,id,mode){ const key=id+'|'+(mode||'face'); if(_texCache[key]) return _texCache[key];
-  const S=256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
-  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=4; if('SRGBColorSpace'in THREE) t.colorSpace=THREE.SRGBColorSpace;
-  if(mode==='world'||mode==='roof'){ const ft=mode==='roof'&&id==='metal'?8:(TEX_FEET[id]||6); t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
+  const S=(id==='siding'||id==='vboard'||id==='seam'||id==='rib')?1024:256, cv=document.createElement('canvas'); cv.width=cv.height=S; paintTex(cv.getContext('2d'),id,S);
+  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; if('SRGBColorSpace'in THREE) t.colorSpace=THREE.SRGBColorSpace;
+  if(mode==='world'||mode==='roof'){ const ft=mode==='roof'&&ROOF_FEET[id]?ROOF_FEET[id]:(TEX_FEET[id]||6); t.repeat.set(1/ft,1/ft); } else { const r=TEX_REPEAT[id]||[3,3]; t.repeat.set(r[0],r[1]); }
   _texCache[key]=t; return t; }
 // rewrite a BoxGeometry's UVs into world feet, so a world-mode texture tiles evenly no matter the face size
 function worldUVBox(geo, w,h,d){ const uv=geo.attributes.uv; if(!uv) return;
@@ -103,16 +124,17 @@ export function buildHouse(THREE, spec, opts){
     const tex=(idx==null||idx<0)?'':(PALTEX[idx]||'');
     if(!tex) return solid(hex);
     const key='T|'+hex+'|'+tex+'|'+(mode||'face'); if(matCache[key]) return matCache[key];
-    const metal=(tex==='metal');
-    const m=new THREE.MeshStandardMaterial({color:hex,roughness:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
+    const metal=(tex==='metal'),painted=(tex==='seam'||tex==='rib');   // painted steel stays matte: metalness turned it pale in sun
+    const m=new THREE.MeshStandardMaterial({color:hex,roughness:painted?.82:metal?0.5:1,metalness:metal?0.4:0,flatShading:false,side:THREE.DoubleSide});
     m.map=makeMap(THREE,tex,mode||'face'); matCache[key]=m; return m; };
   const dormerCuts=[];
   const M=(v)=> (v&&v.isMaterial)?v:solid(v);                        // accept a material OR a hex colour
   const WALL_T=0.5;                                                  // wall thickness (~6", units = feet)
+  const FRAME_W=spec.frameW??.35;
   const winFrames = !!spec.windowFrames;                            // optional trim frame around each window
   const roofMat=new THREE.MeshStandardMaterial({color:defRoof,roughness:.6,metalness:.3,flatShading:true,side:THREE.DoubleSide});
   const trimMat=new THREE.MeshStandardMaterial({color:defTrim,roughness:1,flatShading:true,side:THREE.DoubleSide});
-  const glassMat=new THREE.MeshStandardMaterial({color:0x2a3440,roughness:.2,metalness:.2,flatShading:true,transparent:true,opacity:.55});
+  const glassMat=new THREE.MeshStandardMaterial({color:0x141a20,roughness:.25,metalness:.1,flatShading:true,transparent:true,opacity:.86});
   const doorMat=new THREE.MeshStandardMaterial({color:0x3a2c1e,roughness:.9,flatShading:true});
 
   const mesh=(geo,mat,x,y,z)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;};
@@ -121,6 +143,9 @@ export function buildHouse(THREE, spec, opts){
   const triM=(a,b,c,mat)=>addTris([...a,...b,...c],mat);
   const quad=(a,b,c,d,mat)=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([...a,...b,...c,...a,...c,...d],3));geo.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,0,1,1,1,0,0,1,1,1,0],2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
   const P=(p,y)=>[p[0],y,p[1]];
+  // One definition of a gable piece: base is the height of the eave edge, rise the climb from there to the ridge.
+  const roofMetrics=rp=>{let along=rp.w>=rp.d;if(rp.flipRidge)along=!along;const span=along?rp.d:rp.w,eave=rp.overhang??2,rise=rp.rise??span/2*(rp.pitch??.5),run=span/2+eave;
+    return {along,span,eave,rise,run,slope:rise/run,height:(x,z)=>(rp.base||0)+rise*(1-Math.abs(along?z-rp.z:x-rp.x)/run)};};
 
   // ---- a wall between two points, openings punched out (off = metres from start point) ----
   function wallSeg(x0,z0,x1,z1, baseY,h, ops, wallColor, surf, inColor, outFace, butt){
@@ -142,32 +167,49 @@ export function buildHouse(THREE, spec, opts){
       // Keep horizontal siding courses aligned across window fragments and floors.
       for(const face of [0,1,4,5])for(let i=0;i<4;i++){const k=face*4+i;geo.attributes.uv.setY(k,geo.attributes.uv.getY(k)+baseY+y0);}
       const m=new THREE.Mesh(geo,mat); m.position.set((a+b)/2,(y0+y1)/2,0); wg.add(m); };
-    const frame=(a,b,y0,y1)=>{ const fw=0.35, d=t+0.3, fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
+    const frame=(a,b,y0,y1,splits,tm=trimMat)=>{ const fw=FRAME_W, d=t+Math.min(.3,fw*.8), fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
       const cx=(a+b)/2, cy=(y0+y1)/2, w=b-a, hh=y1-y0;   // trim frame + centre mullion, proud of the wall
-      const fb=(w2,h2,x,yy)=>{ const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),trimMat); mf.position.set(x,yy,0); wg.add(mf); };
+      const fb=(w2,h2,x,yy)=>{ const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),tm); mf.position.set(x,yy,0); wg.add(mf); };
       fb(fw, hh+2*fw, a-fw/2, cy); fb(fw, hh+2*fw, b+fw/2, cy);        // left + right jambs
       fb(w, fw, cx, y1+fw/2); fb(w, fw, cx, y0-fw/2);                  // head + sill
-      fb(fw*0.55, hh, cx, cy); };                                     // centre mullion (the sliding-window divider)
+      for(const c of splits)fb(fw*0.55, hh, c, cy); };                 // mullions between the panes
     const os=(ops||[]).map(o=>{ const off=Math.max(0,Math.min(len-o.w,o.off));
       return {...o,a:-len/2+off, b:-len/2+off+o.w, y0:Math.max(0,o.y0), y1:Math.min(h,o.y1)}; }).filter(o=>o.y1>o.y0).sort((p,q)=>p.a-q.a);
     let cur=-len/2-ext;
     for(const o of os){
       seg(cur,o.a,0,h, wm); seg(o.a,o.b,0,o.y0, wm); seg(o.a,o.b,o.y1,h, wm);
+      if(o.casing!=null){                                       // flat board surround, proud of the siding on both faces
+        const cw=o.casingW??.45,cm=swatchMat(o.casing,defTrim),d=t+.14,top=o.y1+cw,bot=o.type==='window'?o.y0-cw:o.y0;
+        const cb=(w2,h2,x,yy)=>{const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),cm);mf.position.set(x,yy,0);wg.add(mf);};
+        cb(cw,top-bot,o.a-cw/2,(top+bot)/2);cb(cw,top-bot,o.b+cw/2,(top+bot)/2);cb(o.b-o.a,cw,(o.a+o.b)/2,o.y1+cw/2);if(o.type==='window')cb(o.b-o.a,cw,(o.a+o.b)/2,o.y0-cw/2);
+      }
       if(o.type==='garage'){
-        const material=swatchMat(o.mat,defWall),rows=Math.max(3,Math.round((o.y1-o.y0)/1.6));
+        const material=swatchMat(o.mat,defWall),rows=o.rows??Math.max(3,Math.round((o.y1-o.y0)/1.6)),cols=o.cols||0,hh=(o.y1-o.y0)/rows,cw=(o.b-o.a)/(cols||1);
+        const raised=material.clone();raised.map=null;raised.color.multiplyScalar(1.28);
         for(let r=0;r<rows;r++){
-          const hh=(o.y1-o.y0)/rows,m=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a-.08,hh-.07,.2),material);
+          const m=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a-.08,hh-.05,.2),material);
           m.position.set((o.a+o.b)/2,o.y0+(r+.5)*hh,0);wg.add(m);
+          for(let c=0;c<cols;c++){const pn=new THREE.Mesh(new THREE.BoxGeometry(cw-.42,hh-.42,.26),raised);pn.position.set(o.a+(c+.5)*cw,o.y0+(r+.5)*hh,0);wg.add(pn);}
         }
       } else if(o.type==='door'){                             // optional closed leaf for exterior reference views
         const leaf=new THREE.Group(); leaf.position.set(o.a,(o.y0+o.y1)/2,0);
         const l=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a,o.y1-o.y0,0.15),o.mat!=null?swatchMat(o.mat,defTrim):doorMat); l.position.x=(o.b-o.a)/2; leaf.add(l);
+        if(o.closed&&o.lites){                                // glazed upper part with a muntin grid, proud of the leaf on both faces
+          const [cols,rws]=o.lites,lw=o.b-o.a,lh=o.y1-o.y0,gx=.2,gy0=lh*(o.liteFrom??.48),gw=lw-2*gx,gh=lh-gy0-gx;
+          const glass=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,.2),glassMat);glass.position.set(lw/2,-lh/2+gy0+gh/2,0);leaf.add(glass);
+          const mull=o.mat!=null?swatchMat(o.mat,defTrim):doorMat;
+          for(let c=1;c<cols;c++){const b=new THREE.Mesh(new THREE.BoxGeometry(.06,gh,.24),mull);b.position.set(gx+gw*c/cols,-lh/2+gy0+gh/2,0);leaf.add(b);}
+          for(let r=1;r<rws;r++){const b=new THREE.Mesh(new THREE.BoxGeometry(gw,.06,.24),mull);b.position.set(lw/2,-lh/2+gy0+gh*r/rws,0);leaf.add(b);}
+        }
         leaf.rotation.y=o.closed?0:-1.9; wg.add(leaf);
       } else {                                                 // window: thin glass, sized JUST inside the frame opening and split around the mullion -> never intersects the frame
         const gi=0.09, gy0=o.y0+gi, gy1=o.y1-gi;
         const pane=(xa,xb)=>{ const gw=xb-xa, gh=gy1-gy0; if(gw>0.05&&gh>0.05){ const gm=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,0.05),glassMat); gm.position.set((xa+xb)/2,(gy0+gy1)/2,0); wg.add(gm); } };
-        if(winFrames){ frame(o.a,o.b,o.y0,o.y1); const mw=0.35*0.55, cx=(o.a+o.b)/2;   // two panes on either side of the centre mullion (matches a sliding window)
-          pane(o.a+gi, cx-mw/2-gi); pane(cx+mw/2+gi, o.b-gi); }
+        if(winFrames){ const mw=FRAME_W*0.55, W=o.b-o.a;
+          // split lists the pane widths as fractions; the default is two equal panes (a sliding window)
+          const fr=o.split||[.5,.5];let at=0;const cuts=fr.slice(0,-1).map(f=>o.a+W*(at+=f));
+          frame(o.a,o.b,o.y0,o.y1,cuts,o.trim!=null?swatchMat(o.trim,defTrim):trimMat);
+          [o.a,...cuts].forEach((c,i,l)=>{const end=i+1<l.length?l[i+1]:o.b;pane(c+(i?mw/2+gi:gi),end-(i+1<l.length?mw/2+gi:gi));}); }
         else pane(o.a+gi, o.b-gi);                              // frameless: one inset pane
       }
       cur=Math.max(cur,o.b);
@@ -216,17 +258,16 @@ export function buildHouse(THREE, spec, opts){
     const ceiling=p=>peak-Math.abs(local(p)[0])*(peak-eave)/(L/2);
     let mainHeight=null;
     if(main&&(main.style||'gable')==='gable'){
-      let along=main.w>=main.d;if(main.flipRidge)along=!along;
-      const span=along?main.d:main.w,rise=span/2*(main.pitch??.5);
-      mainHeight=p=>(main.base||0)+rise*(1-Math.abs(along?p[1]-main.z:p[0]-main.x)/(span/2+2));
+      const metrics=roofMetrics(main);
+      mainHeight=p=>metrics.height(p[0],p[1]);
     }
     for(const side of [-1,1]){
       const a=side<0?-(L/2+WALL_T/2):0,b=side<0?0:L/2+WALL_T/2;
       // Extend the opening through the eave for a flush wall dormer.
       dormerCuts.push({roofIndex,poly:[plan(a,flush?-4:0),plan(b,flush?-4:0),plan(b,depth),plan(a,depth)],ceiling,baseY});
       if(!opts.noRoof){
-        const ra=side<0?-(L/2+.6):0,rb=side<0?0:L/2+.6;
-        let poly=[plan(ra,-.6),plan(rb,-.6),plan(rb,depth),plan(ra,depth)];
+        const dov=w.dormerOverhang??.6,ra=side<0?-(L/2+dov):0,rb=side<0?0:L/2+dov;
+        let poly=[plan(ra,-dov),plan(rb,-dov),plan(rb,depth),plan(ra,depth)];
         if(mainHeight)poly=clipRoofPolygon(poly,p=>ceiling(p)-mainHeight(p));
         if(poly.length>=3){
           const slant=Math.hypot(1,(peak-eave)/(L/2));
@@ -250,7 +291,7 @@ export function buildHouse(THREE, spec, opts){
 
   function roof(outline, topY, rs, sm){                        // sm = {pi} identifies which roof piece, for painting
     const pi = sm ? sm.pi : undefined;
-    const pitch=rs.pitch??0.5, eave=2, style=rs.style||'gable', h=topY;
+    const pitch=rs.pitch??0.5, eave=rs.overhang??2, rake=rs.rake??eave, style=rs.style||'gable', h=topY;
     const rmat = rs.mat!=null ? swatchMat(rs.mat,defRoof,'roof') : roofMat;
     if(style==='flat'){
       slabPoly(outline, topY, (rs.holes||[]).map(h=>({poly:roofOpeningPolygon(h)})), rmat, 0.6);
@@ -262,7 +303,7 @@ export function buildHouse(THREE, spec, opts){
     const rg=new THREE.Group(); rg.position.set(x,0,z); rg.userData.surf={kind:'roof',pi}; g.add(rg);
     let along=w>=d; if(rs.flipRidge) along=!along;              // ridge runs along the longer side by default; flipRidge turns it 90°
     const len=along?w:d, span=along?d:w;
-    const rise=(span/2)*pitch, sln=Math.hypot(span/2+eave,rise), ang=Math.atan2(rise,span/2+eave);
+    const rise=rs.rise??(span/2)*pitch, sln=Math.hypot(span/2+eave,rise), ang=Math.atan2(rise,span/2+eave);
     const sub=new THREE.Group(); sub.rotation.y=along?0:Math.PI/2; rg.add(sub);
     // one roof panel spanning eave -> ridge. s=+1 is the +z side, -1 the -z side.
     // ext extends the panel a touch PAST the ridge so the two sides cross and meet cleanly (no gap / no notch).
@@ -281,7 +322,7 @@ export function buildHouse(THREE, spec, opts){
       const m=new THREE.Mesh(roofPanelGeometry(THREE,poly,cuts,height,uv,thickness),rmat);m.userData.roofPanel=true;sub.add(m);
     }
     const slope=s=>{
-      const a=-len/2-eave,b=len/2+eave,z0=s<0?-(span/2+eave):0,z1=s<0?0:span/2+eave;
+      const a=-len/2-rake,b=len/2+rake,z0=s<0?-(span/2+eave):0,z1=s<0?0:span/2+eave;
       panel([[a,z0],[b,z0],[b,z1],[a,z1]],p=>h+rise*(1-s*p[1]/(span/2+eave)),p=>[p[0],p[1]*sln/(span/2+eave)]);
     };
     const gableEnd=(sx)=>{const eH=rise*eave/(span/2+eave); const shp=new THREE.Shape();   // top follows the roof rake (slope over span/2+eave) so it meets the roof with no gap
@@ -295,7 +336,12 @@ export function buildHouse(THREE, spec, opts){
       return;
     }
     slope(1,0); slope(-1,0);                                   // panels now meet exactly along the ridge line
-    if(style!=='hip')panel([[-len/2-eave,-.275],[len/2+eave,-.275],[len/2+eave,.275],[-len/2-eave,.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
+    if(style!=='hip')panel([[-len/2-rake,-.275],[len/2+rake,-.275],[len/2+rake,.275],[-len/2-rake,.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
+    if(rs.fasciaMat!=null&&style==='gable'){                    // eave boards and rake boards, set just under the steel
+      const fm=swatchMat(rs.fasciaMat,defTrim),fh=rs.fasciaH??.55,fz=span/2+eave,L=len+2*rake,slopeLen=Math.hypot(fz,rise),tilt=Math.atan2(rise,fz);
+      for(const s of [-1,1]){const e=new THREE.Mesh(new THREE.BoxGeometry(L,fh,.12),fm);e.position.set(0,h-.18-fh/2+.2,s*fz);sub.add(e);}
+      for(const sx of [-1,1])for(const s of [-1,1]){const r=new THREE.Mesh(new THREE.BoxGeometry(.12,fh,slopeLen),fm);r.position.set(sx*(len/2+rake),h+rise/2-fh/2+.02,s*fz/2);r.rotation.x=s*tilt;sub.add(r);}
+    }
     if(style==='hip'){
       const rl=Math.max(0.01,len-span), y0=h, y1=h+rise, Lx=len/2+eave, W=span/2+eave, R=rl/2;
       const Q=[[-Lx,y0,-W],[Lx,y0,-W],[Lx,y0,W],[-Lx,y0,W],[-R,y1,0],[R,y1,0]];
@@ -359,11 +405,11 @@ export function buildHouse(THREE, spec, opts){
   if(!opts.noRoof){ if(spec.roof && spec.roof.style && spec.roof.style!=='none') roof(F[F.length-1].outline, acc, spec.roof);   // legacy whole-house roof (new designs use a roof piece instead)
     const okPiece=rp=> rp.w>0.5&&rp.d>0.5&&isFinite(rp.x)&&isFinite(rp.z)&&isFinite(rp.base||0)&&isFinite(rp.pitch??0.5);
     (spec.roofPieces||[]).forEach((rp,pi)=>{ if(okPiece(rp))   // every roof (incl. the main house) is one of these
-      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:rp.holes}, {pi}); });
+      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:rp.holes,overhang:rp.overhang,rake:rp.rake,rise:rp.rise,fasciaMat:rp.fasciaMat,fasciaH:rp.fasciaH}, {pi}); });
     // raise the walls sitting under a roof piece up into its underside (opt-in, gable pieces)
     (spec.roofPieces||[]).forEach(rp=>{ if(!rp.raiseWalls||!okPiece(rp)||(rp.style||'gable')!=='gable') return;
-      const rw=rp.w, rd=rp.d; let along=rw>=rd; if(rp.flipRidge) along=!along; const span=(along?rd:rw)||1, rise=(span/2)*(rp.pitch??0.5), base=rp.base||0, reave=2;
-      const rHt=(x,z)=> base + rise*Math.max(0, 1-(along?Math.abs(z-rp.z):Math.abs(x-rp.x))/(span/2+reave));   // roof underside height — run includes the eave overhang so the wall slope matches the roof exactly
+      const rw=rp.w, rd=rp.d, {along,span,rise,run}=roofMetrics(rp), base=rp.base||0;
+      const rHt=(x,z)=> base + rise*Math.max(0, 1-(along?Math.abs(z-rp.z):Math.abs(x-rp.x))/run);   // roof underside height — run includes the eave overhang so the wall slope matches the roof exactly
       const inFoot=(x,z)=> x>=rp.x-rw/2-0.6 && x<=rp.x+rw/2+0.6 && z>=rp.z-rd/2-0.6 && z<=rp.z+rd/2+0.6;
       F.forEach((f,fi)=>{ const ftop=baseYs[fi]+(f.h||10); if(Math.abs(ftop-base)>1.5) return;   // walls whose top meets this eave
         const o=f.outline, mm=f.mats||{};
@@ -383,13 +429,19 @@ export function buildHouse(THREE, spec, opts){
   (spec.details||[]).forEach((d,di)=>{
     if(opts.upto!=null&&d.floor!=null&&d.floor>opts.upto)return;
     if(opts.noRoof&&(d.type==='skylight'||d.type==='chimney'))return;
-    const dg=new THREE.Group();dg.position.set(d.x||0,d.y||0,d.z||0);dg.rotation.set(...(d.rotation||[0,0,0]).map(v=>v*Math.PI/180));dg.userData.surf={kind:'detail',di};g.add(dg);
+    const dg=new THREE.Group();dg.position.set(d.x||0,d.y||0,d.z||0);dg.rotation.set(...(d.rotation||[0,0,0]).map(v=>v*Math.PI/180));
+    // A roof-mounted detail follows its roof piece, so resizing the roof cannot bury it.
+    const seat=d.onRoof!=null&&spec.roofPieces?.[d.onRoof];
+    if(seat){const mt=roofMetrics(seat),t=Math.atan(mt.slope),sg=Math.sign((mt.along?d.z-seat.z:d.x-seat.x)||1);
+      dg.position.y=mt.height(d.x,d.z)+(d.lift??0);
+      if(d.type==='skylight'){dg.position.y+=.2/Math.cos(t)+(d.h||.25)/2;if(mt.along)dg.rotation.x=sg*t;else dg.rotation.z=-sg*t;}}dg.userData.surf={kind:'detail',di};g.add(dg);
     const material=d.type==='skylight'?glassMat:swatchMat(d.mat,defTrim,'world');
     const w=Math.max(.05,d.w||1),h=Math.max(.05,d.h||1),dep=Math.max(.05,d.d||1);
     function part(w,h,dd,x,y,z,mat=material){const geo=new THREE.BoxGeometry(w,h,dd);worldUVBox(geo,w,h,dd);const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);dg.add(m);return m;}
     if(d.type==='chimney'){
       const pipe=new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2,h,12),material);dg.add(pipe);
       part(w*1.5,.18,w*1.5,0,h/2,0);
+      if(d.collarMat!=null){part(w*1.9,.35,w*1.9,0,-h/2+.1,0,swatchMat(d.collarMat,defTrim));}
     }else if(d.type==='balcony'){
       const rail=swatchMat(d.railMat,'#24282b'),post=.45;
       part(w,.5,dep,0,0,0);
@@ -403,7 +455,24 @@ export function buildHouse(THREE, spec, opts){
       const points=shape.getPoints(32).map(p=>new THREE.Vector3(p.x,p.y,.05)),curve=new THREE.CatmullRomCurve3(points,true);
       dg.add(new THREE.Mesh(new THREE.TubeGeometry(curve,64,.10,6,true),material));
     }else if(d.type==='skylight'){
-      part(w+.25,h,dep+.25,0,0,0,swatchMat(d.mat,defTrim));part(w,.04,dep,0,h/2+.025,0,glassMat);
+      const pale=d.glass?new THREE.MeshStandardMaterial({color:d.glass,roughness:.3,flatShading:true}):glassMat;
+      part(w+.25,h,dep+.25,0,0,0,swatchMat(d.mat,defTrim));part(w,.04,dep,0,h/2+.025,0,pale);
+    }else if(d.type==='railing'){                              // posts, top + bottom rails and balusters along one run
+      const rail=swatchMat(d.mat,'#141414'),x1=d.x1-(d.x||0),z1=d.z1-(d.z||0),L=Math.hypot(x1,z1),bays=d.bays||1,per=d.perBay||0,pw=d.postW??.3,inset=d.railDrop??.1,bw=d.baluster??.07,ang=-Math.atan2(z1,x1);
+      const piece=(l,hh,dd,a,yy)=>{const m=part(l,hh,dd,0,yy,0,rail);m.position.set(x1*a,yy,z1*a);m.rotation.y=ang;return m;};
+      const mid=(l,hh,dd,yy)=>{const m=part(l,hh,dd,0,yy,0,rail);m.position.set(x1/2,yy,z1/2);m.rotation.y=ang;};
+      mid(L,d.topH??.12,d.topW??.14,h-inset);mid(L,.08,.1,.35);
+      for(let b=0;b<=bays;b++){const a=b/bays;piece(pw,h+(d.postRise??.1),pw,a,(h+(d.postRise??.1))/2);if(d.plate)piece(pw+.25,.08,pw+.25,a,.04);
+        if(b<bays)for(let k=1;k<=per;k++){piece(bw,h-inset-.35,bw,(b+k/(per+1))/bays,(h-inset+.35)/2);}}
+    }else if(d.type==='beam'){                                 // a timber between two points: posts, braces, logs
+      const a=new THREE.Vector3(d.from[0]-(d.x||0),d.from[1]-(d.y||0),d.from[2]-(d.z||0)),b=new THREE.Vector3(d.to[0]-(d.x||0),d.to[1]-(d.y||0),d.to[2]-(d.z||0)),v=b.clone().sub(a),L=v.length();
+      const m=d.round?new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2,L,7),material):part(w,L,dep,0,0,0);if(d.round)dg.add(m);
+      m.position.copy(a.clone().add(b).multiplyScalar(.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());
+    }else if(d.type==='sconce'){                               // wall lantern on a mounting block; +z is outward
+      if(d.blockMat!=null)part(.55,.8,.08,0,0,-.08,swatchMat(d.blockMat,defTrim));
+      part(.34,.55,.34,0,0,.2);part(.46,.08,.46,0,.3,.2);part(.1,.12,.1,0,.4,.2);
+    }else if(d.type==='dish'){                                 // satellite dish on a short arm
+      const c=new THREE.Mesh(new THREE.CylinderGeometry(w/2,w/2*.35,.3,12),material);c.rotation.x=1.1;dg.add(c);part(.1,.1,1,0,-.2,-.5);
     }else part(w,h,dep,0,0,0);
   });
 

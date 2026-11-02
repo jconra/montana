@@ -15,27 +15,27 @@
           12
         ],
         [
-          4.5,
+          5.5,
           12
         ],
         [
-          4.5,
-          12.5
+          5.5,
+          14
         ],
         [
-          3,
-          15
+          3.75,
+          15.5
         ],
         [
-          -3,
-          15
+          -3.75,
+          15.5
         ],
         [
-          -4.5,
-          12.5
+          -5.5,
+          14
         ],
         [
-          -4.5,
+          -5.5,
           12
         ],
         [
@@ -47,11 +47,11 @@
           11.3
         ],
         [
-          -34,
+          -32.2,
           11.3
         ],
         [
-          -34,
+          -32.2,
           1.3
         ],
         [
@@ -125,24 +125,6 @@
           "wi": 2
         },
         {
-          "on": "outline",
-          "off": 0.73,
-          "w": 4.6,
-          "y0": 4,
-          "y1": 8,
-          "type": "window",
-          "edge": 5
-        },
-        {
-          "on": "outline",
-          "off": 0.69,
-          "w": 1.5,
-          "y0": 4,
-          "y1": 8,
-          "type": "window",
-          "edge": 6
-        },
-        {
           "on": "wall",
           "off": 2.74,
           "w": 3,
@@ -153,66 +135,131 @@
         },
         {
           "on": "outline",
-          "off": 3.03,
-          "w": 5,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "edge": 11
-        },
-        {
-          "on": "outline",
-          "off": 5.07,
-          "w": 3.5,
-          "y0": 5.5,
-          "y1": 7.5,
-          "type": "window",
-          "edge": 13
-        },
-        {
-          "on": "outline",
-          "off": 8.17,
-          "w": 8,
+          "edge": 8,
+          "off": 8.85,
+          "w": 5.3,
           "y0": 4,
           "y1": 8,
-          "type": "window",
-          "edge": 8
+          "type": "window"
         },
         {
           "on": "outline",
-          "off": 8.17,
-          "w": 5.5,
+          "edge": 2,
+          "off": 7.3,
+          "w": 4.4,
           "y0": 4.5,
+          "y1": 7.6,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 5,
+          "off": 0.6,
+          "w": 6.3,
+          "y0": 3.1,
           "y1": 8,
           "type": "window",
-          "edge": 2
+          "split": [
+            0.22,
+            0.56,
+            0.22
+          ]
         },
         {
           "on": "outline",
-          "off": 3.98,
-          "w": 3.5,
-          "y0": 7,
-          "y1": 8.5,
-          "type": "window",
-          "edge": 10
-        },
-        {
-          "on": "outline",
-          "off": 0.96,
-          "w": 3.5,
-          "y0": 7,
-          "y1": 8.5,
-          "type": "window",
-          "edge": 10
-        },
-        {
-          "on": "outline",
-          "off": 0.71,
+          "edge": 4,
+          "off": 0.4,
           "w": 1.5,
-          "y0": 4,
+          "y0": 3.1,
           "y1": 8,
           "type": "window",
-          "edge": 4
+          "split": [
+            1
+          ]
+        },
+        {
+          "on": "outline",
+          "edge": 6,
+          "off": 0.4,
+          "w": 1.5,
+          "y0": 3.1,
+          "y1": 8,
+          "type": "window",
+          "split": [
+            1
+          ]
+        },
+        {
+          "on": "outline",
+          "edge": 3,
+          "off": 0.3,
+          "w": 1.4,
+          "y0": 3.1,
+          "y1": 8,
+          "type": "window",
+          "split": [
+            1
+          ]
+        },
+        {
+          "on": "outline",
+          "edge": 7,
+          "off": 0.3,
+          "w": 1.4,
+          "y0": 3.1,
+          "y1": 8,
+          "type": "window",
+          "split": [
+            1
+          ]
+        },
+        {
+          "on": "outline",
+          "edge": 10,
+          "off": 0.4,
+          "w": 3.1,
+          "y0": 5.6,
+          "y1": 7.9,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 10,
+          "off": 4.2,
+          "w": 3.1,
+          "y0": 5.6,
+          "y1": 7.9,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 11,
+          "off": 3.6,
+          "w": 2.8,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true,
+          "mat": 5,
+          "lites": [
+            1,
+            1
+          ],
+          "liteFrom": 0.45,
+          "casing": 10,
+          "casingW": 0.22
+        },
+        {
+          "on": "outline",
+          "edge": 11,
+          "off": 6.7,
+          "w": 1,
+          "y0": 2.6,
+          "y1": 6.8,
+          "type": "window",
+          "split": [
+            1
+          ]
         },
         {
           "on": "outline",
@@ -264,11 +311,11 @@
           -12
         ],
         [
-          24.4,
+          24,
           -12
         ],
         [
-          24.4,
+          24,
           12
         ],
         [
@@ -305,30 +352,32 @@
           "z1": -12
         },
         {
-          "x0": -20.5,
+          "x0": -19.25,
           "z0": 12,
-          "x1": -11.5,
+          "x1": -12.75,
           "z1": 12,
           "dormer": true,
           "mat": 3,
           "dormerBase": 6.5,
-          "dormerHeight": 5.7,
+          "dormerHeight": 5,
           "dormerDepth": 12,
-          "dormerRise": 2.5,
-          "roofPiece": 0
+          "dormerRise": 2,
+          "roofPiece": 0,
+          "dormerOverhang": 1.1
         },
         {
-          "x0": 11.5,
+          "x0": 12.75,
           "z0": 12,
-          "x1": 20.5,
+          "x1": 19.25,
           "z1": 12,
           "dormer": true,
           "mat": 3,
           "dormerBase": 6.5,
-          "dormerHeight": 5.7,
+          "dormerHeight": 5,
           "dormerDepth": 12,
-          "dormerRise": 2.5,
-          "roofPiece": 0
+          "dormerRise": 2,
+          "roofPiece": 0,
+          "dormerOverhang": 1.1
         }
       ],
       "openings": [
@@ -349,24 +398,6 @@
           "y1": 7,
           "type": "door",
           "wi": 2
-        },
-        {
-          "on": "wall",
-          "wi": 3,
-          "off": 1.8,
-          "w": 5.4,
-          "y0": 0.75,
-          "y1": 4.95,
-          "type": "window"
-        },
-        {
-          "on": "wall",
-          "wi": 4,
-          "off": 1.8,
-          "w": 5.4,
-          "y0": 0.75,
-          "y1": 4.95,
-          "type": "window"
         },
         {
           "on": "outline",
@@ -393,6 +424,33 @@
           "w": 4.5,
           "y0": 2.8,
           "y1": 6.1,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 3,
+          "off": 1.45,
+          "w": 3.6,
+          "y0": 0.9,
+          "y1": 3.6,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 4,
+          "off": 1.45,
+          "w": 3.6,
+          "y0": 0.9,
+          "y1": 3.6,
+          "type": "window"
+        },
+        {
+          "on": "outline",
+          "edge": 5,
+          "off": 6,
+          "w": 2,
+          "y0": 2.5,
+          "y1": 5.5,
           "type": "window"
         }
       ],
@@ -431,9 +489,9 @@
   "roof": null,
   "roofPieces": [
     {
-      "x": 0.2,
+      "x": 0,
       "z": 0,
-      "w": 48.4,
+      "w": 48,
       "d": 24,
       "base": 15.5,
       "style": "gable",
@@ -441,31 +499,39 @@
       "mat": 4,
       "flipRidge": false,
       "raiseWalls": false,
-      "gableMat": 3
+      "gableMat": 3,
+      "rake": 1.5,
+      "fasciaMat": 11
     },
     {
       "x": 0,
-      "z": 13.5,
-      "w": 9,
-      "d": 3,
+      "z": 13.75,
+      "w": 11,
+      "d": 3.5,
       "base": 9,
       "style": "gable",
       "pitch": 0.5,
       "raiseWalls": true,
       "flipRidge": true,
-      "mat": 4
+      "mat": 4,
+      "overhang": 2.25,
+      "rake": 0.5,
+      "fasciaMat": 11
     },
     {
-      "x": -29.9,
+      "x": -29.8,
       "z": 6.3,
-      "w": 11.6,
-      "d": 12.6,
+      "w": 11,
+      "d": 10,
       "base": 8.6,
       "style": "gable",
-      "pitch": 0.5,
+      "pitch": 0.6,
       "raiseWalls": true,
       "mat": 4,
-      "flipRidge": true
+      "flipRidge": true,
+      "overhang": 1,
+      "rake": 0.3,
+      "fasciaMat": 11
     },
     {
       "x": 26.5,
@@ -478,7 +544,8 @@
       "mat": 4,
       "gableMat": 3,
       "flipRidge": false,
-      "raiseWalls": false
+      "raiseWalls": false,
+      "fasciaMat": 11
     }
   ],
   "stairs": [
@@ -495,20 +562,25 @@
     "#6b5a45",
     "#ffffff",
     "#33363a",
-    "#4a2a28",
-    "#4b4750",
+    "#1f0f10",
+    "#2e262c",
     "#241a12",
     "#666862",
     "#07150e",
     "#292d2b",
-    "#b7bab5"
+    "#b7bab5",
+    "#cfc5ae",
+    "#1d1210",
+    "#6b6862",
+    "#17110e",
+    "#d9d8d0"
   ],
   "palTex": [
     "wood",
     null,
     null,
-    "wood",
-    "metal",
+    "siding",
+    "seam",
     null,
     null,
     null,
@@ -516,9 +588,9 @@
     null
   ],
   "colors": {
-    "wall": "#4a2a28",
-    "roof": "#4b4750",
-    "trim": "#deddd3"
+    "wall": "#1f0f10",
+    "roof": "#2e262c",
+    "trim": "#cfc5ae"
   },
   "windowFrames": true,
   "details": [
@@ -526,47 +598,40 @@
       "type": "skylight",
       "name": "Left skylight",
       "x": -5,
-      "y": 19.450000000000003,
-      "z": 6.5,
-      "w": 2.3,
-      "h": 0.25,
-      "d": 4,
-      "rotation": [
-        34.992020198558656,
-        0,
-        0
-      ],
+      "z": 5,
+      "w": 2.5,
+      "h": 0.3,
+      "d": 4.5,
       "mat": 1,
-      "floor": 1
+      "floor": 1,
+      "onRoof": 0,
+      "glass": "#878e93"
     },
     {
       "type": "skylight",
       "name": "Right skylight",
-      "x": 4,
-      "y": 19.450000000000003,
-      "z": 6.5,
-      "w": 2.3,
-      "h": 0.25,
-      "d": 4,
-      "rotation": [
-        34.992020198558656,
-        0,
-        0
-      ],
+      "x": 3.5,
+      "z": 5,
+      "w": 2.5,
+      "h": 0.3,
+      "d": 4.5,
       "mat": 1,
-      "floor": 1
+      "floor": 1,
+      "onRoof": 0,
+      "glass": "#878e93"
     },
     {
       "type": "chimney",
       "name": "Stove pipe",
       "x": -21.5,
-      "y": 19.95,
+      "y": 21.3,
       "z": 8.5,
-      "w": 0.65,
+      "w": 0.95,
       "h": 6,
-      "d": 0.65,
-      "mat": 1,
-      "floor": 1
+      "d": 0.95,
+      "mat": 9,
+      "floor": 1,
+      "collarMat": 11
     },
     {
       "type": "archedWindow",
@@ -1184,10 +1249,143 @@
       "d": 1.4,
       "mat": 7,
       "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry porch column north",
+      "x": -35.1,
+      "y": 4.3,
+      "z": 1.8,
+      "w": 0.5,
+      "h": 8.6,
+      "d": 0.5,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry porch column south",
+      "x": -35.1,
+      "y": 4.3,
+      "z": 10.8,
+      "w": 0.5,
+      "h": 8.6,
+      "d": 0.5,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry porch header",
+      "x": -35.1,
+      "y": 8.5,
+      "z": 6.3,
+      "w": 0.5,
+      "h": 0.5,
+      "d": 9.5,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry side beam north",
+      "x": -33.6,
+      "y": 8.5,
+      "z": 1.8,
+      "w": 3.4,
+      "h": 0.4,
+      "d": 0.4,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry side beam south",
+      "x": -33.6,
+      "y": 8.5,
+      "z": 10.8,
+      "w": 3.4,
+      "h": 0.4,
+      "d": 0.4,
+      "mat": 11,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry porch landing",
+      "x": -34.6,
+      "y": 0.05,
+      "z": 7,
+      "w": 5,
+      "h": 0.2,
+      "d": 7.5,
+      "mat": 12,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry door mat",
+      "x": -33.2,
+      "y": 0.17,
+      "z": 6.2,
+      "w": 1.6,
+      "h": 0.05,
+      "d": 2.8,
+      "mat": 13,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "Entry porch lamp",
+      "x": -32.05,
+      "y": 6.3,
+      "z": 3,
+      "w": 0.12,
+      "h": 0.5,
+      "d": 0.35,
+      "mat": 14,
+      "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "West ridge end box",
+      "x": -25,
+      "y": 24.3,
+      "z": 0,
+      "w": 1.8,
+      "h": 0.7,
+      "d": 1.6,
+      "mat": 14,
+      "floor": 0
+    },
+    {
+      "type": "chimney",
+      "name": "Back slope vent",
+      "x": 2.4,
+      "y": 24.2,
+      "z": -2,
+      "w": 0.35,
+      "d": 0.35,
+      "h": 2.4,
+      "mat": 14,
+      "floor": 1
+    },
+    {
+      "type": "dish",
+      "name": "Satellite dish",
+      "x": 24.8,
+      "y": 17,
+      "z": -11.2,
+      "w": 2.4,
+      "h": 0.3,
+      "d": 0.3,
+      "mat": 14,
+      "floor": 1
     }
   ],
   "origin": [
     0,
     0
-  ]
+  ],
+  "frameW": 0.17
 }
