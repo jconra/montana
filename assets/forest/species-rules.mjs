@@ -1,6 +1,6 @@
 // Which kind of tree stands where. Positions come from LiDAR and hand edits and are never changed here; only the
 // kind is chosen, from the tree's height and how crowded its surroundings are.
-export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag'];
+export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
 export const ASPEN_STANDS=[{x:-46,z:12,r:8.5,planted:12,hMin:8,hMax:14}];
@@ -38,4 +38,13 @@ export function treeWide(kind,id,h){const r=treeHash(id,4);
 export function migrateTreeAsset(record,kindOf){
  if(!record||!LEGACY_TREE_ASSETS.has(record.asset))return record;
  return {...record,asset:'tree/'+kindOf(record)};
+}
+
+// A plant's own measured colour. A record may carry `tone`: its crown's average colour in sunlight as '#rrggbb'. The model is then tinted so
+// its average comes out at that colour; TONE_REF is what each model averages untinted, read from renders.
+export const TONE_REF={fir:'#3f4630',spruce:'#39443a',fir_small:'#445038',juniper:'#4c5230',aspen:'#7d8652',open_fir:'#4a5436',juniper_column:'#4c5230',juniper_low:'#4c5230',juniper_cone:'#4c5230',snag:'#8d8a82'};
+export function toneTint(kind,tone){
+ if(typeof tone!=='string'||!/^#[0-9a-f]{6}$/i.test(tone))return null;
+ const ref=TONE_REF[kind]||'#4c5230',ch=(h,i)=>Math.pow(parseInt(h.substr(1+i*2,2),16)/255,2.2);
+ return [0,1,2].map(i=>Math.max(.35,Math.min(2.2,ch(tone,i)/Math.max(.002,ch(ref,i)))));
 }

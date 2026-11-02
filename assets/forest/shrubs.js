@@ -82,7 +82,7 @@ function sageForm({seed,stems,spread,bare,branch,size,lean=0,thick=.03,low=.3}){
   shoot(start,y+lean*Math.cos(y-leanYaw),el,len,thick*(.7+r()*.6),col,0);
  }
  // dark inner tufts close the middle in places, as the older leaves and shade do
- for(let s=0;s<stems*1.5;s++){const y=r()*6.283,d=.15+r()*.65,rea=reach(y)*d,h=Math.max(bare*.6,.18)+r()*.5;tuft(L,[Math.cos(y)*rea,h,Math.sin(y)*rea],[Math.cos(y)*.4,.9,Math.sin(y)*.4],size*.85,r,.55+r()*.25);}
+ for(let s=0;s<stems*3;s++){const y=r()*6.283,d=.15+r()*.65,rea=reach(y)*d,h=Math.max(bare*.6,.18)+r()*.5;tuft(L,[Math.cos(y)*rea,h,Math.sin(y)*rea],[Math.cos(y)*.4,.9,Math.sin(y)*.4],size*.85,r,.55+r()*.25);}
  // a few ground-hugging shoots: tufts low on the outside, so it meets the ground
  for(let s=0;s<Math.round(stems*low);s++){const y=r()*6.283,rea=reach(y)*.8,col=BARK[0];shoot([0,0,0],y,.28+r()*.4,rea*(.75+r()*.4),thick*.45,col,1);}
  // normalise: base at 0, height 1, centred on the root
@@ -93,11 +93,11 @@ function sageForm({seed,stems,spread,bare,branch,size,lean=0,thick=.03,low=.3}){
 }
 
 export const SAGE_FORMS=[
- {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,stems:7,spread:.62,bare:.34,branch:3,size:.34}},
- {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,stems:6,spread:.78,bare:.28,branch:3,size:.36,lean:.4}},
- {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,stems:8,spread:1.5,bare:.1,branch:3,size:.62,low:.7,thick:.05}},
- {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,stems:6,spread:.55,bare:.52,branch:3,size:.27,thick:.024,low:.25}},
- {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,stems:5,spread:.95,bare:.42,branch:4,size:.33,lean:.8,thick:.03}},
+ {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,stems:12,spread:.7,bare:.14,branch:3,size:.46,low:.7}},
+ {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,stems:11,spread:.86,bare:.12,branch:3,size:.48,lean:.4,low:.7}},
+ {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,stems:13,spread:1.5,bare:.06,branch:3,size:.8,low:.9,thick:.05}},
+ {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,stems:9,spread:.6,bare:.36,branch:3,size:.34,thick:.024,low:.35}},
+ {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,stems:8,spread:1,bare:.22,branch:4,size:.44,lean:.8,thick:.03,low:.5}},
 ];
 
 // -> species for a Forest, in SAGE_FORMS order.
@@ -105,7 +105,7 @@ export function buildShrubSpecies(){
  const map=sprayTexture();
  return SAGE_FORMS.map(({name,label,defaultHeight,form})=>{
   const {leaf,wood}=sageForm(form);
-  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.58,.585,.50),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.66,.67,.6),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   const root=new THREE.Group();root.add(new THREE.Mesh(wood,woodMat),new THREE.Mesh(leaf,leafMat));
   return {name,label,defaultHeight,height:1,root,parts:[{geometry:wood,material:woodMat},{geometry:leaf,material:leafMat}],tint:false,soften:.25,spec:.08,coverage:true,sway:.12,
    shape:{lump:.12,mix:.7,dark:.48,tip:.22,olive:0,branchDark:.5,under:.12,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};

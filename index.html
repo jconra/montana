@@ -152,7 +152,7 @@ import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
-import {TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
 import {roadCoverage,DRIVE_LINE} from './assets/driveway-measured.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
@@ -685,13 +685,14 @@ let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to 
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});}
-function treeTint(kind,id,tint){
+function treeTint(kind,id,tint,tone){
+  const own=toneTint(kind,tone);if(own)return new THREE.Color(own[0],own[1],own[2]);
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
   if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
   // blue-green junipers; other evergreens from dark blue-green through olive to a sunlit yellow-green
   if(kind==='snag')return new THREE.Color(tint,tint,tint);
-  if(kind.startsWith('juniper')){const l=.82+.3*c;return new THREE.Color(tint*l*(.88+.24*a),tint*l*(.92+.12*b),tint*l*(.62+.3*a));}
+  if(kind.startsWith('juniper')){const l=.86+.3*c;return new THREE.Color(tint*l*(.92+.2*a),tint*l*(.94+.12*b),tint*l*(.76+.3*a));}
   const olive=a*a,lift=.72+.62*c;return new THREE.Color(tint*lift*(.8+.56*olive),tint*lift*(.9+.2*b),tint*lift*(1.06-.56*olive));
 }
 const treeAssetsReady=(async()=>{
@@ -724,7 +725,7 @@ function buildTreesFrom(n){
     const all=landscapeRecords.filter(o=>o.asset.startsWith('tree/')),lidar=all.filter(o=>o.id.startsWith('lidar:'));
     const count=Math.min(lidar.length,Math.round(lidar.length*n/Math.max(1,realXZ.length/3))),chosen=new Set();
     for(let i=0;i<count;i++)chosen.add(lidar[Math.floor(i*lidar.length/count)].id);
-    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,offset:o.offset,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],lean:o.rotation[0],tint:o.tint,wide:(o.scale[0]+o.scale[2])/2/o.scale[1],editorRotation:o.rotation,editorScale:o.scale}));
+    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,offset:o.offset,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],lean:o.rotation[0],tint:o.tint,tone:o.tone,wide:(o.scale[0]+o.scale[2])/2/o.scale[1],editorRotation:o.rotation,editorScale:o.scale}));
     buildTreeMesh();return;
   }
   const total=realXZ.length/3; n=Math.min(n,total);
@@ -786,7 +787,7 @@ function buildTreeMesh(){
   const fixed=[];
   for(const t of trees.concat(groveList)){
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
-    fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint)});
+    fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint,t.tone)});
   }
   groundDetail.setTrees(trees.concat(groveList));
   forest.setFixed(fixed);
