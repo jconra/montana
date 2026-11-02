@@ -4,10 +4,18 @@ export function photoToWorld(u,v){
   const du=u-1240,dv=v-823,a=-0.004946272542881978,b=-0.08932266266176393;
   return {x:8+a*du-b*dv,z:-8+b*du+a*dv};
 }
-const pondAnchors=[[398,595],[442,605],[480,651],[492,726],[497,820],[521,900],[542,974],[517,1010],[466,1028],[413,1010],[383,950],[371,874],[376,795],[390,725],[401,654]].map(([u,v])=>photoToWorld(u,v));
+// The water's edge read from solved July 2022 frames on LiDAR ground (world x,z).
+const pondAnchors=[[13,60.5],[17,59],[22,57.8],[27,56.8],[32,57],[36,59],[38.5,63],[39.5,67.5],[38,71],[33,72],[27,71.2],[21,70],[16,68.5],[12.5,65]].map(([x,z])=>({x,z}));
+// The earlier outline. It only seeds scatters whose object ids saved edits refer to, so those stay put.
+const legacyAnchors=[[398,595],[442,605],[480,651],[492,726],[497,820],[521,900],[542,974],[517,1010],[466,1028],[413,1010],[383,950],[371,874],[376,795],[390,725],[401,654]].map(([u,v])=>photoToWorld(u,v));
 // Rounded interpolation through the traced bank avoids a visibly polygonal shoreline.
 export const POND_OUTLINE=pondAnchors.flatMap((p1,i)=>Array.from({length:6},(_,j)=>{
  const p0=pondAnchors[(i+pondAnchors.length-1)%pondAnchors.length],p2=pondAnchors[(i+1)%pondAnchors.length],p3=pondAnchors[(i+2)%pondAnchors.length],t=j/6;
+ const interp=k=>.5*((2*p1[k])+(-p0[k]+p2[k])*t+(2*p0[k]-5*p1[k]+4*p2[k]-p3[k])*t*t+(-p0[k]+3*p1[k]-3*p2[k]+p3[k])*t*t*t);
+ return {x:interp('x'),z:interp('z')};
+}));
+export const LEGACY_POND_OUTLINE=legacyAnchors.flatMap((p1,i)=>Array.from({length:6},(_,j)=>{
+ const p0=legacyAnchors[(i+legacyAnchors.length-1)%legacyAnchors.length],p2=legacyAnchors[(i+1)%legacyAnchors.length],p3=legacyAnchors[(i+2)%legacyAnchors.length],t=j/6;
  const interp=k=>.5*((2*p1[k])+(-p0[k]+p2[k])*t+(2*p0[k]-5*p1[k]+4*p2[k]-p3[k])*t*t+(-p0[k]+3*p1[k]-3*p2[k]+p3[k])*t*t*t);
  return {x:interp('x'),z:interp('z')};
 }));

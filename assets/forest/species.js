@@ -74,10 +74,10 @@ const FLAME={u0:0,u1:1,v0:0,v1:1};
 function flameTexture(seed){
  const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d'),r=rnd(seed);g.clearRect(0,0,256,256);g.lineCap='round';
  // a solid flame first, ragged at the edge, so it covers what's behind it at any distance
- g.fillStyle='rgb(62,69,37)';g.beginPath();g.moveTo(128,252);for(let k=0;k<=24;k++){const t=k/24,w=Math.pow(Math.sin(Math.PI*Math.pow(Math.min(1,t*.97+.03),.72)),.8)*108+3;g.lineTo(128-w*(.82+r()*.3),250-t*234);}for(let k=24;k>=0;k--){const t=k/24,w=Math.pow(Math.sin(Math.PI*Math.pow(Math.min(1,t*.97+.03),.72)),.8)*108+3;g.lineTo(128+w*(.82+r()*.3),250-t*234);}g.closePath();g.fill();
+ g.fillStyle='rgb(50,64,37)';g.beginPath();g.moveTo(128,252);for(let k=0;k<=24;k++){const t=k/24,w=Math.pow(Math.sin(Math.PI*Math.pow(Math.min(1,t*.97+.03),.72)),.8)*108+3;g.lineTo(128-w*(.82+r()*.3),250-t*234);}for(let k=24;k>=0;k--){const t=k/24,w=Math.pow(Math.sin(Math.PI*Math.pow(Math.min(1,t*.97+.03),.72)),.8)*108+3;g.lineTo(128+w*(.82+r()*.3),250-t*234);}g.closePath();g.fill();
  for(let i=0;i<620;i++){
   const t=Math.pow(r(),.75),half=(1-t)*(1-t*.15)*96+6,x=128+(r()-.5)*2*half,y=250-t*226,a=-Math.PI/2+(x-128)/128*.9+(r()-.5)*.7,l=7+r()*13,tone=t+(r()-.5)*.55;
-  const col=tone<.45?[52,60,32]:tone<.85?[84,92,47]:[142,142,76];g.strokeStyle=`rgb(${col[0]+r()*12|0},${col[1]+r()*12|0},${col[2]+r()*8|0})`;g.lineWidth=1.2+r()*2;
+  const col=tone<.45?[42,58,33]:tone<.85?[66,84,46]:[112,124,66];g.strokeStyle=`rgb(${col[0]+r()*12|0},${col[1]+r()*12|0},${col[2]+r()*8|0})`;g.lineWidth=1.2+r()*2;
   g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();
  }
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;

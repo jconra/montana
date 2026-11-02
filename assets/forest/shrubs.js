@@ -13,15 +13,15 @@ export function sprayTexture(seed=91,size=512){
  g.clearRect(0,0,size,size);g.lineCap='round';
  for(let q=0;q<4;q++){
   const ox=(q%2)*cell,oy=(q>>1)*cell,S=cell/256;
-  for(let i=0;i<46+q*6;i++){
+  for(let i=0;i<130+q*8;i++){
    const a=-Math.PI/2+(r()-.5)*(1.25+.2*q),len=(120+r()*110)*S,bx=ox+cell/2+(r()-.5)*44*S,by=oy+cell-8*S,tone=r(),
-    shade=tone<.3?[150,156,142]:tone<.75?[182,188,174]:[212,216,202];
-   let x=bx,y=by,ang=a;const steps=12;
+    shade=tone<.3?[132,136,128]:tone<.75?[170,174,166]:[204,206,198];
+   let x=bx,y=by,ang=a;const steps=20;
    for(let k=0;k<steps;k++){
     const t=k/steps,nx=x+Math.cos(ang)*len/steps,ny=y+Math.sin(ang)*len/steps;
     g.strokeStyle=`rgb(${shade[0]*.72|0},${shade[1]*.72|0},${shade[2]*.72|0})`;g.lineWidth=Math.max(1,(2.2-t*1.6)*S);g.beginPath();g.moveTo(x,y);g.lineTo(nx,ny);g.stroke();
     if(t>.2)for(const side of [-1,1]){
-     const l=(10+r()*24)*S*(1.15-t*.55),w=(1.8+r()*2)*S,b=ang+side*(.45+r()*.55),j=.86+r()*.28;
+     const l=(5+r()*11)*S*(1.15-t*.55),w=(1+r()*1.1)*S,b=ang+side*(.45+r()*.55),j=.86+r()*.28;
      g.fillStyle=`rgb(${shade[0]*j|0},${shade[1]*j|0},${shade[2]*j|0})`;
      g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(b+1.5)*w,y+Math.sin(b+1.5)*w);g.lineTo(x+Math.cos(b)*l,y+Math.sin(b)*l);g.lineTo(x+Math.cos(b-1.5)*w,y+Math.sin(b-1.5)*w);g.closePath();g.fill();
     }
@@ -60,44 +60,36 @@ function tuft(a,tip,dir,size,r,shade){
  }
 }
 
-// shape: {seed, stems, spread (half-width, in units of height), lean, branch (side shoots per stem), bare (share of a stem without tufts), size (tuft), flat}
-function sageForm({seed,stems,spread,bare,branch,size,lean=0,thick=.03,low=.3}){
+// A plant is a few overlapping soft mounds of silver tufts, solid from the ground up. Stems only show low on the woody forms.
+// spread: half-width in units of height. mounds: how many overlap. bare: height of bare stem under the woody forms.
+function sageForm({seed,mounds,spread,tufts,size,bare=0,flat=1}){
  const r=rnd(seed),W={pos:[],nor:[],uv:[],c:[],idx:[]},L={pos:[],nor:[],uv:[],c:[],idx:[]};
- const p1=r()*6.283,p2=r()*6.283,leanYaw=r()*6.283;
- const reach=y=>spread*(1+.32*Math.sin(2*y+p1)+.22*Math.sin(3*y+p2));     // an uneven outline, not a circle
- const tall=y=>1-.28*(.5+.5*Math.sin(y*1.6+p2));                            // and an uneven top
- const shoot=(from,yaw,el,len,r0,col,depth)=>{
-  const pts=[from],seg=[3,2,1][depth];let [x,y,z]=from,a=yaw,e=el;
-  for(let i=0;i<seg;i++){const d=len/seg;x+=Math.cos(a)*Math.cos(e)*d;y+=Math.sin(e)*d;z+=Math.sin(a)*Math.cos(e)*d;a+=(r()-.5)*.7;e+=(r()-.5)*.5+(depth?.05:.1);pts.push([x,Math.max(y,.004),z]);}
-  tube(W,pts,r0,r0*.42,col);
-  // side shoots from the upper part
-  if(depth<2)for(let b=0;b<(depth?1:branch);b++){const t=.3+r()*.6,at=pts[Math.round(t*(pts.length-1))],ya=a+(r()<.5?-1:1)*(.5+r()*.9);shoot(at,ya,Math.max(.15,e*.75+(r()-.5)*.3),len*(.42+r()*.28),r0*.5,col,depth+1);}
-  const last=pts[pts.length-1],before=pts[pts.length-2],dl=[last[0]-before[0],last[1]-before[1],last[2]-before[2]],ll=Math.hypot(...dl)||1;
-  if(last[1]>bare*.75||r()<.2)tuft(L,last,dl.map(v=>v/ll),size*(.85+r()*.55),r,.8+.4*Math.min(1,last[1]));
-  // a tuft or two along the way, so the crown closes up in places and stays open in others
-  if(depth>0&&r()<.7){const m=pts[Math.round(pts.length/2)];if(m[1]>bare)tuft(L,m,[0,1,0],size*.9,r,.72+.4*Math.min(1,m[1]));}
- };
- for(let s=0;s<stems;s++){
-  const y=(s+r()*.8)/stems*6.283,col=BARK[Math.floor(r()*3)],rea=reach(y),h=tall(y)*(.72+r()*.28),len=Math.hypot(rea*.68,h*.62)*(.9+r()*.25),el=Math.atan2(h*.62,rea*.68),start=[Math.cos(y)*.03*(.5+r()),0,Math.sin(y)*.03*(.5+r())];
-  shoot(start,y+lean*Math.cos(y-leanYaw),el,len,thick*(.7+r()*.6),col,0);
+ const blobs=[];for(let m=0;m<mounds;m++){const a=m/mounds*6.283+r()*.9,d=m?spread*(.32+r()*.42):0,R=spread*(.42+r()*.28)*(m?1:1.15);blobs.push({x:Math.cos(a)*d,z:Math.sin(a)*d,R,h:(m?.62+r()*.33:1)*flat});}
+ const area=blobs.reduce((n,b)=>n+b.R*b.R,0);
+ for(const b of blobs){
+  const n=Math.max(8,Math.round(tufts*b.R*b.R/area));
+  for(let i=0;i<n;i++){
+   // a point on the dome, a little under the surface for some, so gaps show more foliage, never the ground
+   const yaw=r()*6.283,el=Math.acos(1-r()*.98),deep=r()<.25?.62:.9+r()*.12,lump=1+.12*Math.sin(yaw*4+b.x*17+el*5)*Math.sin(el*7+b.z*13),
+    rad=Math.sin(el)*b.R*deep*lump,hy=Math.cos(el)*b.h*deep*lump,y=bare+(b.h-bare)*Math.max(0,hy/b.h),x=b.x+Math.cos(yaw)*rad,z=b.z+Math.sin(yaw)*rad,
+    t=y/b.h,shade=(deep<.7?.58:.72)+t*.42+(r()-.5)*.14;
+   tuft(L,[x,y+size*.1,z],[Math.cos(yaw)*Math.sin(el),Math.cos(el)+.25,Math.sin(yaw)*Math.sin(el)],size*(.8+r()*.5),r,shade);
+  }
  }
- // dark inner tufts close the middle in places, as the older leaves and shade do
- for(let s=0;s<stems*3;s++){const y=r()*6.283,d=.15+r()*.65,rea=reach(y)*d,h=Math.max(bare*.6,.18)+r()*.5;tuft(L,[Math.cos(y)*rea,h,Math.sin(y)*rea],[Math.cos(y)*.4,.9,Math.sin(y)*.4],size*.85,r,.55+r()*.25);}
- // a few ground-hugging shoots: tufts low on the outside, so it meets the ground
- for(let s=0;s<Math.round(stems*low);s++){const y=r()*6.283,rea=reach(y)*.8,col=BARK[0];shoot([0,0,0],y,.28+r()*.4,rea*(.75+r()*.4),thick*.45,col,1);}
- // normalise: base at 0, height 1, centred on the root
+ // a few short dark stems into the root
+ const stems=bare>0?7:3;for(let k=0;k<stems;k++){const a=r()*6.283,top=Math.max(bare,.12)*1.3,d=spread*(.08+r()*.22),col=BARK[Math.floor(r()*3)];tube(W,[[Math.cos(a)*d*.2,0,Math.sin(a)*d*.2],[Math.cos(a)*d*.6,top*.5,Math.sin(a)*d*.6],[Math.cos(a)*d,top,Math.sin(a)*d]],.03*(bare>0?1.1:.7),.012,col);}
  const leaf=build(L.pos,L.nor,L.uv,L.c,L.idx),wood=build(W.pos,W.nor,W.uv,W.c,W.idx);
- const box=new THREE.Box3().setFromBufferAttribute(leaf.attributes.position).union(new THREE.Box3().setFromBufferAttribute(wood.attributes.position)),k=1/(box.max.y-Math.min(0,box.min.y));
+ const box=new THREE.Box3().setFromBufferAttribute(leaf.attributes.position),k=1/box.max.y;
  for(const g of [leaf,wood]){g.scale(k,k,k);g.computeBoundingBox();g.computeBoundingSphere();}
  return {leaf,wood};
 }
 
 export const SAGE_FORMS=[
- {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,stems:12,spread:.7,bare:.14,branch:3,size:.46,low:.7}},
- {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,stems:11,spread:.86,bare:.12,branch:3,size:.48,lean:.4,low:.7}},
- {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,stems:13,spread:1.5,bare:.06,branch:3,size:.8,low:.9,thick:.05}},
- {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,stems:9,spread:.6,bare:.36,branch:3,size:.34,thick:.024,low:.35}},
- {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,stems:8,spread:1,bare:.22,branch:4,size:.44,lean:.8,thick:.03,low:.5}},
+ {name:'sage_round',label:'Sage, tufted round',defaultHeight:1.1,form:{seed:7101,mounds:5,spread:.68,tufts:190,size:0.24}},
+ {name:'sage_round2',label:'Sage, tufted lopsided',defaultHeight:1,form:{seed:7244,mounds:6,spread:.82,tufts:210,size:0.25}},
+ {name:'sage_low',label:'Sage, low spreading patch',defaultHeight:.55,form:{seed:7355,mounds:7,spread:1.25,tufts:220,size:0.36,flat:.9}},
+ {name:'sage_woody',label:'Sage, tall and woody',defaultHeight:2.2,form:{seed:7466,mounds:4,spread:.58,tufts:170,size:0.2,bare:.2}},
+ {name:'sage_sprawl',label:'Sage, old and sprawling',defaultHeight:1.3,form:{seed:7577,mounds:7,spread:.95,tufts:200,size:0.24,bare:.08}},
 ];
 
 // -> species for a Forest, in SAGE_FORMS order.
@@ -105,10 +97,10 @@ export function buildShrubSpecies(){
  const map=sprayTexture();
  return SAGE_FORMS.map(({name,label,defaultHeight,form})=>{
   const {leaf,wood}=sageForm(form);
-  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.66,.67,.6),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.72,.72,.63),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   const root=new THREE.Group();root.add(new THREE.Mesh(wood,woodMat),new THREE.Mesh(leaf,leafMat));
   return {name,label,defaultHeight,height:1,root,parts:[{geometry:wood,material:woodMat},{geometry:leaf,material:leafMat}],tint:false,soften:.25,spec:.08,coverage:true,sway:.12,
-   shape:{lump:.12,mix:.7,dark:.48,tip:.22,olive:0,branchDark:.5,under:.12,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};
+   shape:{lump:.14,mix:.7,dark:.42,tip:.18,olive:0,branchDark:.5,under:.12,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};
  });
 }
 // Which form a placed sage takes when it doesn't name one: from its height and its own id, so it stays put between visits.

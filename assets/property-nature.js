@@ -106,7 +106,7 @@ function flowerGeometry(seed,yellow){
 function paint(g,c){const colors=new Float32Array(g.attributes.position.count*3);for(let i=0;i<colors.length;i+=3)colors.set(c,i);g.setAttribute('color',new THREE.BufferAttribute(colors,3));}
 export function preparePond(tiles,sample){
  const levels=POND_OUTLINE.map(p=>sample(p.x,p.z)).sort((a,b)=>a-b),level=levels[Math.floor(levels.length/2)]+.06;
- for(const t of tiles){const p=t.pos;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);if(x< -14||x>36||z<48||z>76)continue;const d=polygonDistance(x,z);if(d< -3)continue;
+ for(const t of tiles){const p=t.pos;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);if(x<6||x>46||z<50||z>80)continue;const d=polygonDistance(x,z);if(d< -3)continue;
  const target=d>=0?level-.12-1.8*smooth(0,4,d):level+.08;
  const mix=d>=0?1:1-smooth(0,3,-d);t.baseY[i]=t.baseY[i]*(1-mix)+target*mix;
  }}return level;

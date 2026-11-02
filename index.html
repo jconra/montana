@@ -144,7 +144,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
 import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
-import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.mjs';
+import { polygonDistance,LEGACY_POND_OUTLINE,CLEARING,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=42';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
@@ -697,7 +697,7 @@ function treeTint(kind,id,tint,tone){
   // blue-green junipers; other evergreens from dark blue-green through olive to a sunlit yellow-green
   if(kind==='snag')return new THREE.Color(tint,tint,tint);
   if(kind.startsWith('juniper')){const l=.86+.3*c;return new THREE.Color(tint*l*(.92+.2*a),tint*l*(.94+.12*b),tint*l*(.76+.3*a));}
-  const olive=a*a,lift=.72+.62*c;return new THREE.Color(tint*lift*(.8+.56*olive),tint*lift*(.9+.2*b),tint*lift*(1.06-.56*olive));
+  const olive=a*a,lift=.56+.4*c;return new THREE.Color(tint*lift*(.8+.3*olive),tint*lift*(.92+.14*b),tint*lift*(1.02-.3*olive));
 }
 const treeAssetsReady=(async()=>{
   try{
@@ -738,7 +738,7 @@ function buildTreesFrom(n){
   for(let k=0;k<n;k++){const idx=Math.floor(k*stride);
     if(removedTrees.has(idx)) continue;                             // skip trees you've deleted
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
-    if(inBuilding(rx,rz)||polygonDistance(rx,rz)>-.5) continue;                                 // strip trees sitting on the buildings
+    if(inBuilding(rx,rz)||polygonDistance(rx,rz,LEGACY_POND_OUTLINE)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
     const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:treeWide(asset,id,h)});}
   buildTreeMesh();
@@ -791,6 +791,7 @@ function buildTreeMesh(){
   groveList=buildGroves();
   const fixed=[];
   for(const t of trees.concat(groveList)){
+    if(polygonDistance(t.x,t.z)>.3)continue;   // nothing stands in the water
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
     fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint,t.tone)});
   }
@@ -853,9 +854,9 @@ try{shrubModels=await Promise.all([loadShrub('broadleaf_shrub_2401',true),loadSh
 function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.length;i++){const a=DRIVEWAY[i-1],b=DRIVEWAY[i];distance=Math.min(distance,_pSeg(x,z,a.x,a.z,b.x,b.z));}return distance;}
 (function scatterGround(){
   const R=rng(20260813), Z=115, rocks=[],bushes=[];
-  const near=(x,z,d)=>{if(polygonDistance(x,z)>-1)return true;for(const p of Object.values(CLEARING))if(Math.hypot(x-p.x,z-p.z)<4)return true;for(const o of placed){const dx=x-o.x,dz=z-o.z;if(dx*dx+dz*dz<d*d)return true;}return false;};
+  const near=(x,z,d)=>{if(polygonDistance(x,z,LEGACY_POND_OUTLINE)>-1)return true;for(const p of Object.values(CLEARING))if(Math.hypot(x-p.x,z-p.z)<4)return true;for(const o of placed){const dx=x-o.x,dz=z-o.z;if(dx*dx+dz*dz<d*d)return true;}return false;};
   const pt=s=>{const a=R()*6.283,rad=Math.sqrt(R())*s;return [Math.cos(a)*rad,Math.sin(a)*rad];};
-  for(let i=0;i<420;i++){const[x,z]=pt(Z);if(near(x,z,10)||groundRoadDistance(x,z)<3.5)continue;const big=R()<0.12,s=big?1.4+R()*1.2:0.3+R()*0.8;rocks.push({x,z,s,sy:0.75+R()*0.35,r:R()*6.283,rx:(R()-0.5)*0.3,dy:-s*0.12,tint:0.8+R()*0.4});}
+  for(let i=0;i<420;i++){const[x,z]=pt(Z);if(near(x,z,10)||groundRoadDistance(x,z)<3.5)continue;const big=R()<0.12,s=big?.75+R()*.35:0.3+R()*0.8;rocks.push({x,z,s,sy:0.75+R()*0.35,r:R()*6.283,rx:(R()-0.5)*0.3,dy:-s*0.12,tint:0.8+R()*0.4});}
   for(let i=0;i<120;i++){const[x,z]=pt(Z);if(near(x,z,10)||groundRoadDistance(x,z)<4)continue;bushes.push({x,z,s:0.6+R()*1.1,r:R()*6.283,tint:0.82+R()*0.36});}
   // Sample by route length so short bends and long straight sections get equal coverage.
   // Retain the central clearing scatter, adding detail along both sides of the entire drive.
@@ -869,7 +870,7 @@ function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.le
   }
   for(let i=0;i<500;i++){
     const [x,z]=besideRoad(4,24);if(near(x,z,10)||groundRoadDistance(x,z)<3.5)continue;
-    const s=R()<.08?1.1+R()*.8:.2+R()*.65;
+    const s=R()<.08?.65+R()*.3:.2+R()*.65;
     rocks.push({x,z,s,sy:.7+R()*.35,r:R()*6.283,rx:(R()-.5)*.3,dy:-s*.18,tint:.85+R()*.3});
   }
   for(let i=0;i<240;i++){

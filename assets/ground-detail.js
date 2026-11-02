@@ -44,13 +44,12 @@ export function createGroundDetail(half,driveway,sunDir){
   g.setTransform(c.width/maskSize.x,0,0,c.height/maskSize.y,-maskMin.x*c.width/maskSize.x,-maskMin.y*c.height/maskSize.y);
   function path(width,color,offset=0,start=0,end=route.total){g.strokeStyle=color;g.lineWidth=width;g.lineCap=g.lineJoin='round';g.beginPath();for(let d=start;d<=end+.01;d+=.5){const p=route.at(Math.min(d,end),offset);if(d===start)g.moveTo(p.x,p.z);else g.lineTo(p.x,p.z);}g.stroke();}
   // Green channel controls the lush corridor and meadow, red controls gravel.
-  for(let i=0;i<=24;i++){const t=i/24;path(85-i*2.5,`rgb(0,${Math.round(t*t*(3-2*t)*255)},0)`);}
-  g.fillStyle='#00e000';g.beginPath();g.ellipse(-8,28,36,28,-.2,0,Math.PI*2);g.fill();
   // Blue: the damp bank round the pond.
   g.globalCompositeOperation='lighter';g.filter='blur(5px)';g.strokeStyle='#0000ff';g.lineWidth=3.2;g.beginPath();POND_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.stroke();g.filter='none';g.globalCompositeOperation='source-over';
-  // Red: the drive. The apron and arms as traced; two wheel tracks elsewhere, the grass strip between them stays.
+  // Red: the drive. The apron and arms as traced; elsewhere two pale wheel tracks and a weak value down the middle, which fine noise breaks into a patchy grass strip.
   let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=-2)farEnd=d;
-  for(const side of [-1,1]){path(1.0,'#80ff00',side*TRACK_OFFSET,0,farEnd);path(.62,'#ffff00',side*TRACK_OFFSET,0,farEnd);}
+  g.globalCompositeOperation='lighter';path(2.1,'#3a0000',0,0,farEnd);g.globalCompositeOperation='source-over';
+  for(const side of [-1,1])path(1.05,'#ff0000',side*TRACK_OFFSET,0,farEnd);
   g.fillStyle='#ff0000';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
@@ -59,8 +58,8 @@ export function createGroundDetail(half,driveway,sunDir){
   const top=Math.floor((-20-maskMin.y)/maskSize.y*c.height),bottom=Math.ceil((48-maskMin.y)/maskSize.y*c.height);
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
-    data[i+1]=Math.max(data[i+1],Math.round(Math.max(s.lawn,s.tallGrass)*255));
-    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));data[i+1]=Math.max(data[i+1],Math.round(reclaim*255));
+    data[i+1]=Math.round(s.lawn*255);
+    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));
   }
   // Feather only moisture, preserving the narrow gravel wheel tracks.
   const green=document.createElement('canvas');green.width=green.height=c.width;const gg=green.getContext('2d'),gp=gg.createImageData(c.width,c.height);
@@ -150,8 +149,12 @@ export function createGroundDetail(half,driveway,sunDir){
       vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
       float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
-      float drawn=road*max(smoothstep(84.,96.,landUV.x),1.-smoothstep(-66.,-58.,landUV.y));
-      near=mix(near,vec3(.67,.63,.56)*(.86+fine.r*.28),drawn*.9);
+      float drawn=road*smoothstep(3.,8.,landUV.x);
+      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(3.,8.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);drawn=max(drawn,centre*(1.-tuftsHere));
+      near=mix(near,vec3(.79,.76,.71)*(.88+fine.r*.24),drawn*.95);
+      // Mown lawn: a fine sward, mown in stripes that swing a little.
+      float mown=smoothstep(.25,.6,masks.g);
+      if(mown>0.){float stripe=sin(dot(landUV,vec2(.34,.94))*1.9+sin(landUV.x*.07)*1.4);vec3 sward=mix(vec3(.4,.5,.21),vec3(.47,.56,.25),smoothstep(-.2,.2,stripe));sward*=.9+mid.g*.14+tiny.b*.1;near=mix(near,sward,mown*.93);}
       // Real ground from the drone stills, in two sizes so it does not repeat, by what the map says is here.
       float close=1.-smoothstep(70.,300.,distance(cameraPosition,detailWorld));
       vec2 w2=vec2(landUV.x*.8-landUV.y*.6,landUV.x*.6+landUV.y*.8);
@@ -180,7 +183,7 @@ export function createGroundDetail(half,driveway,sunDir){
       diffuseColor.rgb=mix(diffuseColor.rgb,${shown('#7a5a42')}*(.75+fine.a*.5),clamp(baked.b*1.5,0.,1.)*(.25+tiny.r*.45));
       diffuseColor.rgb*=1.-baked.g*.42;
       diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v11';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v14';}};
 }
 export function rockGeometry(seed,detail=2){
   const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);

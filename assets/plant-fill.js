@@ -55,28 +55,28 @@ export async function createPlantFill({scene,heightAt,fill}){
    float mc=cos(iTurn.x),ms=sin(iTurn.x);vec3 p=position*iTurn.y*fillGrow;p.y*=iTurn.z;
    vec3 transformed=iPos+vec3(mc*p.x+ms*p.z,p.y,-ms*p.x+mc*p.z);
    transformed.xz+=vec2(sin(fillTime*1.2+iPos.x*.31+iPos.z*.17),cos(fillTime*1.05+iPos.z*.27))*aH*aH*p.y*.16;
-   vFill=iCol*mix(.72,1.2,aH);`);
+   vFill=iCol*mix(.84,1.08,aH);`);
   sh.fragmentShader=`varying vec3 vFill;\n`+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n diffuseColor.rgb*=vFill;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.12,.18,.12);');
  };
- material.customProgramCacheKey=()=>'plant-fill-v1';
- const shapes={lush:tuft({blades:9,height:.5,width:.021,spread:.2,seed:11}),dry:tuft({blades:6,height:.24,width:.016,spread:.16,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
+ material.customProgramCacheKey=()=>'plant-fill-v2';
+ const shapes={lush:tuft({blades:14,height:.4,width:.03,spread:.32,seed:11}),dry:tuft({blades:7,height:.18,width:.022,spread:.2,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
  const inWater=(x,z)=>{let c=false;const w=data.water;for(let i=0,j=w.length-1;i<w.length;j=i++)if((w[i][1]>z)!==(w[j][1]>z)&&x<(w[j][0]-w[i][0])*(z-w[i][1])/(w[j][1]-w[i][1])+w[i][0])c=!c;return c;};
  const road=data.road,nearRoad=(x,z)=>{for(let i=1;i<road.length;i++){const a=road[i-1],b=road[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));if(Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<1.3)return true;}return false;};
  const clear=(x,z)=>{if(nearRoad(x,z))return false;for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}return polygonDistance(x,z)<-.6&&!inWater(x,z)&&roadCoverage(x,z)<.3;};
  const cells=new Map(),count={};
  const add=(kind,x,z,size,height,col)=>{const k=kind+':'+Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={kind,x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,col,turn:R()*6.283,rank:R(),vary:R()});count[kind]=(count[kind]||0)+1;};
  const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
- const DEEP=[.085,.2,.05],LIME=[.23,.37,.08],OLIVE=[.19,.24,.08],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
+ const DEEP=[.12,.2,.06],LIME=[.2,.3,.09],OLIVE=[.19,.24,.09],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
  for(let i=0;i<data.h;i++)for(let j=0;j<data.w;j++){const cover=data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5);if(cover<.3)continue;
   const X=data.x0+j,Z=data.z0+i,lush=at('lush',X+.5,Z+.5),dry=at('dry',X+.5,Z+.5),bare=at('bare',X+.5,Z+.5),live=cover*(1-bare)*(1-bare);
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
   const nLush=lush*lush*20*live*(.55+.9*patch),nDry=dry*(5+lush*2)*live*(.45+1.1*patch),nShrub=dry*.1*live*(fine>.55?2:.4);
   const roll=(n,fn)=>{for(let q=Math.floor(n)+(R()<n%1?1:0);q>0;q--){const x=X+R(),z=Z+R();if(clear(x,z))fn(x,z);}};
-  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;const t=vnoise(x*.2,z*.2),c=mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.45),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72),[c[0]*v,c[1]*v,c[2]*v]);});
-  roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0,c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),c=mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.45),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5),[c[0]*v,c[1]*v,c[2]*v]);});
   roll(nShrub,(x,z)=>{const c=mix(SILVER,PALE,R());add('shrublet',x,z,.7+R()*.7,.75+R()*.6,c);});
   const grassy=(lush+dry*.6)*live,drift=vnoise(X*.07+31,Z*.07-9)*.7+vnoise(X*.3,Z*.3)*.3,w=at('white',X+.5,Z+.5);
-  roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));
+  roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>(x>-60&&x<30&&z>-25&&z<60&&campSurface(x,z).lawn>.3)||add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));
   roll(grassy*Math.min(at('yellow',X+.5,Z+.5),1)*.35,(x,z)=>add('yellow',x,z,.9+R()*.4,1,[.95,.72,.12]));
  }
  for(const [px,pz,r] of data.yellowPatches)for(let q=r*r*7;q>0;q--){const a=R()*6.283,d=Math.sqrt(R())*r,x=px+Math.cos(a)*d,z=pz+Math.sin(a)*d;if(clear(x,z))add('yellow',x,z,.9+R()*.5,1,[.95,.72,.12]);}

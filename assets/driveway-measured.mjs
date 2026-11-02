@@ -8,7 +8,7 @@ export const DIRT_OUTLINE=pts([[-2.2,-1.7],[-8,-2.2],[-12,-3.5],[-15,-5.5],[-18,
 export const DRIVE_LINE=pts([[98.8,-101.7],[101.0,-99.6],[103.3,-97.6],[105.5,-95.5],[107.6,-93.4],[109.6,-91.1],[111.5,-88.9],[113.4,-86.8],[115.5,-84.8],[117.7,-82.7],[120.0,-80.7],[122.5,-78.7],[125.0,-76.2],[127.2,-73.2],[128.5,-69.9],[129.5,-66.8],[129.9,-63.4],[130.1,-60.4],[130.2,-57.4],[130.2,-54.2],[129.9,-50.8],[129.2,-47.7],[128.5,-44.6],[127.3,-41.5],[125.7,-38.8],[123.9,-36.1],[121.2,-34.5],[118.7,-33.0],[115.8,-32.3],[112.9,-31.4],[110.2,-30.5],[107.3,-30.0],[104.4,-29.5],[101.2,-28.9],[98.2,-27.6],[95.5,-26.1],[92.9,-24.5],[90.3,-22.7],[88.0,-20.7],[85.7,-18.7],[83.4,-16.9],[81.0,-15.2],[78.5,-13.6],[76.0,-12.1],[73.4,-10.6],[70.8,-9.1],[68.1,-7.6],[65.6,-6.2],[63.0,-5.2],[60.2,-4.6],[57.3,-4.0],[54.4,-3.3],[51.5,-2.7],[48.7,-2.2],[45.8,-1.8],[42.8,-1.2],[39.8,-0.7],[36.9,0.1],[33.9,0.7],[31.0,1.3],[28.1,1.8],[25.1,2.1],[22.1,2.5],[19.2,3.0],[16.2,3.5],[13.3,4.0],[10.4,4.4],[7.4,4.8],[4.5,4.9],[1.5,4.8],[-1.4,4.4],[-4.3,3.6],[-7.2,2.8],[-10.1,2.0],[-12.9,0.9],[-15.5,-0.3],[-18.0,-2.0],[-20.3,-3.8],[-22.7,-5.6]]);
 // Beyond the frames the old line was traced on the aerial, which sits about 4.5 m north of LiDAR along the whole measured part.
 export const AERIAL_ROAD_SHIFT=4.5;
-export const TRACK_OFFSET=.72;      // each wheel track from the centre
+export const TRACK_OFFSET=.92;      // each wheel track from the centre
 export const MEDIAN_ENDS_AT=0;      // west of this x the grass strip between the tracks is worn away
 // Tyre marks read off the mosaic: broad soft arcs sweeping from the garage apron into the camp arm, turning doughnuts in the middle, wheel paths up the east arm. Control points for a smooth curve.
 export const RUTS=[
