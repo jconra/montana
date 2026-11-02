@@ -22,7 +22,7 @@ export function verifiable(x,z){
 // Which juniper form a plant with no measured shape takes: columns, pointed cones, round and broad ones, each plant its own, stable by id.
 export function juniperVariety(id,h){const r=treeHash(id,41);
  if(h<2.5)return r<.5?'juniper':r<.8?'juniper_cone':'juniper_low';
- return r<.28?'juniper_column':r<.58?'juniper_cone':r<.9?'juniper':'juniper_low';
+ return r<.14?'juniper_column':r<.58?'juniper_cone':r<.9?'juniper':'juniper_low';
 }
 export function inAspenStand(x,z){return ASPEN_STANDS.some(s=>(x-s.x)**2+(z-s.z)**2<s.r*s.r);}
 
@@ -44,7 +44,7 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
 // How wide a tree stands for its height: big firs are narrower for their height than young ones; tall junipers are columns, small ones round.
 export function treeWide(kind,id,h){const r=treeHash(id,4);
  if(kind.startsWith('juniper'))return .82+r*.42;
- return (1.25+r*.55)*Math.min(1,Math.pow(13/Math.max(1,h),.25));
+ return (1.+r*.45)*Math.min(1,Math.pow(13/Math.max(1,h),.25));
 }
 
 // A saved record naming an old pine takes the kind its position calls for. Everything else about it stays.
@@ -65,6 +65,6 @@ export function toneTint(kind,tone){
 // Evergreen tones as the frames show them, tree to tree: yellow-olive, olive, grey-green, blue-grey, a rusty one now and then. r g b multipliers over the model's own colour.
 export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
 export function evergreenTone(id,juniper=false){
- const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.22?0:a<.5?1:a<.78?2:a<.94?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.78:.68)+b*.34;
- return [t[0]*lift,t[1]*lift,t[2]*lift];
+ const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.22?0:a<.5?1:a<.78?2:a<.94?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.64:.74)+b*.3,red=juniper?.94:.97;
+ return [t[0]*lift*red,t[1]*lift,t[2]*lift];
 }

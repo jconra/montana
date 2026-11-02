@@ -23,6 +23,24 @@ function addBranch(a,at,yaw,len,width,droop,curve,roll,segs,shade,box=SPRAY,tint
  for(let i=0;i<segs;i++){const q=base+i*2;idx.push(q,q+2,q+1,q+1,q+2,q+3);}
 }
 
+// A solid crown: a dense lathe whose surface is pushed out by many small tufts and a few big lobes, so the mass is opaque with a fine lumpy edge. Ridges lighter, hollows darker, the top lightest; its grain is a tile cut from real crowns.
+function crownShell({profile,rows=36,sides=40,seed,tufts=150,lobes=11,tiers=0,tierDepth=.2,tile=5}){
+ const r=rnd(seed),spots=[];
+ for(let i=0;i<lobes;i++)spots.push([r()*6.283,Math.pow(r(),.8),.1+r()*.1,.6+r()*.6]);
+ for(let i=0;i<tufts;i++){const y=Math.pow(r(),.85);spots.push([r()*6.283,y,.045+r()*.045,.6+r()*.6]);}
+ const pos=[],uv=[],col=[],idx=[],big=[],small=[];
+ for(let j=0;j<=rows;j++){const y=j/rows;for(let i=0;i<=sides;i++){const a=(i%sides)/sides*6.283,Ry=Math.max(profile(y),.01);let hb=0,hs=0;
+  spots.forEach(([sa,sy,w,amp],k)=>{let da=Math.abs(a-sa);if(da>3.1416)da=6.283-da;const dx=da*Ry,dy=y-sy,d2=(dx*dx+dy*dy)/(w*w);if(d2<4){const v=amp*Math.exp(-d2);if(k<lobes)hb+=v;else hs+=v;}});big.push(hb);small.push(hs);}}
+ const mean=v=>v.reduce((p,c)=>p+c,0)/v.length,mb=mean(big),ms=mean(small),sd=Math.sqrt(mean(small.map(v=>(v-ms)**2)))||1,mx=Math.max(...big.map(v=>Math.abs(v-mb)))||1;
+ let vi=0;for(let j=0;j<=rows;j++){const y=j/rows;for(let i=0;i<=sides;i++){const a=(i%sides)/sides*6.283,hb=(big[vi]-mb)/mx,hs=Math.max(-2,Math.min(2,(small[vi]-ms)/sd));vi++;
+  let tier=0;if(tiers){const u=y*tiers+.7*Math.sin(a*3+seed)+.45*Math.sin(a*7+seed*2);tier=(u-Math.floor(u)-.5)*tierDepth;}
+  const R=profile(y,a)*(1+hb*.1+hs*.03);pos.push(Math.cos(a)*R,y,Math.sin(a)*R);uv.push(i/sides*Math.round(tile),y*tile);
+  const v=.42+hs*.06+hb*.05+y*.1;col.push(v,v,v*(1-Math.max(0,hs)*.03));}}
+ const row=sides+1;for(let j=0;j<rows;j++)for(let i=0;i<sides;i++){const q=j*row+i;idx.push(q,q+row,q+1,q+1,q+row,q+row+1);}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();
+ const n=g.attributes.normal;for(let j=0;j<=rows;j++){const a=j*row,c=a+sides,x=n.getX(a)+n.getX(c),y=n.getY(a)+n.getY(c),z=n.getZ(a)+n.getZ(c),l=Math.hypot(x,y,z)||1;n.setXYZ(a,x/l,y/l,z/l);n.setXYZ(c,x/l,y/l,z/l);}
+ return g;
+}
 // Inner shape: a lathe of (height, radius) points in one colour.
 // A lumpy inner body in foliage colours, so what shows between sprays reads as deeper foliage rather than a flat shape.
 function lumpyBody(profile,sides,color,seed){
@@ -40,56 +58,40 @@ function lathe(profile,sides,color){
 
 function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46,open=false,dead=0}){
  const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]};
- // Limbs with small sprays along them, not one big card per limb: fine texture up close and a crown that reads from above. Limb lengths vary a lot, so the outline is uneven.
- const spray=(cx,y,cz,yaw,len,w,dr,roll,shade)=>addBranch(a,[cx,y,cz],yaw,len,w,dr,0,roll,1,shade);
- for(let t=0;t<tiers;t++){
-  const f=t/(tiers-1),y=.05+Math.pow(f,1.04)*.94,reach=radius*Math.pow(1-f*.985,pointed)*(.86+.3*Math.sin(t*2.7+seed))+.008,n=Math.max(3,Math.round(perTier*(1-f*.55)));
-  for(let i=0;i<n;i++){
-   if(open&&(f<.14||r()<.35+.25*(.5+.5*Math.sin(t*1.9+seed))))continue;   // gaps between limbs, a bare lower trunk
-   const yaw=(i+r()*.8)/n*Math.PI*2+t*2.399,limb=reach*(.74+r()*r()*.55),dr=droop*(.55+f*.1),light=f>.8?1.08:1,cy=Math.cos(yaw),sy=Math.sin(yaw);
-   const count=limb>.05?3:limb>.025?2:1;
-   for(let k=1;k<=count;k++){
-    const d=limb*(k/count)*.92,len=Math.max(.018,Math.min(.082,limb*.62)),w=len*(.85+r()*.4),ya=yaw+(r()-.5)*.7,yd=y-Math.tan(dr)*d*.72+(r()-.5)*.006;
-    // lying open to the sky, as limbs do; the outer spray of a limb also turned on edge so the outline stays broken from the side
-    spray(cy*d*.9,yd,sy*d*.9,ya,len,w,dr+(r()-.5)*.25,(r()-.5)*.55,(k===count?.86:.68)*light+r()*.32);
-    if(k===count&&i%2===0)spray(cy*d*.9,yd,sy*d*.9,ya+.5,len*.86,w*.7,dr*.7,Math.PI/2+(r()-.5)*.7,.7+r()*.3);
-   }
-  }
- }
+  const layers=Math.max(7,Math.round(tiers*.34)),p0=seed*.7,crown=(y,c=0)=>{const u=y*layers+.6*Math.sin(c*2+p0);return Math.max(.002,radius*1.02*Math.pow(1-y*.99,pointed)*(.68+.5*(1-(u-Math.floor(u))))*(1+.14*Math.sin(c*3+p0+y*5)));};
+ if(!open)tuftLayer(a,r,crown,{count:Math.round(tiers*perTier*1.5),size:Math.max(.03,radius*.3),up:[-.5,.5],shade:[.72,1.2],tiers:layers});
+ else for(let t=0;t<tiers;t++){const f=t/(tiers-1),y=.05+f*.94,reach=radius*Math.pow(1-f*.985,pointed)*(.86+.3*Math.sin(t*2.7+seed))+.008,n=Math.max(3,Math.round(perTier*(1-f*.55)));
+  for(let i=0;i<n;i++){if(f<.14||r()<.12+.2*(.5+.5*Math.sin(t*1.9+seed)))continue;const yaw=(i+r()*.8)/n*Math.PI*2+t*2.399,limb=reach*(.74+r()*r()*.55);for(let k=1;k<=3;k++){const d=limb*k/3*.95,len=Math.max(.05,Math.min(.1,limb*.7));addBranch(a,[Math.cos(yaw)*d,y-d*.25,Math.sin(yaw)*d],yaw+(r()-.5)*.7,len,len,droop*.5,0,(r()-.5)*.6,1,.72+r()*.4,FLAME);}}}
  const leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);
  if(open)return {leaf,wood:lathe([[0,.016],[.3,.012],[.65,.008],[.97,.002]],6,[.2,.14,.09])};
- const R=radius*core*.82,inner=lumpyBody([[0,R],[.25,R*.74],[.5,R*.44],[.7,R*.18],[.84,.002]],9,[.022,.028,.014],seed+3);
+ const inner=crownShell({profile:y=>Math.max(.002,radius*.74*Math.pow(1-y*.99,pointed)),seed:seed+3,tufts:40,lobes:8,rows:18,sides:14,tile:9});
  return {leaf,wood:dead?mergeGeometries([inner,trunk(dead,seed)]):inner};
 }
 // Grey dead limbs and a bare grey trunk showing under the crown, as on the tall forest firs.
 function trunk(limbs,seed){const r=rnd(seed+9),grey=[.22,.21,.195],parts=[lathe([[0,.012],[.34,.009]],5,grey)];for(let i=0;i<limbs;i++){const l=.05+r()*.075,g=lathe([[0,.0035],[l*.6,.002],[l,.0006]],3,grey);g.rotateZ(-1.1-r()*.9);g.rotateY(r()*6.283);g.translate(0,.05+r()*.3,0);parts.push(g);}return mergeGeometries(parts);}
 
-// A juniper as the census crops show it: many uneven foliage masses round a stem, so the outline breaks into lobes. Each mass is lit from above by its own colours: yellow-olive tips, deep green-black underneath.
-function juniperForm({seed,radius,lobes,cards,pointed=1.25,tips=1,egg=0}){
- const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]},tip=[];
- for(let i=0;i<tips;i++){const y=r()*6.283,d=i?radius*(.3+r()*.3):0;tip.push([Math.cos(y)*d,Math.sin(y)*d,i?.66+r()*.24:1]);}
- const E=f=>radius*(egg?Math.pow(Math.max(0,1-Math.pow(f,egg)),.62):Math.pow(Math.max(0,1-f),1/pointed)),ss=(x,y,v)=>{const t=Math.max(0,Math.min(1,(v-x)/(y-x)));return t*t*(3-2*t);};
- for(let l=0;l<lobes;l++){
-  const f=Math.pow(r(),1.12),t=tip[Math.floor(r()*tips)],yaw=r()*6.283,Rm=E(f),L=Math.max(radius*(.2+r()*.17),.055+r()*.04)*(1-f*.4),out=Math.max(0,Rm-L*.5)*(.35+.65*Math.sqrt(r())),cx=t[0]*f+Math.cos(yaw)*out,cz=t[1]*f+Math.sin(yaw)*out,cy=Math.max(L*.55,f*t[2]),own=.82+r()*.36;
-  for(let k=0;k<cards;k++){
-   let dx=r()*2-1,dy=r()*1.5-.5,dz=r()*2-1;const n=Math.hypot(dx,dy,dz)||1;dx/=n;dy/=n;dz/=n;
-   const at=L*(.5+.5*r()),size=.054+r()*.034,top=ss(-.15,.75,dy),sunlit=top>.6&&r()<.62,c=sunlit?[1.72,1.5,.78]:[.5+.55*top,.58+.5*top,.46+.46*top],sh=own*(.85+r()*.3);
-   addBranch(a,[cx+dx*at,cy+dy*at*.85,cz+dz*at],Math.atan2(dz,dx)+(r()-.5)*.7,size*(.9+r()*.5),size*(1.1+r()*.4),-(.3+Math.max(0,dy)*.9),.1,(r()-.5)*.7,1,sh,FLAME,c);
-  }
- }
- return a;
+// A juniper as the census crops show it: a solid dense mass to the ground, fine lumpy surface, with short sprays on it for a soft broken edge.
+// Overlapping tufts cut from real crown pictures, tips up and out, laid over a dark inner mass that closes every gap. The tufts make the lumpy opaque surface and the soft edge; larger ones are the lobes.
+function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=0}){
+ for(let i=0;i<count;i++){const y=Math.pow(r(),.82)*.985,yaw=r()*6.283,R=profile(y,yaw),big=r()<.14?1.55:1,sz=size*(.72+r()*.56)*big,lift=up[0]+r()*(up[1]-up[0]),cy=Math.cos(yaw),sy=Math.sin(yaw);
+  addBranch(a,[cy*R*.8,Math.max(.012,y-sz*.3),sy*R*.8],yaw+(r()-.5)*.9,sz,sz*(1+r()*.35),-lift,.08,(r()-.5)*.9,1,(shade[0]+r()*(shade[1]-shade[0]))*(.8+y*.3)*(tiers?.72+.56*(1-((y*tiers+.6*Math.sin(yaw*2))%1)):1),FLAME);}
 }
-function juniper(opts){const a=juniperForm(opts),R=opts.radius*.6,leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);return {leaf,wood:lumpyBody(opts.egg?[[0,R*.4],[.2,R*.42],[.4,R*.32],[.55,R*.16],[.64,.002]]:[[0,R*.28],[.22,R*.22],[.4,R*.13],[.54,.002]],13,[.028,.038,.018],opts.seed+3)};}
+function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1}){
+ const r=rnd(seed+1),a={pos:[],nor:[],uv:[],col:[],idx:[]},own=[r()*6.283,r()*6.283],
+  base=y=>Math.max(.002,radius*(egg?Math.pow(Math.max(0,1-Math.pow(y,egg)),.62):Math.pow(Math.max(0,1-y),1/pointed)*Math.min(1,.72+y*2.4))),
+  // no two plants one shape: big masses bulge out and bite in round the crown, more so toward the top
+  profile=(y,c=0)=>base(y)*(1+(.13+.3*y)*Math.sin(c*2+own[0]+y*3.1)+(.1+.16*y)*Math.sin(c*3+own[1]-y*7.3)+.09*Math.sin(c*5+own[0]*2+y*13));
+ tuftLayer(a,r,profile,{count,size});
+ return {leaf:fromArrays(a.pos,a.nor,a.uv,a.col,a.idx),wood:crownShell({profile:(y,c)=>profile(y,c)*.84,seed:seed+3,tufts:50,lobes:9,rows:16,sides:18,tile:4})};
+}
 const FLAME={u0:0,u1:1,v0:0,v1:1};
 // A soft flame of juniper foliage: fine scaly strokes, dark olive at the base going to yellow at the tips.
-function flameTexture(seed){
- // No solid card: hundreds of fine scaly strokes, packed in the middle and thinning to a fringe, so a clump has no flat face and no hard edge.
- const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d'),r=rnd(seed);g.clearRect(0,0,256,256);g.lineCap='round';
- for(let i=0;i<1500;i++){
-  const t=Math.pow(r(),.8),half=(1-t)*(1-t*.2)*104+6,e=(r()-.5)*2,x=128+e*Math.abs(e)*half,y=246-t*230,a=-Math.PI/2+(x-128)/128*1.05+(r()-.5)*.9,l=6+r()*12,tone=r()*.7+t*.3+Math.abs(e)*.25-.1;
-  const col=tone<.3?[36,48,30]:tone<.65?[58,74,42]:tone<.95?[78,92,52]:[100,110,64];g.strokeStyle=`rgb(${col[0]+r()*12|0},${col[1]+r()*12|0},${col[2]+r()*8|0})`;g.lineWidth=1+r()*1.6;
-  g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();
- }
+function tuftTexture(image,seed){
+ // A tuft cut from a real crown tile: pointed top, broken edge from small lobes, darker at the base where it enters the tree.
+ const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d'),r=rnd(seed);
+ g.fillStyle='#000';g.beginPath();for(let i=0;i<34;i++){const t=r(),w=Math.sqrt(1-t*t)*82+6,x=128+(r()-.5)*2*w,y=232-t*196,R=13+r()*18;g.moveTo(x+R,y);g.arc(x,y,R,0,6.283);}g.fill();
+ g.globalCompositeOperation='source-in';g.drawImage(image,r()*200,r()*200,120,120,0,0,256,256);
+ g.globalCompositeOperation='source-atop';const d=g.createLinearGradient(0,256,0,0);d.addColorStop(0,'rgba(10,14,8,.62)');d.addColorStop(.55,'rgba(10,14,8,.08)');d.addColorStop(1,'rgba(235,225,150,.2)');g.fillStyle=d;g.fillRect(0,0,256,256);
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;
 }
 // A dead tree as the census crop shows it: a silver trunk whose limbs fork again and again, the upper ones broken short.
@@ -132,6 +134,7 @@ function aspen({seed}){
 }
 
 // Loads the pictures, builds each kind. -> [{name,label,defaultHeight,root,parts,soften,shape,sink,sway}], index in TREE_KINDS order.
+async function crownTile(file){const t=await new THREE.TextureLoader().loadAsync(new URL('../trees/tex/'+file,import.meta.url).href);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;}
 export async function buildTreeSpecies(baseUrl){
  const {scene:bush}=await new GLTFLoader().loadAsync(new URL('../models/big-bush.glb?v=bb3',import.meta.url).href);
  bush.updateMatrixWorld(true);
@@ -139,24 +142,26 @@ export async function buildTreeSpecies(baseUrl){
  const branch=bushMesh.material.map;branch.anisotropy=4;
  const bark=await new THREE.TextureLoader().loadAsync(new URL('../trees/tex/birch_color.jpg',import.meta.url).href);bark.wrapS=bark.wrapT=THREE.RepeatWrapping;bark.colorSpace=THREE.SRGBColorSpace;
  const needle=(color)=>new THREE.MeshStandardMaterial({map:branch,color,alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+ const juniperTile=await crownTile('juniper-crown.jpg'),firTile=await crownTile('fir-crown.jpg'),crownMat=t=>new THREE.MeshStandardMaterial({map:t,vertexColors:true,roughness:1,metalness:0,name:'crown'});
  const coreMat=()=>new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'core'});
  const pack=(name,label,defaultHeight,g,leafMat,woodMat,extra)=>{const root=new THREE.Group(),L=new THREE.Mesh(g.leaf,leafMat),W=new THREE.Mesh(g.wood,woodMat);root.add(W,L);return {name,label,defaultHeight,height:1,root,parts:[{geometry:g.wood,material:woodMat},{geometry:g.leaf,material:leafMat}],soften:.3,spec:.12,...extra};};
- const lump={lump:.09,mix:.8,dark:.8,tip:.5,olive:.22,branchDark:.2,under:.2,glow:.12};
+ const flame=tuftTexture(juniperTile.image,66),firTuft=tuftTexture(firTile.image,67),juniperMat=()=>{const m=needle(0xffffff);m.map=flame;return m;};
+ const firLeaf=c=>{const m=needle(c);m.map=firTuft;m.color.multiplyScalar(2.3);return m;};
+ const lump={lump:.05,mix:.8,dark:.38,tip:.3,olive:0,branchDark:.2,under:.2,glow:.12};
  const out=[];
- out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.17,tiers:36,perTier:8,droop:.62,pointed:.62,dead:16}),needle(0x7b6e60),coreMat(),{shape:lump,sway:.05}));
- out.push(pack('spruce','Narrow spruce',24,conifer({seed:4202,radius:.15,tiers:38,perTier:7,droop:.72,pointed:.6,dead:14}),needle(0x6e6a68),coreMat(),{shape:lump,sway:.05}));
- out.push(pack('fir_small','Young fir',9,conifer({seed:4303,radius:.38,tiers:22,perTier:9,droop:.5,pointed:.78}),needle(0x85775f),coreMat(),{shape:{...lump,lump:.13},sway:.08}));
+ out.push(pack('fir','Full fir',22,conifer({seed:4101,radius:.21,tiers:36,perTier:8,droop:.62,pointed:.85,dead:16}),firLeaf(0xffffff),crownMat(firTile),{shape:lump,sway:.05}));
+ out.push(pack('spruce','Narrow spruce',24,conifer({seed:4202,radius:.19,tiers:38,perTier:7,droop:.72,pointed:.85,dead:14}),firLeaf(0xe8ecf0),crownMat(firTile),{shape:lump,sway:.05}));
+ out.push(pack('fir_small','Young fir',9,conifer({seed:4303,radius:.38,tiers:22,perTier:9,droop:.5,pointed:.78}),firLeaf(0xfff8e4),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
- const flame=flameTexture(66),juniperMat=()=>{const m=needle(0xffffff);m.map=flame;return m;};
- out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.46,lobes:44,cards:32,tips:3,egg:2.1}),juniperMat(),coreMat(),{shape:{...lump,lump:.05,dark:.82,tip:.4,olive:.05},coverage:true,wideBase:1.3,sway:.1}));
+ out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,egg:2.1}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,wideBase:1.3,sway:.1}));
  {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:0xf0f0e0,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},coverage:true,sway:.2}));}
- out.push(pack('open_fir','Open fir',18,conifer({seed:4606,radius:.25,tiers:20,perTier:8,droop:.5,pointed:.62,open:true}),needle(0x8e7f60),coreMat(),{shape:lump,sway:.06}));
- out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.24,lobes:40,cards:30,pointed:1.7,tips:1,egg:0}),juniperMat(),coreMat(),{shape:{...lump,lump:.05,dark:.82,tip:.4,olive:.05},coverage:true,sway:.07}));
+ out.push(pack('open_fir','Open fir',18,conifer({seed:4606,radius:.25,tiers:20,perTier:8,droop:.5,pointed:.62,open:true}),firLeaf(0xfff4dc),coreMat(),{shape:lump,sway:.06}));
+ out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.28,pointed:1.5,count:440,size:.075}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.07}));
 
- out.push(pack('juniper_low','Low spreading juniper',3.5,juniper({seed:4808,radius:.8,lobes:48,cards:30,pointed:1.05,tips:4}),juniperMat(),coreMat(),{shape:{...lump,lump:.05,dark:.82,tip:.4,olive:.05},coverage:true,sway:.1}));
+ out.push(pack('juniper_low','Low spreading juniper',3.5,juniper({seed:4808,radius:.72,egg:1.5,count:640,size:.11}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.1}));
  {const g=snag({seed:4909}),m=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),root=new THREE.Group();root.add(new THREE.Mesh(g,m));
   out.push({name:'snag',label:'Dead snag',defaultHeight:7,height:1,root,parts:[{geometry:g,material:m}],soften:.1,spec:.1,sway:.02});}
- out.push(pack('juniper_cone','Broad cone juniper',5,juniper({seed:5001,radius:.34,lobes:42,cards:32,pointed:1.25,tips:2}),juniperMat(),coreMat(),{shape:{...lump,lump:.05,dark:.82,tip:.4,olive:.05},coverage:true,sway:.09}));
+ out.push(pack('juniper_cone','Broad cone juniper',5,juniper({seed:5001,radius:.39,pointed:1.2}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.09}));
  return out;
 }
