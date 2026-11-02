@@ -467,11 +467,11 @@ function makeCabin(){
   const X0=-15.6,X1=13,WF=8,DF=14,DECK=5.6,EAVE=13.3,RIDGE=17.4,PITCH=.5,HW=7;
   const mapped=(hex,pattern)=>{const m=new THREE.MeshLambertMaterial({color:hex});const t=cabinTexture(pattern);m.map=t;return m;};
   const tag=(m,kind,wear,horiz)=>{m.userData.wx={kind,wear,horiz};return m;};
-  const side=tag(mapped(0x9c7a3e,'board'),'vboard'),roof=tag(mapped(0x3a3847,'rib'),'roof'),rake=MAT(0xcdb88f),fascia=MAT(0x2a2428),
+  const side=tag(mapped(0xbc904b,'board'),'vboard'),roof=tag(mapped(0x474557,'rib'),'roof'),rake=MAT(0xcdb88f),fascia=MAT(0x2a2428),
         Tx=sharedTextures(THREE),woodMat=new THREE.MeshStandardMaterial({map:Tx.wood,normalMap:Tx.woodN,normalScale:new THREE.Vector2(.9,.9),roughness:.94});woodMat.userData.wx={box:true,chip:0};
   const RED=[.125,.013,.016],BROWN=[.3,.2,.11],post={wood:true,paint:[.42,.31,.19]},rail={wood:true,paint:[.5,.38,.25]},railTop={wood:true,paint:[.58,.46,.32]},rim={wood:true,paint:[.42,.31,.2]},deckB={wood:true,paint:RED,kind:1.25},landing={wood:true,paint:[.4,.34,.3]},log={wood:true,paint:[.42,.31,.19]},
         
-        red=MAT(0x7c1e12,.9),doorRed=MAT(0x631f19,.9),glass=makeGlass(THREE,{alpha:1,tint:0x0d1114}),doorGlass=MAT(0x55565c,1),curtain=MAT(0xa3a69f),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
+        red=MAT(0x7f1712,.9),doorRed=MAT(0x470d0f,.9),glass=makeGlass(THREE,{alpha:1,tint:0x0d1114}),doorGlass=MAT(0x55565c,1),curtain=MAT(0xa3a69f),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
         white=MAT(0xf2efe6),blue=MAT(0x4e93b0),pale=MAT(0x9fc6d4),dark=MAT(0x1c2024);
   red.userData.wxDone=doorRed.userData.wxDone=true;   // these painted boards keep their full colour
   const B=(w,h,d,x,y,z,mat)=>{if(mat.wood){const m=box(g,w*F,h*F,d*F,x*F,y*F,z*F,woodMat);boardGeometry(m.geometry,mat);return m;}return box(g,w*F,h*F,d*F,x*F,y*F,z*F,mat);};
@@ -503,7 +503,7 @@ function makeCabin(){
   {const u=[-run+vUp,pY+vUp*PITCH],pos=[],uvs=[],Q=[[-run,pY,pF],[pX,pY1,pF],[pX,pY1+.25,pB],[u[0],u[1],pB]],len=Math.hypot(pX+run,pY1-pY);
    for(const i of [0,1,2,0,2,3,0,2,1,0,3,2]){pos.push(Q[i][0]*F,Q[i][1]*F+.05,Q[i][2]*F);uvs.push(Q[i][2]/4.4,Q[i][0]/4.4);}
    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,roof));
-   flat([-run+.2,pY+.18,pF],[u[0]+.2,u[1]+.13,pB],1,.04,MAT(0x6e6c78,.7));}
+   flat([-run+.2,pY+.18,pF],[u[0]+.2,u[1]+.13,pB],.7,.04,MAT(0x131218,.8));}
   for(const [a,b] of [[[-run,pY-.2,pF],[pX,pY1-.2,pF]],[[pX,pY1-.2,pB],[pX,pY1-.2,pF]]])T(a,b,.3,fascia);
   // eave fascia + pale rake boards on the front gable
   for(const sgn of [-1,1]){if(sgn>0)T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,zF],.25,fascia);else T([sgn*run,RIDGE-fall-.2,zB],[sgn*run,RIDGE-fall-.2,pB],.25,fascia);
