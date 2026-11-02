@@ -447,9 +447,9 @@ function makeCabin(){
   const g=new THREE.Group(),F=FT;
   const X0=-15.6,X1=13,WF=8,DF=14,DECK=5.6,EAVE=13.3,RIDGE=17.4,PITCH=.5,HW=7;
   const mapped=(hex,pattern,feet,r=.95)=>{const m=new THREE.MeshStandardMaterial({color:hex,roughness:r,flatShading:false});const t=cabinTexture(pattern);m.map=t;return m;};
-  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x2c2629,'rib',0,.82),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x9a7a4c,.85),logPale=MAT(0xa39a88,.85),
-        post=MAT(0x7a5f3c,.9),rail=MAT(0xa5906c,.95),railTop=MAT(0xb4a68c,.95),deckRed=mapped(0x7a2a2a,'deck'),deckGrey=mapped(0x8a7560,'deck'),rim=MAT(0x9c8152,.95),
-        red=MAT(0x74301f,.9),doorRed=MAT(0x5e2a20,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x5a5f66,.5),curtain=MAT(0xd8d6cc),conc=MAT(0x8a8a82,.95),block=MAT(0x8f8d86,.95),
+  const side=mapped(0x9c7a3e,'board'),roof=mapped(0x171316,'rib',0,.82),rake=MAT(0xa98a52),fascia=MAT(0x2a2428),log=MAT(0x7d6238,.85),logPale=MAT(0x857c6c,.85),
+        post=MAT(0x634a2c,.9),rail=MAT(0x5f4f36,.95),railTop=MAT(0x74664e,.95),deckRed=mapped(0x571a1c,'deck'),deckGrey=mapped(0x6b5a46,'deck'),rim=MAT(0x5c4a2e,.95),
+        red=MAT(0x552316,.9),doorRed=MAT(0x431c15,.9),glass=MAT(0x12181d,.3),doorGlass=MAT(0x5a5f66,.5),curtain=MAT(0xd8d6cc),conc=MAT(0x62625c,.95),block=MAT(0x66645e,.95),
         white=MAT(0xe6e2d6),blue=MAT(0x4e93b0),dark=MAT(0x1c2024);
   const B=(w,h,d,x,y,z,mat)=>box(g,w*F,h*F,d*F,x*F,y*F,z*F,mat);
   const uvBox=(w,h,d,x,y,z,mat,tile)=>{const m=B(w,h,d,x,y,z,mat);cabinBoxUV(m.geometry,w,h,d,tile);return m;};
@@ -492,8 +492,8 @@ function makeCabin(){
   for(const x of [-.9,.0,.9])T([3.6+x*0+x,DECK+1,zW+.13],[3.6+x+.9,DECK+5,zW+.13],.03,dark);
   B(1.7,2.1,.1,-.4,14.6,zW+.05,dark);B(1.25,1.65,.06,-.4,14.6,zW+.11,blue);
   // antler above the window, resting on the front log
-  const AY=12.4,AZ=DF-.5;
-  for(const [a,b] of [[[-2.9,AY,AZ],[.3,AY+.15,AZ]],[[-2.9,AY,AZ],[-3.7,AY+1.9,AZ]],[[-2,AY,AZ],[-1.3,AY-1,AZ]],[[-.8,AY+.05,AZ],[-.3,AY-1.1,AZ]],[[.3,AY+.15,AZ],[.9,AY+.5,AZ]]])T(a,b,.13,white,true);
+  const AY=13.5,AZ=DF-.4;
+  for(const [a,b] of [[[-2.9,AY,AZ],[.3,AY+.15,AZ]],[[-2.9,AY,AZ],[-3.7,AY+1.9,AZ]],[[-2,AY,AZ],[-1.3,AY-1,AZ]],[[-.8,AY+.05,AZ],[-.3,AY-1.1,AZ]],[[.3,AY+.15,AZ],[.9,AY+.5,AZ]]])T(a,b,.2,white,true);
   // deck frame: red south of the door line, weathered north of it; 2 x 12 rim
   const SPLIT=2.6;
   uvBox(SPLIT-X0,.2,DF-WF,(X0+SPLIT)/2,DECK-.1,(WF+DF)/2,deckRed,.5);
@@ -518,7 +518,7 @@ function makeCabin(){
   run2(X0,WF+.6,X0+2.2,WF+.6,2);run2(-11,WF+.6,-HW,WF+.6,4);                        // back of the south deck, stair gap between
   run2(HW,WF,X1,WF,6);run2(X1,WF,X1,10.8,2);                                        // north deck back rail and return
   // north stair: 8 treads, 8 risers, 2 stringers, 2 end posts + 10 pickets each side, pad at the foot
-  const N=8,SW=3.2,RIS=DECK/N,TR=1.05,SZ=(10.8+DF)/2;
+  const N=8,SW=3.2,RIS=DECK/N,TR=.98,SZ=(10.8+DF)/2;
   for(let i=0;i<N;i++){const x=X1+TR*(i+.5),y=DECK-RIS*(i+1);B(TR+.1,.14,SW,x,y+.07,SZ,deckGrey);}
   for(const z of [10.8,DF]){T([X1,DECK-.3,z],[X1+TR*N,-.2,z],.7,rim);run2(X1,z,X1+TR*N,z,10,DECK,RIS*.5);}
   B(4.5,.25,3.6,X1+TR*N+2,0,SZ,conc);
@@ -1251,7 +1251,7 @@ const landscapeReady=(async()=>{
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
   // Apply authored transforms after the scatter baseline to preserve existing
   // landscape object IDs. Keep per-axis scale and the full Euler rotation.
-  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-37.985,125.7,37.665],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.6,127.3,45.2],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
+  const buildingDefaults=[{"id":"house:0","position":[8.78,124.1,-4.88],"rotation":[0,0.15009831567151233,0],"scale":[1,1,1]},{"id":"garage:1","position":[-30.73,124.4,-8.2],"rotation":[0,1.160643952576229,0],"scale":[1,1,1]},{"id":"cabin:2","position":[-37.985,125.7,37.665],"rotation":[0,1.6057029118347832,0],"scale":[1,1,1]},{"id":"shed:3","position":[-42.6,127.55,45.2],"rotation":[0,1.6406094968746698,0],"scale":[1,1,1]}];
   for(const [i,rec] of placed.entries()){
     const saved=buildingDefaults.find(row=>row.id===`${rec.type}:${i}`);if(!saved)continue;
     rec.x=saved.position[0];rec.z=saved.position[2];rec.foundationY=saved.position[1];

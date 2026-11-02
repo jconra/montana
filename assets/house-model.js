@@ -383,9 +383,9 @@ export function buildHouse(THREE, spec, opts){
       const turn=Math.abs(((t2-t1)*180/Math.PI+540)%360-180);        // 0 = straight, 90 = right angle
       const mat=swatchMat(m[e],defWall);
       if(turn<12){                                                    // ~straight (redundant vertex): just bridge the butt gap with a wall-aligned box — no visible post
-        const fg=new THREE.BoxGeometry(WALL_T,h,WALL_T); worldUVBox(fg,WALL_T,h,WALL_T);
+        const fg=new THREE.BoxGeometry(WALL_T,h,WALL_T); worldUVBox(fg,WALL_T,h,WALL_T); for(let k=0;k<fg.attributes.uv.count;k++)fg.attributes.uv.setY(k,fg.attributes.uv.getY(k)+y);
         const fm=new THREE.Mesh(fg, swatchMat(m[e],defWall,'world')); fm.position.set(v[0],y+h/2,v[1]); fm.rotation.y=-t2; g.add(fm); }
-      else if(Math.abs(turn-90)<12) box(WALL_T,h,WALL_T,v[0],y+h/2,v[1],mat);                       // crisp square post at right angles
+      else if(Math.abs(turn-90)<12){const cg=new THREE.BoxGeometry(WALL_T,h,WALL_T);worldUVBox(cg,WALL_T,h,WALL_T);for(let k=0;k<cg.attributes.uv.count;k++)cg.attributes.uv.setY(k,cg.attributes.uv.getY(k)+y);mesh(cg,swatchMat(m[e],defWall,'world'),v[0],y+h/2,v[1]);}                       // crisp square post at right angles
       else mesh(new THREE.CylinderGeometry(WALL_T*0.58,WALL_T*0.58,h,10),mat,v[0],y+h/2,v[1]); }    // round column fills 45°/odd corners with no gap or z-fight
     (f.walls||[]).forEach((w,wi)=>{
       const ops=(f.openings||[]).filter(x=>x.on==='wall'&&x.wi===wi);
