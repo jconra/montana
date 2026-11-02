@@ -3,37 +3,41 @@
     {
       "outline": [
         [
-          -3.5,
+          -4.25,
           -3.5
         ],
         [
-          3.5,
+          4.25,
           -3.5
         ],
         [
-          3.5,
+          4.25,
           3.5
         ],
         [
-          -3.5,
+          -4.25,
           3.5
         ]
       ],
-      "h": 9.4,
+      "h": 8.8,
       "walls": [],
       "openings": [
         {
           "on": "outline",
           "edge": 2,
-          "off": 1.9,
-          "w": 2.3,
-          "y0": 5.2,
-          "y1": 7.5,
+          "off": 2.33,
+          "w": 2.2,
+          "y0": 5.1,
+          "y1": 7.4,
           "type": "window",
           "split": [
             1
           ],
-          "trim": 7
+          "trim": 7,
+          "curtain": "#7a8590",
+          "curtainW": 0.42,
+          "casing": 7,
+          "casingW": 0.18
         }
       ],
       "mats": {
@@ -52,18 +56,18 @@
     {
       "x": 0,
       "z": 0,
-      "w": 7,
+      "w": 8.5,
       "d": 7,
-      "base": 9.35,
-      "style": "gable",
-      "pitch": 0.06,
+      "base": 9.85,
+      "style": "shed",
+      "pitch": -0.238,
       "mat": 1,
       "gableMat": 0,
-      "flipRidge": true,
+      "flipRidge": false,
       "overhang": 0.5,
       "rake": 0.5,
       "fasciaMat": 5,
-      "fasciaH": 0.35
+      "fasciaH": 0.25
     }
   ],
   "details": [
@@ -71,27 +75,97 @@
       "type": "box",
       "name": "Stone skirt",
       "x": 0,
-      "y": 0.5,
+      "y": 0.3,
       "z": 0,
-      "w": 8,
-      "h": 2.2,
-      "d": 7.8,
+      "w": 10,
+      "h": 1.7,
+      "d": 8.8,
       "mat": 4
+    },
+    {
+      "type": "box",
+      "name": "Sill trim line",
+      "x": 0,
+      "y": 4.75,
+      "z": 3.57,
+      "w": 8.5,
+      "h": 0.2,
+      "d": 0.14,
+      "mat": 8
+    },
+    {
+      "type": "box",
+      "name": "Eave trim line",
+      "x": 0,
+      "y": 9.05,
+      "z": 3.57,
+      "w": 8.5,
+      "h": 0.28,
+      "d": 0.14,
+      "mat": 8
+    },
+    {
+      "type": "box",
+      "name": "Base trim line",
+      "x": 0,
+      "y": 1.35,
+      "z": 3.57,
+      "w": 8.5,
+      "h": 0.2,
+      "d": 0.14,
+      "mat": 8
+    },
+    {
+      "type": "box",
+      "name": "Eave shadow gap",
+      "x": 0,
+      "y": 9.49,
+      "z": 3,
+      "w": 8.5,
+      "h": 0.42,
+      "d": 1,
+      "mat": 9
+    },
+    {
+      "type": "box",
+      "name": "Brown board section",
+      "x": 5.3,
+      "y": 1.7,
+      "z": 2.6,
+      "w": 2.1,
+      "h": 3.4,
+      "d": 0.3,
+      "mat": 10
+    },
+    {
+      "type": "box",
+      "name": "Front wall above the eave line",
+      "x": 0,
+      "y": 9.1,
+      "z": 3.25,
+      "w": 8.5,
+      "h": 0.6,
+      "d": 0.5,
+      "mat": 0
     }
   ],
   "stairs": [],
   "palette": [
-    "#a8842c",
-    "#2a2622",
+    "#a1893f",
+    "#3d3732",
     "#858275",
     "#d5d1c4",
     "#c9c3b4",
     "#141414",
     "#2f3a20",
-    "#3a2a1c"
+    "#3a2616",
+    "#a58f63",
+    "#0d0c0c",
+    "#4a3320",
+    "#6b7680"
   ],
   "palTex": [
-    "vboard",
+    "vpanel",
     "rib",
     "",
     "",
@@ -106,5 +180,5 @@
   },
   "windowFrames": true,
   "frameW": 0.2,
-  "glassAlpha": 1
+  "glassAlpha": 0.55
 }

@@ -206,14 +206,14 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
     [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
  // The two pale poles by the entry, measured on the drone mosaic. They lie along the slope: a straight piece levelled at its middle would dip under the ground and show as dashes.
- [[2.9,.065,-3.45,-2.05,.05,'pole-entry'],[4.7,.06,-4.55,.2,0,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]);mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);g.children.forEach(m=>{m.position.y=r*.9+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});
+ [[3.2,.075,-3.99,-1.97,0,'pole-entry'],[3.65,.08,-3.31,-.02,.16,'pole-entry-2']].forEach(([len,r,x,z,yaw,id])=>{const g=new THREE.Group();log(g,len,r,[0,0,0],[0,0,Math.PI/2]);mergeGroup(g);const e=len*.5,hi=heightAt(x+Math.cos(yaw)*e,z-Math.sin(yaw)*e),lo=heightAt(x-Math.cos(yaw)*e,z+Math.sin(yaw)*e);g.children.forEach(m=>{m.position.y=r*.9+(hi+lo)*.5-heightAt(x,z);m.rotation.z+=Math.atan2(hi-lo,len);});place(g,{x,z},yaw,'prop:'+id,'Pole by the entry');});
  place(rootCellar(),{x:-7.28,z:-4.67},.03,'prop:root-cellar','Root cellar door');
  {const g=cellarTimbers(),p=place(g,{x:-7,z:-6},0,'prop:cellar-timbers','Old timbers');g.position.y=125.3;props.at(-1).baseY=125.3;}
  {const g=new THREE.Group();log(g,2.8,.13,[0,.12,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x:-27.5,z:17.5},.97,'prop:log-west','Downed log');}
  // Loose logs beside the upper pit, measured from solved drone cameras.
  [[1.76,.15,-6.59,21.27,.49],[.95,.17,-5.3,23.22,1.45]].forEach(([len,r,x,z,yaw],i)=>{const g=new THREE.Group();log(g,len,r,[0,r*.8,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x,z},yaw,`prop:loose-log:${i}`,`Loose log ${i+1}`);});
  HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});
- const chairColors=[0x2b9798,0xce5669,0x40a6a1,0xc85871,0x3f91a0];
+ const chairColors=[0x009aa0,0xb5121b,0x00a0a6,0xbe1520,0x008f9c];
  chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CAMP_PROPS.fire.x+Math.sin(a)*2.35,z:CAMP_PROPS.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
  // Horizontal water surface with animated ripple normals and sky tint, no reflection render pass.
  const shape=new THREE.Shape(POND_OUTLINE.map(p=>new THREE.Vector2(p.x,-p.z))),waterGeo=new THREE.ShapeGeometry(shape,24);waterGeo.rotateX(-Math.PI/2);

@@ -198,19 +198,21 @@ float wShakeE = max(-wKind, 0.0), wSetBack = 0.0;
 #ifdef W_KIND
   #if W_KIND==2
     #ifdef USE_MAP
-      float wPC=(uWxPanelV>.5?vMapUv.y:vMapUv.x)*2.,wPI=floor(wPC);
-      float wAl=uWxPanelV>.5?vMapUv.x:vMapUv.y;
-      diffuseColor.rgb*=.8+.42*texture2D(uNoise,vec2(wPI*.211,.71)).r;
-      diffuseColor.rgb*=1.-.2*smoothstep(.56,.85,clamp((texture2D(uNoise,vec2(wPC*.9,wAl*.05)).g-.5)*2.8+.5,0.,1.));
+      // each pan between two seams differs a little from its neighbours (8 pans to a tile)
+      diffuseColor.rgb*=.95+.1*texture2D(uNoise,vec2(floor(vMapUv.x*8.)*.211,.71)).r;
     #endif
     float wSunF=clamp(dot(wN,normalize(vec3(-.7,.45,.45))),0.,1.);
-    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(wLum)*vec3(1.2,1.16,1.22)+vec3(.012,.011,.013),.5*smoothstep(.42,.72,wBig.r)*(.45+.55*wSunF));
-    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.07,.057,.042),.16*smoothstep(.5,.8,wFine.g));
+    #ifdef USE_MAP
+      // on the slope turned from the light a seam stops catching it: pale lines fade toward the steel, as in the frames
+      diffuseColor.rgb=mix(diffuse*.34,diffuseColor.rgb,.45+.55*smoothstep(.1,.6,wSunF));
+    #endif
+    diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.07,.057,.042),.07*smoothstep(.5,.8,wFine.g));
   #elif W_KIND==1
-    float wCo=floor(wP.y/uWxBoard),wEnd=floor((wAlong+wCo*1.7)/3.7);
-    diffuseColor.rgb*=.76+.5*texture2D(uNoise,vec2(wCo*.137+wEnd*.073,wEnd*.19+.3)).r;
+    // long unbroken courses: each differs slightly in tone, with no butt joints along it
+    float wCo=floor(wP.y/uWxBoard);
+    diffuseColor.rgb*=.9+.2*texture2D(uNoise,vec2(wCo*.137,.3)).r;
   #elif W_KIND==5
-    diffuseColor.rgb*=.8+.4*texture2D(uNoise,vec2(floor(wAlong/.406)*.137,.3)).r;
+    diffuseColor.rgb*=.8+.4*texture2D(uNoise,vec2(floor(wAlong/.203)*.137,.3)).r;
   #else
     diffuseColor.rgb*=.86+.28*wBig.g;
     if(wN.y>.5)diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.27,.216,.16),(.32*smoothstep(.35,.7,wBig.b)+.1*wFine.g)*smoothstep(.03,.2,wLum));
