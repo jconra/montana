@@ -61,7 +61,7 @@ function horseshoePit(){
 // A low heap of split firewood on the ground, as the May frames show it: no rack, no roof.
 function stoneRow(len,seed){const g=new THREE.Group(),R=rng(seed),m=mat(0x8d8a80),n=Math.round(len/.32);for(let i=0;i<n;i++){const r=.1+R()*.11,o=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),m);o.position.set((i-(n-1)/2)*len/n+(R()-.5)*.1,r*.55,(R()-.5)*.28);o.rotation.set(R()*3,R()*3,R()*3);o.scale.y=.7;g.add(o);}mergeGroup(g);return g;}
 // A chicken-wire cage full of field stones, as the frames show them: a short round column, stones packed to the top, a few wire hoops and uprights.
-function rockCage(radius,height,seed){const g=new THREE.Group(),R=rng(seed),m=mat(0x77736a),light=mat(0x9a9488),wire=mat(0x4d4f4c),rows=Math.max(3,Math.round(height/.2));
+function rockCage(radius,height,seed){const g=new THREE.Group(),R=rng(seed),m=mat(0x4f4b44),light=mat(0x6d675b),wire=mat(0x3c3e3b),rows=Math.max(3,Math.round(height/.2));
  for(let row=0;row<rows;row++){const n=Math.max(5,Math.round(radius*16)),y=.1+(row+.5)*(height-.1)/rows;for(let i=0;i<n;i++){const a=(i+R())/n*Math.PI*2,r=radius*(.62+R()*.22),o=new THREE.Mesh(rockGeometry(7+Math.floor(R()*60),1),R()<.3?light:m),k=.1+R()*.07;o.scale.set(k*1.25,k*.85,k);o.position.set(Math.cos(a)*r,y,Math.sin(a)*r);o.rotation.set(R()*3,R()*6,R()*3);g.add(o);}}
  for(let i=0;i<7;i++){const h=new THREE.Mesh(new THREE.TorusGeometry(radius,.006,3,18),wire);h.rotation.x=Math.PI/2;h.position.y=.08+i*(height-.1)/6;g.add(h);}
  for(let i=0;i<10;i++){const a=i/10*Math.PI*2,u=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,height,3),wire);u.position.set(Math.cos(a)*radius,height/2,Math.sin(a)*radius);g.add(u);}

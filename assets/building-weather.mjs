@@ -240,7 +240,7 @@ normal=normalize(abs(wdet)*normal-sign(wdet)*(whx*wr1+why*wr2));}
 `;
 const col=(THREE,h)=>new THREE.Color(h);
 const LOOKS={
- house:{uFixedTop:4.72,uGrimeAmt:.45,uWallBand:.24},garage:{uFixedTop:5.6,uGrimeAmt:.22,uStreakLen:1.2},cabin:{uFixedTop:4.05,uGrimeAmt:.55},shed:{uFixedTop:2.85,uGrimeAmt:.6}};
+ house:{uFixedTop:4.72,uGrimeAmt:.45,uWallBand:.4},garage:{uFixedTop:5.6,uGrimeAmt:.22,uStreakLen:1.2},cabin:{uFixedTop:4.05,uGrimeAmt:.55},shed:{uFixedTop:2.85,uGrimeAmt:.6}};
 const KIND={plain:0,hsiding:1,roof:2,roofV:2,vboard:5};
 function patch(THREE,m,type,o){
   const T=sharedTextures(THREE),box=!!o.box,defs={...(m.defines||{})};
