@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {applyReferenceEdits,applyReferenceHeights} from './reference-edits.mjs?v=terrain-20261011';
 import {LandscapeState,EditHistory,brushVertices} from './landscape-state.mjs';
+import {applyCensusToObjects,loadCensus,CENSUS_KEY} from './plant-census.mjs';
 
 const clone=o=>JSON.parse(JSON.stringify(o));
 const DRAFT_KEY='montanaLandscapeDraft:v1';
@@ -9,9 +10,15 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  let published=state.export();
  const response=await fetch(new URL('./landscape-defaults.json',import.meta.url));
  if(!response.ok)throw Error('Published landscape defaults could not load.');
- published=state.validate(await response.json());state.load(published);
+ const defaults=await response.json();let census=null;
+ try{census=await loadCensus(new URL('./plant-census.json',import.meta.url));defaults.objects=applyCensusToObjects(defaults.objects,census,state.base);}catch(e){console.error('Plant census not applied:',e);}
+ published=state.validate(defaults);state.load(published);
  let restored=false,saveWarning='';
- try{const draft=localStorage.getItem(DRAFT_KEY);if(draft){state.load(JSON.parse(draft));restored=true;}}catch(e){saveWarning='Saved draft was not loaded: '+e.message;}
+ try{const draft=localStorage.getItem(DRAFT_KEY);if(draft){const saved=JSON.parse(draft);
+  // A draft older than this census takes the census once; edits made after that are left alone.
+  if(census&&localStorage.getItem(CENSUS_KEY)!==census.revision){saved.objects=applyCensusToObjects(saved.objects,census,state.base);localStorage.setItem(DRAFT_KEY,JSON.stringify(saved));}
+  state.load(saved);restored=true;}
+  if(census)localStorage.setItem(CENSUS_KEY,census.revision);}catch(e){saveWarning='Saved draft was not loaded: '+e.message;}
  // Merge this photo pass into older drafts without discarding newer user edits.
  try{
   const res=await fetch(new URL('./property-refinement-edits.json',import.meta.url));
