@@ -152,8 +152,10 @@ import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
+import {censusTone} from './assets/plant-census.mjs';
 import {toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
+import {createPlantFill,loadPlantFillMap} from './assets/plant-fill.js';
 import {roadCoverage,DRIVE_LINE} from './assets/driveway-measured.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
 import {inCentralArea} from './assets/central-rocks.mjs';
@@ -687,6 +689,8 @@ const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});}
 function treeTint(kind,id,tint,tone){
   const own=toneTint(kind,tone);if(own)return new THREE.Color(own[0],own[1],own[2]);
+  const measured=censusTone.get(id);
+  if(measured){const base=kind==='aspen'?[.97,.95,.87]:kind.startsWith('juniper')?[.68,.82,.66]:[.58,.72,.64];return new THREE.Color(tint*base[0]*measured[0],tint*base[1]*measured[1],tint*base[2]*measured[2]);}
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
   if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
@@ -707,6 +711,7 @@ const treeAssetsReady=(async()=>{
   }catch(e){console.warn('Forest could not load, using the basic trees',e);forest=null;treeAssetsSettled=true;}
 })();
 // aspen groves (small, north-leaning, green) at the two spots he marked — scene coords x=E, z=-N
+// The second spot has no real aspens: its records (grove:9-15) are removed by the census. It stays listed so base ids never renumber.
 const ASPEN_GROVES=[[-39.8, 10.8],[-6.1, 43.8]];
 // distance from a point to the driveway polyline (routePts), for zoning trees along the drive
 function _pSeg(px,pz,ax,az,bx,bz){ const dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1; let u=((px-ax)*dx+(pz-az)*dz)/l2; u=u<0?0:u>1?1:u; const cx=ax+u*dx,cz=az+u*dz; return Math.hypot(px-cx,pz-cz); }
@@ -879,7 +884,7 @@ function groundRoadDistance(x,z){let distance=Infinity;for(let i=1;i<DRIVEWAY.le
 // ---- vertical exaggeration ---------------------------------------------
 function applyVex(v){
   VEX=v;
-  propertyNature?.setVerticalScale(v);if(typeof meadow!=='undefined'&&v!==meadowVex){meadowVex=v;meadow.reanchor();}
+  propertyNature?.setVerticalScale(v);if(typeof meadow!=='undefined'&&v!==meadowVex){meadowVex=v;meadow.reanchor();plantFill.reanchor();}
   for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();t.mesh.geometry.computeBoundingBox();t.mesh.geometry.computeBoundingSphere();}
   for(const o of placed) o.group.position.y=o.foundationY!=null?o.foundationY*v:heightAt(o.x,o.z);
   for(const {im,list} of treeMeshes){for(let i=0;i<list.length;i++){const t=list[i];
@@ -1144,7 +1149,9 @@ function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
   flattenPad(hx,hz,hw,hd,padY,5);
 }
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
-const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial});
+const plantFillMap=await loadPlantFillMap();
+const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial,fill:plantFillMap});
+const plantFill=await createPlantFill({scene,heightAt,fill:plantFillMap});
 applyVex(1);
 // Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
@@ -1194,7 +1201,7 @@ try{const mode=localStorage.getItem('montanaShadowQuality');if(['auto','off','2'
 $('shadowQuality').onchange=()=>{configureShadows();try{localStorage.setItem('montanaShadowQuality',$('shadowQuality').value);}catch(e){}};
 function applyQuality(level){
   qualityLevel=level;const q=QUALITY_LEVELS[level];configureShadows();setWeatherQuality(level);
-  propertyNature.setQuality(level,q.density);meadow.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
+  propertyNature.setQuality(level,q.density);meadow.setQuality(level);plantFill.setQuality(level);cloudSky.uniforms.cloudOn.value=level>=2?1:0;
   landscapeLayer?.setQuality(level,q.density);
   LOD_DIST=q.distance;MAX_DETAIL=q.meshes;
   treeBudget={distance:q.distance,meshes:q.meshes,blendDist:[0,60,140,220,320][level],depth:level>=2};forest?.setBudget(treeBudget);shrubBudget={distance:[14,22,30,36,44][level],meshes:[40,80,120,160,220][level],blendDist:[0,40,60,90,120][level],depth:false};shrubForest?.setBudget(shrubBudget);buildShrubs();
@@ -1303,7 +1310,7 @@ const landscapeReady=(async()=>{
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
       forest?.setHidden(id);shrubForest?.setHidden(id);
     },
-    terrainChanged(){propertyNature.reanchor();meadow.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
+    terrainChanged(){propertyNature.reanchor();meadow.reanchor();plantFill.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[]),...(shrubForest?landscapeRecords.filter(o=>landscapeCatalog.get(o.asset)?.shrub).map(o=>o.id):[])]);},
@@ -1347,7 +1354,7 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   updateQuality(elapsed,dt);
   updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
   photoMatch.applyRoll();
-  propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);
+  propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);
   landscapeLayer?.update(cam);
   if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);shrubForest?.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
   tickWind(dt);updateTreeShadows();cloudSky.update(cam,dt);

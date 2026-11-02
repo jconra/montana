@@ -25,7 +25,7 @@ async function zoneReader(){
  const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(image,0,0);const d=g.getImageData(0,0,512,512).data;
  return (x,z)=>{const i=Math.floor((x+110)*2),j=Math.floor((z+100)*2);if(i<0||j<0||i>=512||j>=512)return [0,0];const k=(j*512+i)*4;return [d[k]/255,d[k+2]/255];};
 }
-export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
+export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=null}){
  const zone=await zoneReader(),wind={value:0},far={value:80},R=(()=>{let s=20261101;return ()=>((s=Math.imul(s,1664525)+1013904223>>>0)/4294967296);})();
  const material=new THREE.MeshLambertMaterial({side:THREE.DoubleSide});
  material.onBeforeCompile=sh=>{
@@ -62,6 +62,8 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
   const x=gx+(R()-.5)*STEP*1.4-5,z=gz+(R()-.5)*STEP*1.4+10,centre=Math.hypot(x+5,z-12);if(centre>E)continue;
   const near=centre<62?1:Math.max(.16,1-(centre-62)/85),patch=vnoise(x*.09+3,z*.09)*.65+vnoise(x*.34,z*.34)*.35,dense=.25+1.25*Math.max(0,patch-.26);
   if(R()>near*Math.min(1,dense))continue;if(!clear(x,z))continue;
+  // Where the photo-matched ground layer grows (plant-fill.js), only a thin base stays; bare patches stay bare.
+  if(fill){const f=fill.at('cover',x,z);if(f>.6&&(fill.at('bare',x,z)>.45||R()<.72))continue;}
   const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0,tallGrass:0},wet=wetAt(x,z),lawn=s.lawn;
   const tall=(1-lawn)*(.7+patch*.6)*(.8+R()*.45)*(.5+Math.pow(wet,1.5)*1.1),size=(1-lawn*.3)*(.9+R()*.5);
   const dryBunch=(1-lawn)*(wet<.42?1:.15)*(patch>.6?1:.3)*(R()<.1?1:0);
