@@ -117,10 +117,21 @@ export function createGroundDetail(half,driveway,sunDir){
       float shady=clamp(.5-hn.x*.9+hn.z*-.2,0.,1.);
       float forest=smoothstep(.5,.57,noise+shady*.13-.03+smoothstep(2500.,1800.,h)*-.04)*smoothstep(3050.,2700.,h);
       c=mix(c,${shown('#3f5236')}*(.75+n4.r*.5),forest);
-      float rust=smoothstep(.68,.8,texture2D(patchMap,vec2(hp.x*.0052,hp.y*.0009)).r*.6+n2.a*.4)*(1.-forest);
-      c=mix(c,${shown('#9a6a50')},rust*.55);
+      // Dirt and scree in streaks running down the fall line, not blotches.
+      vec2 fall=normalize(hn.xz+vec2(1e-4)),across=vec2(-fall.y,fall.x);
+      float streak=texture2D(patchMap,vec2(dot(hp,across)*.0041,dot(hp,fall)*.00035)).r*.7+n2.a*.3;
+      float rust=smoothstep(.62,.76,streak)*(1.-forest)*smoothstep(.04,.2,length(hn.xz));
+      c=mix(c,${shown('#9a6a50')},rust*.6);
+      c=mix(c,${shown('#c4b48a')},smoothstep(.56,.68,1.-streak)*(1.-forest)*.4);
+      // The bald knob on the skyline to the north-west stays pale grass.
+      float bald=1.-smoothstep(500.,1000.,distance(hp,vec2(-4460.,-5432.)));
+      c=mix(c,${shown('#b4a884')},bald*(.75+.25*n4.g));
       c=mix(c,${shown('#f2f2f0')},smoothstep(2900.,3150.,h+(n3.r-.5)*200.));
-      diffuseColor.rgb=c*(.82+n4.b*.36);`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+      c*=.82+n4.b*.36;
+      // Air between the ridges: each layer further off goes bluer and paler.
+      float air=1.-exp(-distance(cameraPosition,hillWorld)/8500.);
+      c=mix(c,${shown('#8a95a3')}*1.15,air*.82);
+      diffuseColor.rgb=c;`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
       vec2 hillBump=(texture2D(patchMap,hillWorld.xz*.0031).rg-.5)*.55;normal=normalize(normal+(viewMatrix*vec4(hillBump.x,0.,hillBump.y,0.)).xyz);`);
   };material.customProgramCacheKey=()=>'montana-far-hills-v1';}
   return {uniforms,paint,setTrees,attachHills,attach(material){material.onBeforeCompile=sh=>{
@@ -152,7 +163,7 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 zoneLocal=(landUV-zonesMin)/zonesSize;vec3 zone=texture2D(groundZones,vec2(zoneLocal.x,1.-zoneLocal.y)).rgb;
       float zoneTrust=zone.b*step(0.,zoneLocal.x)*step(zoneLocal.x,1.)*step(0.,zoneLocal.y)*step(zoneLocal.y,1.);
       float aerialGreen=clamp((diffuseColor.g-diffuseColor.r)*9.+.42,0.,1.);
-      float wet=mix(.14+aerialGreen*.42+coverage.g*.26,zone.r*.92+.08,zoneTrust);
+      float wet=mix(.06+aerialGreen*.42+coverage.g*.06,zone.r*.92+.08,zoneTrust);
       float variety=mix(1.,.55,zoneTrust);
       wet+=((broad.r-.5)*.9+(mid.g-.5)*.6)*variety+(fine.b-.5)*.32+(tiny.a-.5)*.14+(greenness-.85);
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
@@ -174,7 +185,7 @@ export function createGroundDetail(half,driveway,sunDir){
       grass=mix(grass,grass*vec3(1.22,1.1,.72),smoothstep(.56,.74,mid.b*.5+fine.a*.5)*.7);
       grass*=.68+bladeVar*.5;grass*=.9+tiny.g*.2;
       vec3 dirtPatch=${shown('#8a7a5e')}*(.75+dot(soil,vec3(.5)));
-      float bare=smoothstep(.62,.78,fine.g*.6+tiny.g*.4)*(1.-smoothstep(.1,.5,wet));
+      float bare=smoothstep(.54,.72,fine.g*.6+tiny.g*.4)*(1.-smoothstep(.2,.56,wet));
       vec3 land=mix(grass,dirtPatch,bare*.8);
       land=mix(land,dirtPatch*.95,smoothstep(.15,.55,steep)*.7);
       land=mix(land,stone*.8,smoothstep(.62,.8,steep));
@@ -182,8 +193,8 @@ export function createGroundDetail(half,driveway,sunDir){
       road=mix(road,surfacePaint.r,surfacePaint.a);
       detailed=mix(detailed,grass,surfacePaint.a*(1.-surfacePaint.r));
       // Dirt: grey-brown packed earth with gravel pockets, dark ruts pressed in.
-      vec3 dirt=mix(${shown('#a89a84')},${shown('#cdbca0')},smoothstep(.3,.7,fine.r*.6+mid.a*.4));
-      dirt=mix(dirt,${shown('#b0906a')},smoothstep(.56,.76,fine.a)*.5);
+      vec3 dirt=mix(${shown('#9c9284')},${shown('#c2b7a6')},smoothstep(.3,.7,fine.r*.6+mid.a*.4));
+      dirt=mix(dirt,${shown('#a88a68')},smoothstep(.56,.76,fine.a)*.3);
       dirt*=.92+dot(gravel,vec3(.75))*.8;
       float pebbles=smoothstep(.74,.82,texture2D(patchMap,landUV*1.7).r);dirt=mix(dirt,${shown('#e0d6c4')},pebbles*.55);
       dirt=mix(dirt,${shown('#857767')},clamp(rut,0.,1.)*.78);

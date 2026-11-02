@@ -151,6 +151,10 @@ import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
 import {TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
+import {roadCoverage,DRIVE_LINE} from './assets/driveway-measured.mjs';
+import {campSurface} from './assets/camp-approach.mjs';
+import {inCentralArea} from './assets/central-rocks.mjs';
+import {loadSageModel} from './assets/sagebrush.js';
 import {makeCloudSky} from './assets/sky/cloudSky.js';
 import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
@@ -201,7 +205,7 @@ scene.fog=new THREE.Fog(HAZE, 5000, 30000);          // only distant (>5km) fade
 // Drifting clouds on a dome that follows the camera; from Medium up (costly per pixel on the sky), a plain gradient below.
 const cloudSky=makeCloudSky({horizon:0xc6d6e2,zenith:0x3f7cc4,radius:50000});
 cloudSky.mesh.material.fragmentShader=cloudSky.mesh.material.fragmentShader.replace('#include <colorspace_fragment>','');   // the page's sky colours are already display colours
-cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.46});cloudSky.uniforms.cloudScale.value=2400;cloudSky.uniforms.cloudHeight.value=2200;cloudSky.uniforms.cloudSoft.value=.24;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
+cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.46});cloudSky.uniforms.cloudScale.value=2400;cloudSky.uniforms.cloudHeight.value=2200;cloudSky.uniforms.cloudSoft.value=.24;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.skyToward.value.set(0xf0dcb8);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
 const sunbeams=new Sunbeams(renderer,{strength:.75,color:0xfff0d6,threshold:.6,radius:.5,reach:1.1,edge:.15});
 
 // shared aerial texture
@@ -786,7 +790,8 @@ const lidarReady=(async()=>{
   const verts=new Float32Array(W*H*3), idx=[];
   for(let j=0;j<H;j++)for(let i=0;i<W;i++){
     const x=(i/(W-1)-0.5)*span, z=-((0.5-j/(H-1))*span), e=dz[j*W+i], k=(j*W+i)*3;
-    verts[k]=x; verts[k+1]=(e-gmin)-3; verts[k+2]=z;      // -3 so it tucks just under the detailed terrain
+    const toKnob=Math.hypot(x+4460,z+5432),knob=110*Math.exp(-toKnob*toKnob/(2*420*420));   // sharpen the bald knob the coarse elevation data rounds off
+    verts[k]=x; verts[k+1]=(e-gmin)-3+knob; verts[k+2]=z;      // -3 so it tucks just under the detailed terrain
   }
   for(let j=0;j<H-1;j++)for(let i=0;i<W-1;i++){
     const cx=((i+0.5)/(W-1)-0.5)*span, cz=-((0.5-(j+0.5)/(H-1))*span);
@@ -1220,6 +1225,7 @@ const landscapeReady=(async()=>{
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
   if(propertyNature.models.sage.length)asset('bush/sage','Sagebrush',propertyNature.models.sage,[1,1,1]);
+  try{asset('bush/sage-model','Sage (Blender model)',await loadSageModel(),[1,1,1]);}catch(e){console.warn('Sage model unavailable',e);}
   try{const parts=await loadBigBush();asset('bush/big-bush','BigBush',parts,[2.95,2.95,2.95]);base.push({id:'bush:big-bush:sample',asset:'bush/big-bush',x:-15,z:27,offset:0,rotation:[0,0,0],scale:[2.95,2.95,2.95],tint:1});}catch(error){console.warn('Big bush unavailable:',error);}
   // Photo-modelled boulders. If a file cannot load, the saved rows still need an
   // asset, so a plain rock stands in at about the right size.
@@ -1238,6 +1244,14 @@ const landscapeReady=(async()=>{
   }
   // The shrubs scattered here were generic broadleaf models that read as dark twigs; the same placements now draw the sage model.
   if(propertyNature.models.sage.length)for(const key of ['bush/broadleaf','bush/evergreen'])if(catalog.has(key))catalog.get(key).parts=propertyNature.models.sage;
+  // Dense sage on the dry slope and at road edges and foundations, and small pale rocks across the hillside; new ids, invented placements.
+  {const k=rng(7719),free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25;
+   if(propertyNature.models.sage.length){const put=(n,x,z,s)=>{if(free(x,z))base.push(row('sage2:'+n,'bush/sage',{x,z,r:k()*6.283,tint:.88+k()*.24},[s*(.9+k()*.3),s,s*(.9+k()*.3)]));};
+    for(let n=0;n<1500;n++){const x=-55+k()*185,z=-85+k()*80,cl=Math.sin(x*.21+Math.sin(z*.13)*2)+Math.cos(z*.17-x*.07);if(cl>-.2)put(n,x,z,.5+k()*.75);else{k();k();k();k();}}
+    for(let n=0;n<130;n++){const line=DRIVE_LINE[Math.floor(k()*(DRIVE_LINE.length-1))],s=k()<.5?-1:1;put(2000+n,line.x+(k()-.5)*9,line.z+s*(2.2+k()*3),.45+k()*.5);}
+    [[8.78,-4.88,11.5,5.6],[-30.7,-8.2,5.5,5.5],[-39,37.7,4,5]].forEach(([cx,cz,hx,hz],b)=>{for(let n=0;n<26;n++){const a=k()*6.283;put(3000+b*100+n,cx+Math.cos(a)*(hx+.8+k()*1.4),cz+Math.sin(a)*(hz+.8+k()*1.4),.35+k()*.4);}});}
+   const shapes=[11,27,43,61];for(let n=0;n<1100;n++){const x=-60+k()*190,z=-85+k()*82,near=inCentralArea(x,z),v=k(),s=(near?.28:.09)*(.6+v*v*2.2);if(!free(x,z)||campSurface(x,z).tallGrass>.2){k();k();continue;}base.push(row('pebble:'+n,'rock/'+shapes[n%4],{x,z,r:k()*6.283,tint:1.02+k()*.2},[s,s*.65,s*.85],undefined,-s*.14));}
+  }
   for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
   // Bake each prop in its own local coordinates, then register it with the
   // same persistent object IDs and instanced editor used for vegetation.
