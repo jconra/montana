@@ -153,10 +153,12 @@ import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
 import {censusTone} from './assets/plant-census.mjs';
-import {toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {installGrade,gradeLand} from './assets/land-grade.mjs';
+import {evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
+import {createHillStones} from './assets/hill-stones.js';
 import {createPlantFill,loadPlantFillMap} from './assets/plant-fill.js';
-import {roadCoverage,DRIVE_LINE} from './assets/driveway-measured.mjs';
+import {roadCoverage,DRIVE_LINE,driveLineDistance} from './assets/driveway-measured.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
 import {inCentralArea} from './assets/central-rocks.mjs';
 import {loadSageModel} from './assets/sagebrush.js';
@@ -187,6 +189,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,1));
 // Preserve the scene lighting authored before r155.
 renderer.useLegacyLights=true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+installGrade(THREE,renderer);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fb8d0);
 const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1.5, 120000);
@@ -211,7 +214,7 @@ scene.fog=new THREE.Fog(HAZE, 5000, 30000);          // only distant (>5km) fade
 // Drifting clouds on a dome that follows the camera; from Medium up (costly per pixel on the sky), a plain gradient below.
 const cloudSky=makeCloudSky({horizon:0xc6d6e2,zenith:0x3f7cc4,radius:50000});
 cloudSky.mesh.material.fragmentShader=cloudSky.mesh.material.fragmentShader.replace('#include <colorspace_fragment>','');   // the page's sky colours are already display colours
-cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.46});cloudSky.uniforms.cloudScale.value=2400;cloudSky.uniforms.cloudHeight.value=2200;cloudSky.uniforms.cloudSoft.value=.24;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.skyToward.value.set(0xf0dcb8);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
+cloudSky.mesh.material.toneMapped=false;cloudSky.mesh.renderOrder=-1000;Object.assign(cloudSky.uniforms.cloudCover,{value:.5});cloudSky.uniforms.cloudScale.value=1500;cloudSky.uniforms.cloudHeight.value=1300;cloudSky.uniforms.cloudSoft.value=.1;cloudSky.uniforms.sunDirSky.value.copy(SUN_DIR);cloudSky.uniforms.skyToward.value.set(0xf0dcb8);cloudSky.uniforms.glowCol.value.setRGB(.5,.44,.32);cloudSky.uniforms.sunDisc.value.setRGB(3,2.8,2.4);scene.add(cloudSky.mesh);
 const sunbeams=new Sunbeams(renderer,{strength:.75,color:0xfff0d6,threshold:.6,radius:.5,reach:1.1,edge:.15});
 
 // shared aerial texture
@@ -258,7 +261,7 @@ const fine  =buildTile(fData,M.fine.W,  M.fine.H,  M.fine.px,[uv0,uv0,uv1,uv1],f
 // Remove the coarse underlay inside the fine tile so lowering fine vertices
 // exposes the edited surface, not the original terrain underneath it.
 {const old=coarse.mesh.geometry.index.array,indices=[];for(let i=0;i<old.length;i+=3){let inside=true;for(let j=0;j<3;j++){const n=old[i+j];inside&&=Math.abs(coarse.pos.getX(n))<fHalf&&Math.abs(coarse.pos.getZ(n))<fHalf;}if(!inside)indices.push(old[i],old[i+1],old[i+2]);}coarse.mesh.geometry.setIndex(indices);}
-for(const material of mats){groundDetail.attach(material);prepareShadowMaterial(material);}
+for(const material of mats){groundDetail.attach(material);gradeLand(material);prepareShadowMaterial(material);}
 fine.mesh.receiveShadow=coarse.mesh.receiveShadow=true;
 
 // ---- height sampling ----------------------------------------------------
@@ -702,14 +705,12 @@ function treeKindOf(id,x,z,h,authored=false){return treeKind({id,x,z,h,neighbour
 function treeTint(kind,id,tint,tone){
   const own=toneTint(kind,tone);if(own)return new THREE.Color(own[0],own[1],own[2]);
   const measured=censusTone.get(id);
-  if(measured){const base=kind==='aspen'?[.97,.95,.87]:kind.startsWith('juniper')?[.68,.82,.66]:[.58,.72,.64];return new THREE.Color(tint*base[0]*measured[0],tint*base[1]*measured[1],tint*base[2]*measured[2]);}
+  // Aspens vary toward yellow, snags stay silver; evergreens take one of the tones the frames show, and a measured colour on top where there is one.
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
-  // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
-  if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
-  // blue-green junipers; other evergreens from dark blue-green through olive to a sunlit yellow-green
+  if(kind==='aspen'){const m=measured||[1,1,1],base=measured?[.97,.95,.87]:[.8+.34*a,.88+.14*b,.72+.3*c];return new THREE.Color(tint*base[0]*m[0],tint*base[1]*m[1],tint*base[2]*m[2]);}
   if(kind==='snag')return new THREE.Color(tint,tint,tint);
-  if(kind.startsWith('juniper')){const l=.86+.3*c;return new THREE.Color(tint*l*(.92+.2*a),tint*l*(.94+.12*b),tint*l*(.76+.3*a));}
-  const olive=a*a,lift=.56+.4*c;return new THREE.Color(tint*lift*(.8+.3*olive),tint*lift*(.92+.14*b),tint*lift*(1.02-.3*olive));
+  const t=evergreenTone(id,kind.startsWith('juniper')),m=measured||[1,1,1];
+  return new THREE.Color(tint*t[0]*m[0],tint*t[1]*m[1],tint*t[2]*m[2]);
 }
 const treeAssetsReady=(async()=>{
   try{
@@ -761,7 +762,7 @@ function buildShrubs(){
   const density=Math.max(.35,QUALITY_LEVELS[qualityLevel].density),fixed=[];
   for(const o of landscapeRecords){const shrub=landscapeCatalog.get(o.asset)?.shrub;if(!shrub||(!landscapeAuthored.has(o.id)&&treeHash(o.id,8)>density))continue;
     const a=treeHash(o.id,9),b=treeHash(o.id,10),t=o.tint??1;
-    fixed.push({id:o.id,x:o.x,z:o.z,offset:o.offset,sp:shrub(o),scale:o.scale[1],wide:(o.scale[0]+o.scale[2])/2/o.scale[1],yaw:o.rotation[1],lean:o.rotation[0],tint:new THREE.Color(t*(.96+.08*a),t*(.97+.05*b),t*(.96+.1*(1-a)))});}
+    fixed.push({id:o.id,x:o.x,z:o.z,offset:o.offset,sp:shrub(o),scale:o.scale[1],wide:(o.scale[0]+o.scale[2])/2/o.scale[1],yaw:o.rotation[1],lean:o.rotation[0],tint:new THREE.Color(t*.86*(.96+.08*a),t*.83*(.97+.05*b),t*.86*(.96+.1*(1-a)))});}
   shrubForest.setFixed(fixed);
 }
 function addInst(geo,mat,list){
@@ -788,6 +789,8 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
   // Knee-high junipers dotting the dry slope, too small for the LiDAR to have found. Invented; the ids stay put by order.
   {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
    for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:'juniper',x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}
+  // Smaller trees between the big ones in the deep forest: the LiDAR finds tops only, and the real wood has a wide spread of heights. Invented, sized from their neighbour; new ids after all the others.
+  {const k=rng(5501);trees.forEach((t,n)=>{if(t.h<12||neighboursAt(t.x,t.z)<10||k()>.55){k();k();k();return;}const a=k()*6.283,d=3+k()*4,h=t.h*(.3+k()*.35),x=t.x+Math.cos(a)*d,z=t.z+Math.sin(a)*d,id='under:'+n;if(inBuilding(x,z))return;const asset=treeKindOf(id,x,z,h);list.push({id,asset:asset==='snag'?'fir_small':asset,x,z,gy:heightAt(x,z),h,r:a*3,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});}
   return list;
 }
 let groveList=[];
@@ -838,7 +841,7 @@ const lidarReady=(async()=>{
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(verts,3));
   g.setIndex(idx); g.computeVertexNormals();
-  const hillMaterial=new THREE.MeshStandardMaterial({roughness:1,metalness:0});groundDetail.attachHills(hillMaterial);
+  const hillMaterial=gradeLand(new THREE.MeshStandardMaterial({roughness:1,metalness:0}));groundDetail.attachHills(hillMaterial);
   const mesh=new THREE.Mesh(g,hillMaterial);
   mesh.renderOrder=-1; scene.add(mesh);
 })();
@@ -857,7 +860,7 @@ function addGround(geo,mat,list){
   scene.add(im); groundMeshes.push({im,list});
 }
 // Cheap shape for rocks out along the drive; central rocks swap to the detailed set below.
-const rockGeos=[11,27,43,61].map(seed=>rockGeometry(seed,1)),rockMat=rockMaterial();
+const rockGeos=[11,27,43,61].map(seed=>rockGeometry(seed,1)),rockMat=gradeLand(rockMaterial());
 const blob=(specs,scaleY)=>mergeGeometries(specs.map(([ox,oy,oz,r])=>new THREE.IcosahedronGeometry(r,0).scale(1,scaleY,1).translate(ox,oy,oz)));
 const bushGeo=blob([[0,0.5,0,1],[0.6,0.35,0.2,0.7],[-0.5,0.4,-0.3,0.75],[0.1,0.72,-0.35,0.6]],0.7);
 const bushMat=new THREE.MeshStandardMaterial({color:0x6f8a45,flatShading:true,roughness:1});
@@ -1165,6 +1168,10 @@ propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buil
 const plantFillMap=await loadPlantFillMap();
 const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial,fill:plantFillMap});
 const plantFill=await createPlantFill({scene,heightAt,fill:plantFillMap});
+createHillStones({scene,heightAt,free:(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25&&plantFillMap.at('lush',x,z)<.3&&driveLineDistance(x,z)>2.6&&distDriveway(x,z)>2});
+{const d=plantFillMap.data,px=new Uint8Array(d.w*d.h*4);for(let i=0;i<d.h;i++)for(let j=0;j<d.w;j++){px[(i*d.w+j)*4]=plantFillMap.at('lush',d.x0+j+.5,d.z0+i+.5)*255;px[(i*d.w+j)*4+3]=255;}
+ const lush=new THREE.DataTexture(px,d.w,d.h,THREE.RGBAFormat);lush.minFilter=lush.magFilter=THREE.LinearFilter;lush.needsUpdate=true;
+ groundDetail.uniforms.lushMap.value=lush;groundDetail.uniforms.lushMin.value.set(d.x0,d.z0);groundDetail.uniforms.lushSize.value.set(d.w,d.h);}
 applyVex(1);
 // Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
