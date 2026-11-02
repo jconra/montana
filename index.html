@@ -684,7 +684,8 @@ function treeTint(kind,id,tint){
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
   if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
   // blue-green junipers; other evergreens from dark blue-green through olive to a sunlit yellow-green
-  if(kind==='juniper'){const l=.8+.34*c;return new THREE.Color(tint*l*(.72+.2*a),tint*l*(.9+.14*b),tint*l*(.86+.3*a));}
+  if(kind==='snag')return new THREE.Color(tint,tint,tint);
+  if(kind.startsWith('juniper')){const l=.82+.3*c;return new THREE.Color(tint*l*(.88+.24*a),tint*l*(.92+.12*b),tint*l*(.62+.3*a));}
   const olive=a*a,lift=.72+.62*c;return new THREE.Color(tint*lift*(.8+.56*olive),tint*lift*(.9+.2*b),tint*lift*(1.06-.56*olive));
 }
 const treeAssetsReady=(async()=>{

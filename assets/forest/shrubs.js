@@ -48,7 +48,7 @@ function tube(a,pts,r0,r1,col){
 
 // One tuft: a few small crossed cards of spray at a stem's tip, faces tipped up and out so they show from above as well as from the side.
 function tuft(a,tip,dir,size,r,shade){
- const n=3+(r()<.4?1:0);
+ const n=2+(r()<.5?1:0);
  for(let k=0;k<n;k++){
   const yaw=r()*6.283,tilt=k===0?.85+r()*.4:.12+r()*.5,s=size*(.75+r()*.45);
   // the card rises along `up` from just under the tip; `side` is level, across it
@@ -67,11 +67,11 @@ function sageForm({seed,stems,spread,bare,branch,size,lean=0,thick=.03,low=.3}){
  const reach=y=>spread*(1+.32*Math.sin(2*y+p1)+.22*Math.sin(3*y+p2));     // an uneven outline, not a circle
  const tall=y=>1-.28*(.5+.5*Math.sin(y*1.6+p2));                            // and an uneven top
  const shoot=(from,yaw,el,len,r0,col,depth)=>{
-  const pts=[from],seg=depth?3:4;let [x,y,z]=from,a=yaw,e=el;
+  const pts=[from],seg=[3,2,1][depth];let [x,y,z]=from,a=yaw,e=el;
   for(let i=0;i<seg;i++){const d=len/seg;x+=Math.cos(a)*Math.cos(e)*d;y+=Math.sin(e)*d;z+=Math.sin(a)*Math.cos(e)*d;a+=(r()-.5)*.7;e+=(r()-.5)*.5+(depth?.05:.1);pts.push([x,Math.max(y,.004),z]);}
   tube(W,pts,r0,r0*.42,col);
   // side shoots from the upper part
-  if(depth<2)for(let b=0;b<(depth?Math.ceil(branch/2):branch);b++){const t=.3+r()*.6,at=pts[Math.round(t*(pts.length-1))],ya=a+(r()<.5?-1:1)*(.5+r()*.9);shoot(at,ya,Math.max(.15,e*.75+(r()-.5)*.3),len*(.42+r()*.28),r0*.5,col,depth+1);}
+  if(depth<2)for(let b=0;b<(depth?1:branch);b++){const t=.3+r()*.6,at=pts[Math.round(t*(pts.length-1))],ya=a+(r()<.5?-1:1)*(.5+r()*.9);shoot(at,ya,Math.max(.15,e*.75+(r()-.5)*.3),len*(.42+r()*.28),r0*.5,col,depth+1);}
   const last=pts[pts.length-1],before=pts[pts.length-2],dl=[last[0]-before[0],last[1]-before[1],last[2]-before[2]],ll=Math.hypot(...dl)||1;
   if(last[1]>bare*.75||r()<.2)tuft(L,last,dl.map(v=>v/ll),size*(.85+r()*.55),r,.8+.4*Math.min(1,last[1]));
   // a tuft or two along the way, so the crown closes up in places and stays open in others
@@ -82,7 +82,7 @@ function sageForm({seed,stems,spread,bare,branch,size,lean=0,thick=.03,low=.3}){
   shoot(start,y+lean*Math.cos(y-leanYaw),el,len,thick*(.7+r()*.6),col,0);
  }
  // dark inner tufts close the middle in places, as the older leaves and shade do
- for(let s=0;s<stems*2;s++){const y=r()*6.283,d=.15+r()*.65,rea=reach(y)*d,h=Math.max(bare*.6,.18)+r()*.5;tuft(L,[Math.cos(y)*rea,h,Math.sin(y)*rea],[Math.cos(y)*.4,.9,Math.sin(y)*.4],size*.85,r,.55+r()*.25);}
+ for(let s=0;s<stems*1.5;s++){const y=r()*6.283,d=.15+r()*.65,rea=reach(y)*d,h=Math.max(bare*.6,.18)+r()*.5;tuft(L,[Math.cos(y)*rea,h,Math.sin(y)*rea],[Math.cos(y)*.4,.9,Math.sin(y)*.4],size*.85,r,.55+r()*.25);}
  // a few ground-hugging shoots: tufts low on the outside, so it meets the ground
  for(let s=0;s<Math.round(stems*low);s++){const y=r()*6.283,rea=reach(y)*.8,col=BARK[0];shoot([0,0,0],y,.28+r()*.4,rea*(.75+r()*.4),thick*.45,col,1);}
  // normalise: base at 0, height 1, centred on the root

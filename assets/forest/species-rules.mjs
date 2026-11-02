@@ -1,6 +1,6 @@
 // Which kind of tree stands where. Positions come from LiDAR and hand edits and are never changed here; only the
 // kind is chosen, from the tree's height and how crowded its surroundings are.
-export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir'];
+export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
 export const ASPEN_STANDS=[{x:-46,z:12,r:8.5,planted:12,hMin:8,hMax:14}];
