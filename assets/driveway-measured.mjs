@@ -10,15 +10,15 @@ export const DRIVE_LINE=pts([[123.5,-36.3],[119,-32.5],[110,-28.8],[101,-26.5],[
 export const AERIAL_ROAD_SHIFT=4.5;
 export const TRACK_OFFSET=.72;      // each wheel track from the centre
 export const MEDIAN_ENDS_AT=0;      // west of this x the grass strip between the tracks is worn away
-// Darker tyre ruts cut into the dirt, wandering a little as real ones do.
+// Tyre marks read off the mosaic: broad soft arcs sweeping from the garage apron into the camp arm, turning doughnuts in the middle, wheel paths up the east arm. Control points for a smooth curve.
 export const RUTS=[
- [[0,4.4],[-3,3.3],[-7,1.9],[-12,.2],[-16,-1.7],[-20,-4.3],[-23,-6.6]],
- [[0,5.75],[-3,4.7],[-7,3.3],[-12,1.7],[-17,-.7],[-21,-3.2],[-24.5,-5.4]],
- [[-24,-4],[-20,-3],[-16.8,-1.1],[-15.6,1.6],[-16,5],[-17,9],[-17.6,13],[-18.6,17]],
- [[-22.5,-1.8],[-19.2,-1.2],[-17.4,1.2],[-17.6,5],[-18.5,9],[-19.2,13],[-20,17]],
- [[-7,4.4],[-11,2.6],[-14.6,1],[-16.2,-1.2],[-19,-3.6]],
- [[-9,3.6],[-12.6,2],[-15.4,-.2],[-18,-2.6]],
- [[-13,3.4],[-15.2,2.8],[-16.8,1],[-18,-1.4]],
+ [[0,4.4],[-4,3],[-9,1.6],[-13.5,.2],[-17.5,-2.4],[-22,-5.4]],
+ [[0,5.75],[-4,4.5],[-9,3],[-13.5,1.5],[-18,-1],[-23,-4.2]],
+ [[-11.5,-1.6],[-14,-1.1],[-16,.3],[-17,2],[-17.6,4.2],[-18,8],[-18.6,13]],
+ [[-10,-.6],[-13.2,-.1],[-15.4,1.2],[-16.2,3.6],[-16.4,7],[-17,11.5]],
+ [[-22.2,.9],[-20.6,1.9],[-19.4,3.6],[-19,6]],
+ [[-14.5,3.4],[-12.6,2],[-13.4,.2],[-15.6,.4],[-16.2,2.2],[-14.5,3.4]],
+ [[-18,-3.5],[-15.5,-2.6],[-12.6,-2.2],[-9.5,-.4]],
 ].map(pts);
 export function correctedDriveway(points){
  const join=points.findIndex(p=>Math.abs(p.x-126.1)<.01&&Math.abs(p.z+43.1)<.01);

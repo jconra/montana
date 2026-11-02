@@ -38,8 +38,8 @@ function driveMap(route){
  g.filter='blur(3px)';g.fillStyle='rgb(255,0,0)';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
  g.filter='blur(2px)';g.strokeStyle='rgb(255,0,0)';g.lineWidth=.6;
  for(const side of [-1,1]){g.beginPath();let on=false;for(let d=0;d<=route.total;d+=.5){const p=route.at(d,side*TRACK_OFFSET);if(p.x>62||p.x<-1){on=false;continue;}if(on)g.lineTo(p.x,p.z);else g.moveTo(p.x,p.z);on=true;}g.stroke();}
- g.filter='blur(1.5px)';g.strokeStyle='rgb(0,200,0)';g.lineWidth=.26;
- for(const r of RUTS){g.beginPath();r.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.stroke();}
+ g.filter='blur(5px)';g.strokeStyle='rgb(0,120,0)';g.lineWidth=.42;
+ for(const r of RUTS){g.beginPath();g.moveTo(r[0].x,r[0].z);for(let i=1;i<r.length-1;i++){const m={x:(r[i].x+r[i+1].x)/2,z:(r[i].z+r[i+1].z)/2};g.quadraticCurveTo(r[i].x,r[i].z,m.x,m.z);}const e=r[r.length-1];g.lineTo(e.x,e.z);g.stroke();}
  g.filter='none';const t=new THREE.CanvasTexture(c);t.generateMipmaps=false;t.minFilter=THREE.LinearFilter;return t;
 }
 const ZONES_MIN=new THREE.Vector2(-110,-100),ZONES_SIZE=256;
@@ -127,8 +127,10 @@ export function createGroundDetail(half,driveway,sunDir){
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='uniform sampler2D patchMap;uniform sampler2D driveHi;uniform vec2 hiMin;uniform vec2 hiSize;uniform sampler2D groundZones;uniform vec2 zonesMin;uniform float zonesSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
-    sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
+    sh.fragmentShader='float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D driveHi;uniform vec2 hiMin;uniform vec2 hiSize;uniform sampler2D groundZones;uniform vec2 zonesMin;uniform float zonesSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform float greenness;uniform sampler2D grassDetail;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D soilDetail;uniform sampler2D gravelDetail;uniform sampler2D stoneDetail;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader=sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+      // Light bounced round the meadow: shaded grass stays a living blue-green.
+      totalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12)*(1.-smoothstep(.3,.6,detailRoad));`).replace('#include <map_fragment>',`#include <map_fragment>
       #ifdef USE_MAP
       vec2 landUV=detailWorld.xz;vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 maskUV=vec2(localMask.x,1.-localMask.y);
       vec3 coverage=texture2D(roadMask,maskUV).rgb;coverage*=step(0.,localMask.x)*step(localMask.x,1.)*step(0.,localMask.y)*step(localMask.y,1.);
@@ -136,8 +138,10 @@ export function createGroundDetail(half,driveway,sunDir){
       // The drive: a soft mask read against fine noise makes a crisp, grass-nibbled edge.
       float nibble=tiny.r*.6+fine.g*.4-.5;
       vec2 hiLocal=(landUV-hiMin)/hiSize;vec3 hi=texture2D(driveHi,vec2(hiLocal.x,1.-hiLocal.y)).rgb*step(0.,hiLocal.x)*step(hiLocal.x,1.)*step(0.,hiLocal.y)*step(hiLocal.y,1.);
-      float road=max(smoothstep(.42,.58,hi.r+nibble*.5),smoothstep(.3,.6,coverage.r+nibble*.35));
-      float rut=hi.g*(.55+tiny.b*.6);
+      // The arm toward camp thins out into scattered gravel and worn grass rather than ending.
+      float tongue=(1.-step(-12.,landUV.x))*smoothstep(9.5,19.,landUV.y+(fine.r-.5)*7.+(tiny.g-.5)*3.);
+      float road=max(smoothstep(.34,.66,hi.r+nibble*.6-tongue*(.25+tiny.a*.95)),smoothstep(.3,.6,coverage.r+nibble*.35));
+      float rut=hi.g*1.6*(.6+tiny.b*.5);
       float steep=smoothstep(.2,.62,1.-abs(normalize(detailNormal).y));
       vec3 soil=texture2D(soilDetail,landUV*.45).rgb;
       vec3 stone=texture2D(stoneDetail,landUV*.3).rgb;
@@ -160,7 +164,13 @@ export function createGroundDetail(half,driveway,sunDir){
       grass=mix(grass,${shown('#7aa83f')},smoothstep(.5,.72,wet));
       grass=mix(grass,${shown('#4f8a35')},smoothstep(.76,1.,wet));
       // a mown lawn is mottled rather than even: paler and darker drifts, thin spots
-      grass*=1.+coverage.b*(fine.r-.5)*.5;
+      // Mown ground: mottled through several greens, mow stripes across the slope, the odd dry streak.
+      vec3 mottle=mix(${shown('#5c9e2e')},${shown('#86b53a')},smoothstep(.34,.66,mid.r*.5+fine.g*.5));
+      mottle=mix(mottle,${shown('#3f8a2a')},smoothstep(.54,.76,fine.b*.6+mid.b*.4));
+      mottle=mix(mottle,${shown('#b3ae55')},smoothstep(.66,.8,mid.a*.5+tiny.r*.5)*.55);
+      float mowBand=sin(dot(landUV,vec2(.46,.89))*2.6+sin(landUV.x*.11)*.8);
+      mottle*=1.+smoothstep(-.3,.3,mowBand)*.14-.07;
+      grass=mix(grass,mottle,clamp(coverage.b*1.3,0.,1.));
       grass=mix(grass,grass*vec3(1.22,1.1,.72),smoothstep(.56,.74,mid.b*.5+fine.a*.5)*.7);
       grass*=.68+bladeVar*.5;grass*=.9+tiny.g*.2;
       vec3 dirtPatch=${shown('#8a7a5e')}*(.75+dot(soil,vec3(.5)));
@@ -172,10 +182,12 @@ export function createGroundDetail(half,driveway,sunDir){
       road=mix(road,surfacePaint.r,surfacePaint.a);
       detailed=mix(detailed,grass,surfacePaint.a*(1.-surfacePaint.r));
       // Dirt: grey-brown packed earth with gravel pockets, dark ruts pressed in.
-      vec3 dirt=${shown('#c8b8a0')}*(.7+dot(gravel,vec3(.75))*.62);
-      dirt=mix(dirt,${shown('#d6c8b2')},smoothstep(.5,.72,fine.r)*.5);
-      dirt=mix(dirt,${shown('#7d6f60')},clamp(rut,0.,1.)*.9);
-      detailed=mix(detailed,dirt,road);
+      vec3 dirt=mix(${shown('#a89a84')},${shown('#cdbca0')},smoothstep(.3,.7,fine.r*.6+mid.a*.4));
+      dirt=mix(dirt,${shown('#b0906a')},smoothstep(.56,.76,fine.a)*.5);
+      dirt*=.92+dot(gravel,vec3(.75))*.8;
+      float pebbles=smoothstep(.74,.82,texture2D(patchMap,landUV*1.7).r);dirt=mix(dirt,${shown('#e0d6c4')},pebbles*.55);
+      dirt=mix(dirt,${shown('#857767')},clamp(rut,0.,1.)*.78);
+      detailed=mix(detailed,dirt,road);detailRoad=road;
       float proximity=1.-smoothstep(180.,650.,distance(cameraPosition,detailWorld));
       // Beyond the painted ground the photo is a dry-season view: pull it toward the green, darker ridges.
       float aerialLight=dot(diffuseColor.rgb,vec3(.33));
@@ -187,13 +199,13 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
-      diffuseColor.rgb*=1.-canopy*.3;
+      diffuseColor.rgb*=1.-canopy*.5;
       vec2 castUV=detailWorld.xz/(2.*castHalf)+.5;
       vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
       vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
       diffuseColor.rgb*=1.-baked.g*.42;
       diffuseColor.rgb*=mix(vec3(1.),vec3(.44,.49,.62),clamp(baked.r*2.,0.,1.)*castStrength);`);
-  };material.customProgramCacheKey=()=> 'montana-ground-detail-v9';}};
+  };material.customProgramCacheKey=()=> 'montana-ground-detail-v10';}};
 }
 export function rockGeometry(seed,detail=2){
   const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);
@@ -208,7 +220,7 @@ export function rockGeometry(seed,detail=2){
   }
   g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();g.computeBoundingSphere();return g;
 }
-export function rockMaterial(){const t=surface(2);return new THREE.MeshStandardMaterial({map:t,color:0xd4d7cf,vertexColors:true,flatShading:true,roughness:1});}
+export function rockMaterial(){const t=surface(2);return new THREE.MeshStandardMaterial({map:t,color:0xf0e2c8,vertexColors:true,flatShading:true,roughness:1});}
 export async function loadShrub(name,broadleaf){
   const base='./assets/vegetation-lab/',response=await fetch(base+name+'.json');if(!response.ok)throw new Error(`Shrub ${name}: HTTP ${response.status}`);
   const data=await response.json(),loader=new THREE.TextureLoader();

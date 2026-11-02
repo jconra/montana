@@ -149,7 +149,7 @@ import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
-import {TREE_KINDS,ASPEN_STANDS,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
 import {makeCloudSky} from './assets/sky/cloudSky.js';
 import {Sunbeams} from './assets/sky/sunbeams.js';
@@ -677,14 +677,15 @@ function treeTint(kind,id,tint){
   const a=treeHash(id,1),b=treeHash(id,2),c=treeHash(id,3);
   // each tree its own shade; the aspens vary toward yellow, the evergreens between grey-green and blue-green
   if(kind==='aspen')return new THREE.Color(tint*(.8+.34*a),tint*(.88+.14*b),tint*(.72+.3*c));
-  // evergreens run between olive and blue-green, a few brighter young ones
-  const olive=a*a,lift=.82+.42*c;return new THREE.Color(tint*lift*(.86+.42*olive),tint*lift*(.92+.14*b),tint*lift*(1.08-.46*olive));
+  // blue-green junipers; other evergreens from dark blue-green through olive to a sunlit yellow-green
+  if(kind==='juniper'){const l=.8+.34*c;return new THREE.Color(tint*l*(.72+.2*a),tint*l*(.9+.14*b),tint*l*(.86+.3*a));}
+  const olive=a*a,lift=.72+.62*c;return new THREE.Color(tint*lift*(.8+.56*olive),tint*lift*(.9+.2*b),tint*lift*(1.06-.56*olive));
 }
 const treeAssetsReady=(async()=>{
   try{
     treeSpecies=await buildTreeSpecies();
     // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
-    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:120,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
+    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:50,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
       sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;
@@ -720,7 +721,7 @@ function buildTreesFrom(n){
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
     if(inBuilding(rx,rz)||polygonDistance(rx,rz)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
-    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});}
+    const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:treeWide(asset,id,h)});}
   buildTreeMesh();
 }
 function addInst(geo,mat,list){
@@ -743,7 +744,7 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
     if(inBuilding(x,z)||list.concat(trees).some(t=>(t.x-x)**2+(t.z-z)**2<9))continue;
     list.push({id:`aspen:${n}:${k}`,x,z,gy:heightAt(x,z),h:stand.hMin+s()*(stand.hMax-stand.hMin),r:s()*6.283,tint:.9+s()*.2,lean:0});k++;}});
   // Canopy the tree list missed: peaks in the LiDAR returns with no tree near them (assets/trees-fill.json, measured).
-  fillTrees.forEach(([x,z,h],n)=>{const id='fill:'+n,asset=treeKindOf(id,x,z,h);list.push({id,asset,x,z,gy:heightAt(x,z),h,r:treeHash(id,5)*6.283,tint:.8+treeHash(id,6)*.35,lean:0,wide:asset==='juniper'?1.12+treeHash(id,4)*.45:.84+treeHash(id,4)*.5});});
+  fillTrees.forEach(([x,z,h],n)=>{const id='fill:'+n,asset=treeKindOf(id,x,z,h);list.push({id,asset,x,z,gy:heightAt(x,z),h,r:treeHash(id,5)*6.283,tint:.8+treeHash(id,6)*.35,lean:0,wide:treeWide(asset,id,h)});});
   // Knee-high junipers dotting the dry slope, too small for the LiDAR to have found. Invented; the ids stay put by order.
   {const k=rng(4417),near=new Set();const cell=(x,z)=>Math.round(x/3)+':'+Math.round(z/3);for(const t of trees.concat(list))near.add(cell(t.x,t.z));
    for(let n=0;n<900;n++){const x=-60+k()*190,z=-80+k()*72,h=.9+k()*1.5,keep=k();if(inBuilding(x,z)||near.has(cell(x,z))||groundRoadDistance(x,z)<4||keep>.45)continue;near.add(cell(x,z));const id='knee:'+n;list.push({id,asset:'juniper',x,z,gy:heightAt(x,z),h,r:k()*6.283,tint:.85+k()*.3,lean:0,wide:1.15+k()*.5});}}

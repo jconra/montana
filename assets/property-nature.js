@@ -57,10 +57,15 @@ function horseshoePit(){
  const pin=new THREE.Mesh(new THREE.CylinderGeometry(.015,.015,.43,8),stake);pin.position.set(0,.2,.2);pin.rotation.x=-.12;g.add(pin);
  mergeGroup(g);g.name='horseshoe-pit';return g;
 }
+// A low heap of split firewood on the ground, as the May frames show it: no rack, no roof.
 function woodpile(){const g=new THREE.Group(),R=rng(916);
- for(const x of [-1.3,1.3])box(g,[.12,1.15,.12],[x,.56,0],dark);box(g,[2.75,.12,.8],[0,.1,0],wood);
- for(let row=0;row<4;row++)for(let i=0;i<10-row;i++)log(g,.68+R()*.16,.105+R()*.025,[(i-(9-row)/2)*.25,.24+row*.2,(R()-.5)*.09],[Math.PI/2,(R()-.5)*.06,0]);
- box(g,[2.5,.035,.95],[0,1.01,0],mat(0x586052),[0,0,.04]);mergeGroup(g);return g;}
+ for(let row=0;row<3;row++)for(let i=0;i<9-row*2;i++)log(g,.5+R()*.2,.07+R()*.03,[(i-(8-row*2)/2)*.17+(R()-.5)*.06,.07+row*.13,(R()-.5)*.28],[Math.PI/2,(R()-.5)*.6,0]);
+ mergeGroup(g);return g;}
+function tarp(color,w,d){const g=new THREE.Group(),n=10,geo=new THREE.PlaneGeometry(w,d,n,4);geo.rotateX(-Math.PI/2);const p=geo.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,.05+.035*Math.sin(p.getX(i)*5.1+p.getZ(i)*3)+.025*Math.sin(p.getZ(i)*7.3));geo.computeVertexNormals();const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.8,side:THREE.DoubleSide}));g.add(m);mergeGroup(g);return g;}
+function lumber(pieces,color=0x9c8a6c){const g=new THREE.Group(),R=rng(77),m=mat(color),dk=mat(0x8d7a5c);for(let i=0;i<pieces;i++)box(g,[3.2+R()*.5,.05,.2+R()*.14],[(R()-.5)*.3,.05+Math.floor(i/4)*.06,(i%4-1.5)*.32+(R()-.5)*.06],R()<.3?dk:m,[0,(R()-.5)*.06,0]);mergeGroup(g);return g;}
+function brushPile(){const g=new THREE.Group(),R=rng(303),m=mat(0x6b5a43),d=mat(0x4a3f30);for(let i=0;i<34;i++){const a=R()*6.283,l=1.4+R()*1.6,c=new THREE.Mesh(new THREE.CylinderGeometry(.018,.045,l,5),R()<.5?m:d);c.position.set(Math.cos(a)*R()*.9,.12+R()*.55,Math.sin(a)*R()*.9);c.rotation.set((R()-.5)*1.1,R()*6.28,Math.PI/2+(R()-.5)*.8);g.add(c);}mergeGroup(g);return g;}
+function pedestal(w,h,d,color){const g=new THREE.Group();box(g,[w,h,d],[0,h/2,0],mat(color));box(g,[w*1.1,.04,d*1.1],[0,h+.02,0],mat(color));mergeGroup(g);return g;}
+function board(len,w,color=0xc4ad80){const g=new THREE.Group();box(g,[len,.05,w],[0,.04,0],mat(color));mergeGroup(g);return g;}
 function grassGeometry(seed,reed=false){
  const R=rng(seed),positions=[],colors=[],indices=[];
  const add=(x,y,z,c)=>{positions.push(x,y,z);colors.push(...c);};
@@ -176,7 +181,14 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
- place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),CLEARING.wood,-.3,'prop:wood','Wood stack');
+ place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodpile(),{x:-9.3,z:37.3},-.3,'prop:wood','Firewood heap');
+ // Ground clutter measured on the May mosaic and by rays from solved frames.
+ [[tarp(0x4a9fd0,3,1.2),-6.6,33.5,-.42,'tarp-blue','Blue tarp'],[tarp(0xa89e8e,2,1.4),-9.7,35,-.3,'tarp-pale','Pale tarp'],[tarp(0x3f7fb0,3.6,.8),-7.1,35.9,-.05,'tarp-dark','Blue tarp, folded'],
+  [lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.5,-6.5,.8,'brush-house','Brush heap'],
+  [board(2.1,1.2,0x7d5f42),-7.4,-4.7,1.5,'door-slab','Old door panel'],[board(1,.7,0xe6e2d8),-7.3,-4.1,1.5,'white-panel','White panel'],[board(3.5,.1),-3.5,-2.1,.05,'pole-entry','Pole by the entry'],[board(2.8,.1,0x8b7355),-3.7,.05,0,'pole-entry-2','Pole by the entry'],
+  [pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
+ ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
+ {const g=new THREE.Group();log(g,2.8,.13,[0,.12,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x:-27.5,z:17.5},.97,'prop:log-west','Downed log');}
  // Loose logs beside the upper pit, measured from solved drone cameras.
  [[1.76,.15,-6.59,21.27,.49],[.95,.17,-5.3,23.22,1.45]].forEach(([len,r,x,z,yaw],i)=>{const g=new THREE.Group();log(g,len,r,[0,r*.8,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x,z},yaw,`prop:loose-log:${i}`,`Loose log ${i+1}`);});
  HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});

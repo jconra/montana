@@ -10,7 +10,7 @@ const CHUNK=28,RADIUS=[34,55,80,115,150],DENSITY=[.3,.5,.72,.9,1];
 // Measured footprints the grass stays out of (x, z, half sizes, yaw).
 const FOOTPRINTS=[{x:8.78,z:-4.88,hx:11.2,hz:5.2,yaw:.15},{x:-30.73,z:-8.2,hx:4.6,hz:4.6,yaw:1.16},{x:-38.99,z:37.7,hx:3.2,hz:4,yaw:1.6},{x:-42.75,z:43.13,hx:1.6,hz:1.6,yaw:1.64}];
 // Pale bunches of last year's growth standing in the May frames, ray-measured.
-export const STRAW_BUNCHES=[[-8.9,13.3,1.5],[-9.2,17.2,1.5],[-16.2,23.8,1.2],[-14.6,24.4,1],[-4,27,1.1],[20,14,.9]];
+export const STRAW_BUNCHES=[[-8.9,13.3,1.5],[-9.2,17.2,1.5],[-11,14.6,.8]];
 const hash=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s);};
 const vnoise=(x,z)=>{const i=Math.floor(x),j=Math.floor(z),f=x-i,g=z-j,u=f*f*(3-2*f),v=g*g*(3-2*g),a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};
 function tuftGeometry(blades=7,segs=2,height=.3,width=.042,spread=.22){
@@ -40,7 +40,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow}){
    vec3 transformed=iPos+vec3(mc*p.x+ms*p.z,p.y,-ms*p.x+mc*p.z);
    transformed.xz+=vec2(sin(meadowTime*1.3+iPos.x*.31+iPos.z*.17),cos(meadowTime*1.1+iPos.z*.27))*aH*aH*p.y*.22;
    vTone=iTone;vH=aH;vRoot=iPos.xz;`);
-  sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <color_fragment>',`
+  sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12);').replace('#include <color_fragment>',`
    float wet=vTone.x;vec4 moisture=texture2D(paintMoisture,vec2(vRoot.x/(2.*paintHalf)+.5,.5-vRoot.y/(2.*paintHalf)));wet=mix(wet,mix(.12,.92,moisture.r),moisture.a*.85);
    vec3 c=mix(${shown('#a8a070')},${shown('#8f9a70')},smoothstep(.12,.3,wet));c=mix(c,${shown('#a0b050')},smoothstep(.3,.5,wet));c=mix(c,${shown('#7aa83f')},smoothstep(.5,.72,wet));c=mix(c,${shown('#4f8a35')},smoothstep(.76,1.,wet));
    c=mix(c,${shown('#c2b080')},vTone.y);
