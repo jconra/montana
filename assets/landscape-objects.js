@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {inCentralArea} from './central-rocks.mjs';
 
 // Rebuild only on committed edits. Shared geometry/materials stay instanced;
 // editing one object never creates thousands of independent scene meshes.
@@ -10,10 +11,10 @@ export function createLandscapeObjects(scene,catalog,heightAt){
  function setQuality(l,d){level=l;density=d;for(const c of chunks)for(const im of c.meshes){im.count=Math.max(1,c.authored+Math.ceil((c.list.length-c.authored)*Math.max(c.asset.startsWith('rock/')?.65:c.asset==='bush/sage'?.35:0,d)));im.computeBoundingSphere();}}
  function rebuild(records,authored=new Set()){
   for(const c of chunks)for(const im of c.meshes){scene.remove(im);im.dispose();}chunks.length=0;bindings.clear();
-  const cells=new Map();for(const t of records){if(t.asset.startsWith('tree/'))continue;const x=Math.floor(t.x/28),z=Math.floor(t.z/28),key=t.asset==='bush/sage'?`${t.asset}:${x}:${z}`:t.asset;if(!cells.has(key))cells.set(key,{asset:t.asset,x:(x+.5)*28,z:(z+.5)*28,list:[]});cells.get(key).list.push(t);}
+  const cells=new Map();for(const t of records){if(t.asset.startsWith('tree/'))continue;const x=Math.floor(t.x/28),z=Math.floor(t.z/28),near=catalog.get(t.asset).nearParts&&inCentralArea(t.x,t.z),key=t.asset==='bush/sage'?`${t.asset}:${x}:${z}`:near?t.asset+':near':t.asset;if(!cells.has(key))cells.set(key,{asset:t.asset,near,x:(x+.5)*28,z:(z+.5)*28,list:[]});cells.get(key).list.push(t);}
   const rank=t=>{let n=2166136261;for(const c of t.id)n=Math.imul(n^c.charCodeAt(0),16777619);return n>>>0;};
   for(const chunk of cells.values()){
-   chunk.list.sort((a,b)=>Number(authored.has(b.id))-Number(authored.has(a.id))||rank(a)-rank(b));chunk.authored=chunk.list.filter(t=>authored.has(t.id)).length;chunk.meshes=catalog.get(chunk.asset).parts.map(p=>{const im=new THREE.InstancedMesh(p.geometry,p.material,chunk.list.length);im.name='landscape-'+chunk.asset;chunk.list.forEach((t,i)=>{const tint=p.geometry.hasAttribute('color')?1:t.tint;im.setColorAt(i,color.setRGB(tint,tint,tint));});scene.add(im);return im;});
+   chunk.list.sort((a,b)=>Number(authored.has(b.id))-Number(authored.has(a.id))||rank(a)-rank(b));chunk.authored=chunk.list.filter(t=>authored.has(t.id)).length;chunk.meshes=(chunk.near?catalog.get(chunk.asset).nearParts:catalog.get(chunk.asset).parts).map(p=>{const im=new THREE.InstancedMesh(p.geometry,p.material,chunk.list.length);im.name='landscape-'+chunk.asset;if(p.shadow)im.castShadow=im.receiveShadow=true;chunk.list.forEach((t,i)=>{const tint=p.geometry.hasAttribute('color')&&!p.instanceTint?1:t.tint;im.setColorAt(i,color.setRGB(tint,tint,tint));});scene.add(im);return im;});
    chunk.list.forEach((t,i)=>bindings.set(t.id,{chunk,i}));chunks.push(chunk);write(chunk);
   }setQuality(level,density);
  }

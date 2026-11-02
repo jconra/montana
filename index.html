@@ -145,6 +145,7 @@ import { polygonDistance,CLEARING,photoToWorld } from './assets/property-layout.
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=40';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
+import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
@@ -771,7 +772,8 @@ function addGround(geo,mat,list){
     im.setMatrixAt(i,_o.matrix); if(!geo.hasAttribute('color'))im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
   scene.add(im); groundMeshes.push({im,list});
 }
-const rockGeos=[11,27,43,61].map(rockGeometry),rockMat=rockMaterial();
+// Cheap shape for rocks out along the drive; central rocks swap to the detailed set below.
+const rockGeos=[11,27,43,61].map(seed=>rockGeometry(seed,1)),rockMat=rockMaterial();
 const blob=(specs,scaleY)=>mergeGeometries(specs.map(([ox,oy,oz,r])=>new THREE.IcosahedronGeometry(r,0).scale(1,scaleY,1).translate(ox,oy,oz)));
 const bushGeo=blob([[0,0.5,0,1],[0.6,0.35,0.2,0.7],[-0.5,0.4,-0.3,0.75],[0.1,0.72,-0.35,0.6]],0.7);
 const bushMat=new THREE.MeshStandardMaterial({color:0x6f8a45,flatShading:true,roughness:1});
@@ -1165,10 +1167,17 @@ const landscapeReady=(async()=>{
   function asset(key,label,parts,scale){catalog.set(key,{label,parts,defaults:{asset:key,x:0,z:0,offset:0,rotation:[0,0,0],scale,tint:1}});}
   for(const v of treeSpecies)asset('tree/'+v.name,v.label,v.parts,[v.defaultHeight,v.defaultHeight,v.defaultHeight]);
   rockGeos.forEach((geometry,i)=>asset('rock/'+[11,27,43,61][i],'Rock '+(i+1),[{geometry,material:rockMat}],[.8,.68,.8]));
+  try{const near=await loadCentralRocks();for(const [name,part] of near){const entry=catalog.get('rock/'+name);if(entry)entry.nearParts=[part];}}catch(error){console.warn('Central rock set unavailable:',error);}
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
   if(!shrubModels.length)asset('bush/fallback','Basic bush',[{geometry:bushGeo,material:bushMat}],[1,1,1]);
   if(propertyNature.models.sage.length)asset('bush/sage','Sagebrush',propertyNature.models.sage,[1,1,1]);
   try{const parts=await loadBigBush();asset('bush/big-bush','BigBush',parts,[2.95,2.95,2.95]);base.push({id:'bush:big-bush:sample',asset:'bush/big-bush',x:-15,z:27,offset:0,rotation:[0,0,0],scale:[2.95,2.95,2.95],tint:1});}catch(error){console.warn('Big bush unavailable:',error);}
+  // Photo-modelled boulders. If a file cannot load, the saved rows still need an
+  // asset, so a plain rock stands in at about the right size.
+  for(const [key,label,file,fallback] of [['rock/boulder-a','Lawn boulder (flat pair)','boulder-a',0],['rock/boulder-b','Lawn boulder (round)','boulder-b',2]]){
+    let parts;try{parts=await loadBoulder(file);}catch(error){console.warn(label+' unavailable:',error);parts=[{geometry:rockGeos[fallback],material:rockMat}];}
+    asset(key,label,parts,[1,1,1]);
+  }
   asset('prop/propane','Propane tank',propaneTank(),[1,1,1]);
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+t.asset,t,[t.h*t.wide,t.h,t.h*t.wide]));

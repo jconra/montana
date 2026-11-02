@@ -49,3 +49,18 @@ The main scene loads the local asset asynchronously and retains the procedural
 car if loading or wheel identification fails. Front steering follows manual
 inputs and route turns; wheel rotation follows distance traveled. Steering is
 a visual approximation, not an Ackermann steering or suspension simulation.
+
+## Rocks
+
+`boulder-a.glb` and `boulder-b.glb` are the two lawn boulders, modelled from
+solved drone frames (May 2026): shape carved from each frame's rock outline,
+colour projected from the sharpest, most head-on frames. About 4,000 triangles
+each, one 1024×1024 JPEG, 16-bit indices, in metres with the origin on the ground.
+They load through `../rock-models.js` and stay ordinary editor objects. The sides
+facing north and west were seen poorly, so their grain is filled from the same rock.
+
+`central-rocks.glb` holds four cut-stone shapes of 279 triangles named after the
+rock assets they replace (`11`, `27`, `43`, `61`), sharing one 512×512 texture
+built from patches of both boulders. Rocks inside `../central-rocks.mjs` use
+these; rocks further out use an 80-triangle shape. The choice depends on position
+only, so saved object IDs and the scatter that makes them are unchanged.

@@ -113,8 +113,8 @@ export function createGroundDetail(half,driveway){
       diffuseColor.rgb*=1.-canopy*.75;`);
   };material.customProgramCacheKey=()=> 'montana-ground-detail-v8';}};
 }
-export function rockGeometry(seed){
-  const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);
+export function rockGeometry(seed,detail=2){
+  const g=new THREE.IcosahedronGeometry(1,detail),p=g.attributes.position,col=new Float32Array(p.count*3);
   // Deform by coordinate, not by vertex index: duplicated triangle corners stay
   // coincident, avoiding cracks in the old randomly displaced dodecahedron.
   for(let i=0;i<p.count;i++){
