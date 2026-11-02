@@ -6,13 +6,17 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 // The supplied sage is open twigs and thin leaf cards, which from any distance read as a dark scribble. A small lumpy
 // pale body inside gives it the rounded silver-green mass the real plants have.
 function sageBody(){
- const g=new THREE.IcosahedronGeometry(1,2),p=g.attributes.position,col=new Float32Array(p.count*3);
- for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),n=1+.16*Math.sin(x*5.1+z*3.3)+.1*Math.sin(y*7+x*4)+.07*Math.cos(z*9-y*3);
-  p.setXYZ(i,x*n*.46,Math.max(.03,.42+y*n*.38),z*n*.46);const k=.78+.32*Math.max(0,y)+.1*Math.sin(x*11+y*9+z*7);col.set([.25*k,.28*k,.19*k],i*3);}
- g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();
- return {geometry:g,material:new THREE.MeshLambertMaterial({vertexColors:true,name:'sagebrush-body'})};
+ let seed=9011;const r=()=>((seed=(seed*16807)%2147483647)/2147483647),pos=[],col=[],nor=[];
+ for(let i=0;i<70;i++){
+  // little sprays of silver leaves over a dome, thicker toward the top
+  const a=r()*6.283,up=Math.pow(r(),.6),rad=Math.sqrt(1-up*up)*(.34+r()*.16),cx=Math.cos(a)*rad,cz=Math.sin(a)*rad,cy=.1+up*.62+r()*.08,size=.1+r()*.08,turn=r()*6.283,k=.82+r()*.5;
+  for(const [u,v] of [[-1,-.5],[1,-.5],[.15,1.1]]){const lx=u*size,ly=v*size;pos.push(cx+Math.cos(turn)*lx,cy+ly,cz+Math.sin(turn)*lx);nor.push(cx*.3,1,cz*.3);col.push(.165*k,.2*k,.12*k);}
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(pos.length/3*2),2));g.normalizeNormals();
+ const material=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide,name:'sagebrush-body'});
+ return {geometry:g,material};
 }
-export async function loadSagebrush(){const parts=await loadBushModel('./models/sage.glb?v=c4f739d5','sagebrush');for(const p of parts)p.material.color.multiplyScalar(.68);return [sageBody(),...parts];}
+export async function loadSagebrush(){const parts=await loadBushModel('./models/sage.glb?v=c4f739d5','sagebrush');for(const p of parts)p.material.color.setRGB(.62,.68,.5);return [sageBody(),...parts];}
 export function loadBigBush(){return loadBushModel('./models/big-bush.glb?v=bb3','big-bush');}
 async function loadBushModel(file,name){
  const {scene}=await new GLTFLoader().loadAsync(new URL(file,import.meta.url).href);

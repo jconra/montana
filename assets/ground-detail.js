@@ -162,7 +162,7 @@ export function createGroundDetail(half,driveway,sunDir){
       // a mown lawn is mottled rather than even: paler and darker drifts, thin spots
       grass*=1.+coverage.b*(fine.r-.5)*.5;
       grass=mix(grass,grass*vec3(1.22,1.1,.72),smoothstep(.56,.74,mid.b*.5+fine.a*.5)*.7);
-      grass*=.8+bladeVar*.32;
+      grass*=.68+bladeVar*.5;grass*=.9+tiny.g*.2;
       vec3 dirtPatch=${shown('#8a7a5e')}*(.75+dot(soil,vec3(.5)));
       float bare=smoothstep(.62,.78,fine.g*.6+tiny.g*.4)*(1.-smoothstep(.1,.5,wet));
       vec3 land=mix(grass,dirtPatch,bare*.8);

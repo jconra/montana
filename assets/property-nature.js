@@ -102,10 +102,11 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  plantGround=root.xz;plantViewDistance=length(cameraPosition.xz-root.xz)+abs(cameraPosition.y-root.y)*.2;`);
  sh.fragmentShader='varying vec2 plantGround;uniform sampler2D paintSurface;uniform sampler2D paintMoisture;uniform float paintHalf;uniform float plantDistance;varying float plantViewDistance;\n'+sh.fragmentShader;
  sh.fragmentShader=sh.fragmentShader.replace('void main() {',`void main(){vec2 paintUV=vec2(plantGround.x/(2.*paintHalf)+.5,.5-plantGround.y/(2.*paintHalf));vec4 paintedSurface=texture2D(paintSurface,paintUV);if(${sway===.08?'true':'false'}&&paintedSurface.r*paintedSurface.a>.35)discard;float visibility=1.-smoothstep(plantDistance-18.,plantDistance,plantViewDistance);if(fract(52.9829189*fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))>visibility)discard;`);
+ if(material.name==='sagebrush-body')sh.fragmentShader=sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;');
  sh.fragmentShader=sh.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
  vec4 moisture=texture2D(paintMoisture,paintUV);diffuseColor.rgb*=mix(vec3(1.),mix(vec3(1.8,1.1,.85),vec3(.9,1.13,.96),moisture.r),moisture.a);`);
  };
- material.customProgramCacheKey=()=>`property-plant-${sway}`;
+ material.customProgramCacheKey=()=>`property-plant-${sway}-${material.name}`;
  }
  plantMaterial(material,.08);
  const models=Object.fromEntries(Object.entries(geos).map(([kind,geometry])=>[kind,[{geometry,material}]]));
