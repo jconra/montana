@@ -37,17 +37,23 @@ function picnic(){const g=new THREE.Group();
   box(g,[.06,.045,1.65],[x,.405,0],frame);
  }
  box(g,[1.6,.045,.045],[0,.52,0],frame);mergeGroup(g);return g;}
+// A plastic Adirondack chair as the frames show them: low seat sloping back, tall fan of back slats leaning well back, wide flat arms.
 function chair(color){const g=new THREE.Group(),m=mat(color);
- for(let i=0;i<5;i++){box(g,[.09,.05,.48],[(i-2)*.1,.36,.05],m);box(g,[.095,.63,.045],[(i-2)*.1,.67,-.2],m,[-.22,0,0]);}
- for(const x of [-.29,.29]){box(g,[.05,.48,.055],[x,.23,.2],m);box(g,[.05,.51,.055],[x,.23,-.2],m,[-.16,0,0]);box(g,[.095,.045,.62],[x,.56,.03],m);}
+ for(let i=0;i<5;i++)box(g,[.1,.04,.5],[(i-2)*.11,.3,.08],m,[.12,0,0]);
+ for(let i=0;i<5;i++){const x=(i-2)*.11,h=.72+.08*(2-Math.abs(i-2));box(g,[.095,h,.035],[x*1.12,.28+h/2*.88,-.22-h/2*.45],m,[-.47,0,x*-.25]);}
+ for(const x of [-.32,.32]){box(g,[.05,.5,.06],[x,.25,.3],m);box(g,[.05,.42,.06],[x,.21,-.12],m);box(g,[.15,.035,.72],[x*1.08,.55,.06],m);}
  mergeGroup(g);return g;}
-function firepit(){const g=new THREE.Group(),R=rng(501);
- const ash=new THREE.Mesh(new THREE.CircleGeometry(1.03,24),mat(0x49443b));ash.rotation.x=-Math.PI/2;ash.position.y=.015;g.add(ash);
- for(let row=0;row<2;row++)for(let i=0;i<14;i++){
-  const a=(i+.45*row)/14*Math.PI*2,r=1.08+(R()-.5)*.09,m=new THREE.Mesh(rockGeometry(11+i%4*16),stone),s=.24+R()*.1;
-  m.scale.set(s*1.5,s*.8,s);m.position.set(Math.cos(a)*r,.12+row*.19,Math.sin(a)*r);m.rotation.set((R()-.5)*.3,-a,(R()-.5)*.25);g.add(m);
+// The fire ring as the frames show it: one low ring of fist-to-head sized stones round a black ash bed, a few on a second course,
+// and an old log seat on the near side (north). Not a heap of boulders.
+function firepit(){const g=new THREE.Group(),R=rng(501),pitStone=mat(0x4a3d38);
+ const ash=new THREE.Mesh(new THREE.CircleGeometry(1.0,24),mat(0x2e2b27));ash.rotation.x=-Math.PI/2;ash.position.y=.012;g.add(ash);
+ for(let i=0;i<24;i++){
+  const a=i/24*Math.PI*2+(R()-.5)*.08,r=1.1+(R()-.5)*.1,m=new THREE.Mesh(rockGeometry(11+i%4*16),pitStone),s=.16+R()*.09;
+  m.scale.set(s*1.4,s*.75,s*1.1);m.position.set(Math.cos(a)*r,s*.35,Math.sin(a)*r);m.rotation.set((R()-.5)*.3,-a,(R()-.5)*.25);g.add(m);
  }
- for(let i=0;i<4;i++){const m=log(g,1.1,.09,[(i-1.5)*.17,.1+i*.04,0],[Math.PI/2,0,(i%2)*1.3]);m.material=dark;}
+ for(let i=0;i<8;i++){const a=R()*Math.PI*2,r=1.12,m=new THREE.Mesh(rockGeometry(27+i%3*16),pitStone),s=.11+R()*.06;m.scale.set(s*1.3,s*.7,s);m.position.set(Math.cos(a)*r,.17,Math.sin(a)*r);m.rotation.set(0,-a,0);g.add(m);}
+ for(let i=0;i<3;i++){const m=log(g,.9,.07,[(i-1)*.2,.07,(R()-.5)*.3],[Math.PI/2,0,(i%2)*1.2]);m.material=dark;}
+ {const seat=log(g,2.1,.2,[.25,.24,-1.75],[0,0,Math.PI/2]);seat.material=mat(0x4b443d);for(const x of [-.55,.95]){const m=new THREE.Mesh(rockGeometry(43),pitStone);m.scale.set(.16,.12,.14);m.position.set(x,.08,-1.75);g.add(m);}}
  mergeGroup(g);return g;}
 function horseshoePit(){
  const g=new THREE.Group(),stake=mat(0x626965);
@@ -233,8 +239,9 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  // Loose logs beside the upper pit, measured from solved drone cameras.
  [[1.76,.15,-6.59,21.27,.49],[.95,.17,-5.3,23.22,1.45]].forEach(([len,r,x,z,yaw],i)=>{const g=new THREE.Group();log(g,len,r,[0,r*.8,0],[Math.PI/2,0,0]);mergeGroup(g);place(g,{x,z},yaw,`prop:loose-log:${i}`,`Loose log ${i+1}`);});
  HORSESHOES.forEach((p,i)=>{const other=HORSESHOES[1-i];place(horseshoePit(),p,Math.atan2(other.x-p.x,other.z-p.z),`prop:horseshoe:${i}`,`Horseshoe pit ${i+1}`);});
- const chairColors=[0x009aa0,0xb5121b,0x00a0a6,0xbe1520,0x008f9c];
- chairColors.forEach((color,i)=>{const a=-2.5+i*.38,p={x:CAMP_PROPS.fire.x+Math.sin(a)*2.35,z:CAMP_PROPS.fire.z+Math.cos(a)*2.35};place(chair(color),p,a+Math.PI,`prop:chair:${i}`,`Camp chair ${i+1}`);});
+ const chairColors=[0x169a9c,0x2a2a2c,0x14a3a0,0xd4567a,0x14a3a0];   // (south to north, as the frames show them)
+ // a loose row on the fire's west side facing it, as the July frames show (feet found by rays from picture 7)
+ chairColors.forEach((color,i)=>{const z=37.9+i*1.15+(i%2)*.15,p={x:-22.4+(i%2)*.35,z},a=Math.atan2(CAMP_PROPS.fire.x-p.x,CAMP_PROPS.fire.z-p.z);place(chair(color),p,a,`prop:chair:${i}`,`Camp chair ${i+1}`);});
  // Horizontal water surface with animated ripple normals and sky tint, no reflection render pass.
  const shape=new THREE.Shape(POND_OUTLINE.map(p=>new THREE.Vector2(p.x,-p.z))),waterGeo=new THREE.ShapeGeometry(shape,24);waterGeo.rotateX(-Math.PI/2);
  const waterMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,uniforms:{time:wind},vertexShader:'varying vec3 waterWorld;void main(){waterWorld=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(waterWorld,1.);}',fragmentShader:`uniform float time;varying vec3 waterWorld;
