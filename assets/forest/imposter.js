@@ -107,8 +107,19 @@ export function* bakeImposterSteps(renderer, object, { grid = 12, cell = 128, he
   renderer.setRenderTarget(oldTarget); renderer.setClearColor(oldClear, oldAlpha);
   holder.remove(object); if (parent) parent.add(object);
   object.updateMatrixWorld(true);          // the meshes' world matrices carried the holder's offset: refreshed, or anything placed by them stands half a tree low
-  return { colour: colourRT.texture, normal: normalRT.texture, targets: [colourRT, normalRT], radius, halfW, halfH, centre, grid, hemi, cell };   // targets: to free the atlases (a render target's texture can't free itself)
+  return { colour: colourRT.texture, normal: normalRT.texture, targets: [colourRT, normalRT], radius, halfW, halfH, centre, grid, hemi, cell, floorY: box.min.y, height: ext.y };   // targets: to free the atlases (a render target's texture can't free itself)
 }
+
+// PLANT FORMS: a plant drawn wider or narrower at each height than its model, by a smooth curve (the cubic through four widths
+// at the ground, a third up, two thirds up and the tip; assets/forest/species-rules.mjs fits them). Shared by the imposters and
+// the forest's mesh stages, so a plant has one shape near and far. (1, 1, 1, 1): as modelled.
+export const FORM_GLSL = `
+      float formWidth(vec4 w, float y) {
+        float t = clamp(y, 0.0, 1.0) * 3.0, a = t - 1.0, b = t - 2.0, c = t - 3.0;
+        return max(0.03, -w.x * a * b * c / 6.0 + w.y * t * b * c / 2.0 - w.z * t * a * c / 2.0 + w.w * t * a * b / 6.0);
+      }`;
+// the model's floor and height in its own units (older bakes: the card's)
+const formYOf = (bake) => new THREE.Vector2(bake.floorY ?? bake.centre.y - bake.halfH, Math.max(1e-4, bake.height ?? 2 * bake.halfH));
 
 // The vertex stage shared by the drawing and the shadow-casting materials: the quad turned to
 // the viewer (the camera, or the light when `useOverride` is set), and the atlas cell for the
@@ -122,7 +133,8 @@ const VERTEX = `
       #include <logdepthbuf_pars_vertex>
       #include <shadowmap_pars_vertex>
       #include <fog_pars_vertex>
-      attribute vec3 iPos; attribute float iYaw; attribute float iScale; attribute float iWide; attribute vec3 iTint; attribute float iFade;
+      attribute vec3 iPos; attribute float iYaw; attribute float iScale; attribute float iWide; attribute vec3 iTint; attribute float iFade; attribute vec4 iForm;
+      uniform vec2 formY; varying vec4 vForm; varying vec4 vFormMap;
       uniform float radius; uniform float halfW; uniform float halfH; uniform vec3 centre; uniform float grid; uniform float hemi;
       uniform vec3 viewDirOverride; uniform float useOverride; uniform float blendDist; uniform float blend; uniform float parallax;
       varying vec2 vC0; varying vec2 vC1; varying vec2 vC2; varying vec3 vW; varying vec2 vP0; varying vec2 vP1; varying vec2 vP2;
@@ -161,7 +173,13 @@ const VERTEX = `
         // the card faces the viewer. (Locking it to its view cell was tried: the card then jumps at
         // every cell boundary, trunk and all, and the trees look as if they are walking.)
         vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), toCam)); vec3 up = cross(toCam, right);
-        vec3 world = worldCentre + (right * position.x * halfW * 2.0 * iWide + up * position.y * halfH * 2.0 * mix(1.0, iWide, abs(toCam.y))) * iScale;   // (iWide: a tree edited wider than tall; a card seen from above lies across its width)
+        // PLANT FORM (see FORM_GLSL): the card widened to hold the widest the form asks for, and how the card's height maps to the
+        // plant's (a point on the trunk at height y shows on the card up by y times the up axis's rise) and where the trunk is across it
+        vec4 fd = abs(iForm - 1.0); float formK = fd.x + fd.y + fd.z + fd.w > 0.002 ? max(1.0, max(max(iForm.x, iForm.y), max(iForm.z, iForm.w)) * 1.06) : 0.0;
+        { float vs = mix(1.0, iWide, abs(toCam.y)), span = 2.0 * halfH * vs / max(up.y, 0.3);
+          vec3 rT = vec3(c * right.x - s * right.z, right.y, s * right.x + c * right.z);
+          vFormMap = vec4((centre.y - formY.x - 0.5 * span) / formY.y, span / formY.y, formK, 0.5 - (rT.x * centre.x + rT.z * centre.z) / (2.0 * halfW)); vForm = iForm; }
+        vec3 world = worldCentre + (right * position.x * halfW * 2.0 * iWide * max(formK, 1.0) + up * position.y * halfH * 2.0 * mix(1.0, iWide, abs(toCam.y))) * iScale;   // (iWide: a tree edited wider than tall; a card seen from above lies across its width)
         #ifdef WIND
         { float top = (centre.y + halfH) * iScale, above = world.y - (modelMatrix * vec4(iPos, 1.0)).y, k = clamp(above / max(top, 0.001), 0.0, 1.0);   // the card bends like the plant: its top in the breeze, its foot still
           world.xz += windAt(iPos.xz) * k * k * top * windSway; }
@@ -202,13 +220,14 @@ const LOOKUP = `
       uniform sampler2D atlas; uniform sampler2D atlasN; uniform float grid; uniform float blend;
       varying vec2 vQuad; varying vec2 vFrame; varying vec3 vTint; varying float vFade; varying float vYaw; varying vec3 vViewPos; varying vec3 vToCamView; varying float vRadius; varying vec4 vShadowToCam; varying vec4 vShadowToSun; varying vec2 vLand;
       varying vec2 vC0; varying vec2 vC1; varying vec2 vC2; varying vec3 vW; varying vec2 vP0; varying vec2 vP1; varying vec2 vP2;
+      varying vec4 vForm; varying vec4 vFormMap; uniform float formSpray;
+      ` + FORM_GLSL + `
       uniform mat4 projectionMatrix; uniform float useDepth; uniform float parallax; uniform float halfWc; uniform float halfHc;
       vec4 cellSampleAt(sampler2D t, vec2 cell, vec2 q) { vec2 uv = (cell + clamp(q, 0.002, 0.998)) / grid; return texture2D(t, uv, -0.75); }   // (a sharper mip: the far firs read as soft cut-outs, the frames show their branch texture)
       vec4 cellSample(sampler2D t, vec2 cell) { return cellSampleAt(t, cell, vQuad); }
       // one cell's colour and normal, the sample shifted by the pixel's depth times the view offset
       // (the depth read first at the unshifted spot: one extra read)
-      void cellRead(vec2 cell, vec2 par, out vec4 col, out vec4 nrm) {
-        vec2 q = vQuad;
+      void cellRead(vec2 cell, vec2 par, vec2 q, out vec4 col, out vec4 nrm) {
         if (parallax > 0.5) {
           vec4 n0 = cellSampleAt(atlasN, cell, q);
           float a0 = cellSampleAt(atlas, cell, q).a;
@@ -219,9 +238,17 @@ const LOOKUP = `
       }
       // the cells and weights come from the vertex stage, the same for the whole card
       void lookup(out vec4 col, out vec4 nrm) {
-        vec4 c0, n0; cellRead(vC0, vP0, c0, n0);
+        // a reshaped plant: each row of the card read from the picture narrowed or widened about the trunk by the form's width at
+        // that height (the card is wider by formK, so this row of the picture sits formK times further out than drawn)
+        vec2 q = vQuad;
+        // (formSpray: the share of a plant's width that is sprays hung from points; the model moves those points and keeps the sprays
+        // nearly their size, so its outline narrows less than its points do, and the picture follows that)
+        if (vFormMap.z > 0.5) { float fw = formWidth(vForm, vFormMap.x + vQuad.y * vFormMap.y), w = mix(fw, clamp(pow(fw, 0.75), 0.45, 1.25), formSpray), x = 0.5 + (vQuad.x - 0.5) * vFormMap.z;
+          q.x = vFormMap.w + (x - vFormMap.w) / w;
+          if (q.x < 0.0 || q.x > 1.0) { col = vec4(0.0); nrm = vec4(0.0); return; } }
+        vec4 c0, n0; cellRead(vC0, vP0, q, c0, n0);
         if (vW.y + vW.z > 0.0005) {
-          vec4 c1, n1, c2, n2; cellRead(vC1, vP1, c1, n1); cellRead(vC2, vP2, c2, n2);
+          vec4 c1, n1, c2, n2; cellRead(vC1, vP1, q, c1, n1); cellRead(vC2, vP2, q, c2, n2);
           col = c0 * vW.x + c1 * vW.y + c2 * vW.z; nrm = n0 * vW.x + n1 * vW.y + n2 * vW.z;
         } else { col = c0; nrm = n0; }
       }
@@ -242,7 +269,7 @@ const LOOKUP = `
 export function imposterMaterial(bake, { sunDir = new THREE.Vector3(0.5, 1, 0.3), blend = true, depth = true, shadows = true, soften = 0, wind = 0, glow = 0, sheen = 0 } = {}) {   // sheen (0..1): the faint white sunlight a MeshStandardMaterial adds even fully rough; 1 for a model drawn with one   // glow: the tree's own even light (its material's light map), so far matches near
   const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.lights, THREE.UniformsLib.fog, { soften: { value: soften },
     atlas: { value: null }, atlasN: { value: null }, grid: { value: bake.grid }, hemi: { value: bake.hemi ? 1 : 0 },
-    radius: { value: bake.radius }, halfW: { value: bake.halfW }, halfH: { value: bake.halfH }, centre: { value: bake.centre.clone() }, sunDir: { value: sunDir.clone().normalize() },
+    radius: { value: bake.radius }, halfW: { value: bake.halfW }, halfH: { value: bake.halfH }, centre: { value: bake.centre.clone() }, formY: { value: formYOf(bake) }, formSpray: { value: 0 }, sunDir: { value: sunDir.clone().normalize() },
     blend: { value: blend ? 1 : 0 }, blendDist: { value: 400 }, parallax: { value: 0 }, halfWc: { value: bake.halfW }, halfHc: { value: bake.halfH }, ambient: { value: 0.45 }, glowLight: { value: glow }, sheen: { value: sheen }, shadowNudge: { value: 0.8 }, lowSun: { value: 0 }, lowSunK: { value: 0.7 }, useDepth: { value: depth ? 1 : 0 }, useShadow: { value: shadows ? 1 : 0 },   // (lowSunK 0.7: a wood at 190 m matched its models within 3% from the sun's side and against it, sun 3-8° up)
     viewDirOverride: { value: new THREE.Vector3(0, 1, 0) }, useOverride: { value: 0 },
     calmCol: { value: new THREE.Color(0.3, 0.4, 0.15) }, calmFrom: { value: 60 }, calmTo: { value: 250 }, calmAmt: { value: 0 },
@@ -345,7 +372,7 @@ export function imposterMaterial(bake, { sunDir = new THREE.Vector3(0.5, 1, 0.3)
   // the shadow pass: the same quad, turned to the light, its depth from the atlas, packed the way
   // three's shadow maps expect
   mat.userData.depthMaterial = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([{ atlas: { value: null }, atlasN: { value: null }, grid: { value: bake.grid }, hemi: { value: bake.hemi ? 1 : 0 }, radius: { value: bake.radius }, halfW: { value: bake.halfW }, halfH: { value: bake.halfH }, centre: { value: bake.centre.clone() },
+    uniforms: THREE.UniformsUtils.merge([{ atlas: { value: null }, atlasN: { value: null }, grid: { value: bake.grid }, hemi: { value: bake.hemi ? 1 : 0 }, radius: { value: bake.radius }, halfW: { value: bake.halfW }, halfH: { value: bake.halfH }, centre: { value: bake.centre.clone() }, formY: { value: formYOf(bake) }, formSpray: { value: 0 },
       blend: { value: blend ? 1 : 0 }, blendDist: { value: 0 }, parallax: { value: 0 }, halfWc: { value: bake.halfW }, halfHc: { value: bake.halfH }, useDepth: { value: depth ? 1 : 0 }, viewDirOverride: { value: sunDir.clone().normalize() }, useOverride: { value: 1 } }]),
     side: THREE.DoubleSide, extensions: { fragDepth: true },
     vertexShader: VERTEX,

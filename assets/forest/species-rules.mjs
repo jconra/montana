@@ -45,6 +45,43 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
  if(neighbours>9)return 'fir_back';
  return r<.55?'fir':'spruce';
 }
+// Bush silhouettes the juniper models are built to, widest = 1, listed from the tip down to the ground. The real junipers here keep their skirts: every one is
+// widest right at the ground and narrows upward, and the forms differ only in how the top closes (pointed, egg, round, low, column).
+// (The outlines drawn on the frames averaged narrower at the foot, but that was grass hiding the base and hand-drawn corners rounding.)
+export const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.06,0.26,0.42,0.56,0.67,0.76,0.84,0.9,0.95,0.98,1.0],"round":[0.08,0.38,0.56,0.7,0.8,0.87,0.92,0.96,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.06,0.3,0.48,0.62,0.72,0.8,0.86,0.91,0.95,0.98,1.0],
+ // the exception he pointed out (picture 12): some are widest a third of the way up and tuck in at the foot
+ "eggfoot":[0.12,0.4,0.62,0.8,0.93,1.0,0.99,0.93,0.84,0.76,0.7]};
+export const KIND_OUTLINE={juniper:'round',juniper_column:'column',juniper_low:'low',juniper_cone:'egg',juniper_pyramid:'pyramid',juniper_egg:'eggfoot'};
+export const fromTip=(list,y)=>{const u=Math.max(0,Math.min(.9999,1-y))*(list.length-1),i=Math.floor(u);return list[i]+(list[i+1]-list[i])*(u-i);};
+
+// PLANT FORMS. One model per kind, and each plant reshaped as it is drawn: its width multiplied by a smooth curve, the cubic
+// through four numbers (at the ground, a third up, two thirds up and the tip). The forest's vertex and imposter stages do it
+// (FORM_GLSL in imposter.js), so a reshaped plant costs nothing more to draw.
+// Measured on picture 2 (the broad juniper below the camera, 2026-11-03): its sides follow a parabola, the half-width growing as
+// the square root of the depth below the tip, with a little flare at the skirt. The junipers as modelled drew as bullets, straight
+// sides and a blunt round top, because their sprays stand out past the outline most where it is narrow. So the forms narrow the
+// upper part, the amounts being of the drawn plant's width (not its outline's):
+//  parabola (s 0..1): the top third a tenth to two fifths narrower; most junipers
+//  spire: a narrow pointed top over a full body
+//  flare: a narrow top over a broad flared skirt, sides curved in (the witch's-hat cones)
+// (the tapered ones a little wider low down, where the real ones spread widest: tapered alone, the crowns measured 2-4% small)
+export const FORMS={parabola:(s=.5)=>[1.05,1.03,.9-.22*s,.82-.3*s],spire:()=>[1.05,.97,.6,.5],flare:()=>[1.1,.74,.45,.42]};
+const lagrange=t=>{t*=3;const a=t-1,b=t-2,c=t-3;return [-a*b*c/6,t*b*c/2,-t*a*c/2,t*a*b/6];};
+// the width multiplier at height y (0 ground .. 1 tip), as the shaders work it out
+export function formWidth(w,y){const L=lagrange(Math.max(0,Math.min(1,y)));return Math.max(.03,w[0]*L[0]+w[1]*L[1]+w[2]*L[2]+w[3]*L[3]);}
+// A plant's form: its own (a census record's `form`: a name, {name,s}, or the four widths), else one by rule. The pointed kinds
+// (cone, pyramid, column) mostly the parabola, some spires, a few flared cones; the round and low ones mostly stay round mounds,
+// as about a third of the real junipers are (the critic's seventh round: tapering every kind turned broad round bushes into
+// pyramids). Each plant's widths nudged a little so no two are alike; the narrow-foot egg juniper as he pointed it out. null: as modelled.
+export function plantForm(kind,id,h,own=null){
+ if(Array.isArray(own)&&own.length===4)return own.map(Number);
+ if(own){const name=typeof own==='string'?own:own.name;if(FORMS[name])return FORMS[name](own.s??.5);}
+ if(!KIND_OUTLINE[kind]||kind==='juniper_egg')return null;
+ const r=treeHash(id,61),s=treeHash(id,62),n=k=>1+(treeHash(id,63+k)-.5)*.1;
+ const round=kind==='juniper'||kind==='juniper_low',base=round?(r<.25?FORMS.parabola(s*.5):[1,1,1,1]):r<.68?FORMS.parabola(s):r<.86?FORMS.spire():r<.94?FORMS.flare():[1,1,1,1];
+ return base.map((v,k)=>+(v*n(k)).toFixed(3));
+}
+
 // How wide a tree stands for its height: big firs are narrower for their height than young ones; tall junipers are columns, small ones round.
 export function treeWide(kind,id,h){const r=treeHash(id,4);
  if(kind.startsWith('juniper'))return .82+r*.42;

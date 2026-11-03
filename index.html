@@ -153,9 +153,9 @@ import {loadBoulder,loadCentralRocks} from './assets/rock-models.js';
 import {Forest} from './assets/forest/forest.js';
 import {tickWind} from './assets/forest/wind.js';
 import {buildTreeSpecies} from './assets/forest/species.js';
-import {censusTone} from './assets/plant-census.mjs';
+import {censusTone,censusForm} from './assets/plant-census.mjs';
 import {installGrade,gradeLand} from './assets/land-grade.mjs';
-import {verifiable,juniperVariety,evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset} from './assets/forest/species-rules.mjs';
+import {verifiable,juniperVariety,evergreenTone,toneTint,TREE_KINDS,ASPEN_STANDS,treeWide,treeKind,treeHash,neighbourCounter,migrateTreeAsset,plantForm} from './assets/forest/species-rules.mjs';
 import {createMeadow} from './assets/meadow-grass.js';
 import {createHillStones} from './assets/hill-stones.js';
 import {createPropertyLine} from './assets/property-line.js';
@@ -294,7 +294,7 @@ let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
 let landscapeCatalog=new Map(),landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 // Read-only handle for the test rigs: the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;}};
+window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;}};
 
 // ---- building models ----------------------------------------------------
 const placed=[];
@@ -821,7 +821,8 @@ function buildTreeMesh(){
   for(const t of trees.concat(groveList)){
     if(polygonDistance(t.x,t.z)>.3)continue;   // nothing stands in the water
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
-    fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint,t.tone)});
+    // (form: its width reshaped by height, the census's measured one or one by rule; see plantForm)
+    fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint,t.tone),form:plantForm(kind,t.id??t.x,t.h,censusForm.get(t.id))});
   }
   // Shade between trees: from the drone the real forest is lit crowns over near-black gaps, and a tree standing in taller
   // neighbours' shade is dark all over. Each conifer is darkened by how much taller trees stand round it (most toward the sun),

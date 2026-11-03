@@ -5,11 +5,12 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {OUTLINE_SHAPES,fromTip} from './species-rules.mjs';
 
 function rnd(seed){let s=seed>>>0||1;return ()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
 const SPRAY={u0:.05,u1:.95,v0:.74,v1:.01};       // the spray in the branch picture: base (v0) to tip (v1)
 
-function fromArrays(pos,nor,uv,col,idx){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);return g;}
+function fromArrays(pos,nor,uv,col,idx,anc=null){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));if(anc)g.setAttribute('aAnchor',new THREE.Float32BufferAttribute(anc,2));g.setIndex(idx);return g;}
 
 // A ribbon of `segs` quads from `at` outward along `yaw`, dropping as it goes; `roll` turns it about its own length.
 function addBranch(a,at,yaw,len,width,droop,curve,roll,segs,shade,box=SPRAY,tint=[1,1,1]){
@@ -17,7 +18,7 @@ function addBranch(a,at,yaw,len,width,droop,curve,roll,segs,shade,box=SPRAY,tint
  const side=[-sy*Math.cos(roll),Math.sin(roll),cy*Math.cos(roll)];
  for(let i=0;i<=segs;i++){
   const t=i/segs,w=width*.5*(1-t*.45),px=at[0]+cy*x,pz=at[2]+sy*x,py=at[1]+y,v=box.v0+(box.v1-box.v0)*t;
-  for(const e of [-1,1]){pos.push(px+side[0]*w*e,py+side[1]*w*e,pz+side[2]*w*e);const nx=cy*.75,nz=sy*.75,ny=.65,l=Math.hypot(nx,ny,nz);nor.push(nx/l,ny/l,nz/l);uv.push(e<0?box.u0:box.u1,v);const c=shade*(.72+.28*t);col.push(c*tint[0],c*tint[1],c*tint[2]);}
+  for(const e of [-1,1]){pos.push(px+side[0]*w*e,py+side[1]*w*e,pz+side[2]*w*e);if(a.anc)a.anc.push(at[0],at[2]);const nx=cy*.75,nz=sy*.75,ny=.65,l=Math.hypot(nx,ny,nz);nor.push(nx/l,ny/l,nz/l);uv.push(e<0?box.u0:box.u1,v);const c=shade*(.72+.28*t);col.push(c*tint[0],c*tint[1],c*tint[2]);}
   x+=Math.cos(ang)*len/segs;y-=Math.sin(ang)*len/segs;ang+=curve;
  }
  for(let i=0;i<segs;i++){const q=base+i*2;idx.push(q,q+2,q+1,q+1,q+2,q+3);}
@@ -139,15 +140,9 @@ function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=
  for(let i=0;i<count;i++){let y=Math.pow(r(),.82)*.985;if(weight)for(let k=0;k<8&&r()>weight(y);k++)y=r()*.985;const yaw=r()*6.283,R=profile(y,yaw),big=r()<.14?1.55:1,sz=size*(.72+r()*.56)*big,lift=up[0]+r()*(up[1]-up[0]),cy=Math.cos(yaw),sy=Math.sin(yaw);
   addBranch(a,[cy*R*.8,Math.max(.012,y-sz*.3),sy*R*.8],yaw+(r()-.5)*.9,sz,sz*(1+r()*.35),-lift,.08,(r()-.5)*.9,1,(shade[0]+r()*(shade[1]-shade[0]))*(.8+y*.3)*(tiers?.72+.56*(1-((y*tiers+.6*Math.sin(yaw*2))%1)):1)*(shadeAt?shadeAt(y,yaw):1),FLAME);}
 }
-// Bush silhouettes, widest = 1, listed from the tip down to the ground. The real junipers here keep their skirts: every one is
-// widest right at the ground and narrows upward, and the forms differ only in how the top closes (pointed, egg, round, low, column).
-// (The outlines drawn on the frames averaged narrower at the foot, but that was grass hiding the base and hand-drawn corners rounding.)
-const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.06,0.26,0.42,0.56,0.67,0.76,0.84,0.9,0.95,0.98,1.0],"round":[0.08,0.38,0.56,0.7,0.8,0.87,0.92,0.96,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.06,0.3,0.48,0.62,0.72,0.8,0.86,0.91,0.95,0.98,1.0],
- // the exception he pointed out (picture 12): some are widest a third of the way up and tuck in at the foot
- "eggfoot":[0.12,0.4,0.62,0.8,0.93,1.0,0.99,0.93,0.84,0.76,0.7]};
-const fromTip=(list,y)=>{const u=Math.max(0,Math.min(.9999,1-y))*(list.length-1),i=Math.floor(u);return list[i]+(list[i+1]-list[i])*(u-i);};
+// Bush silhouettes (OUTLINE_SHAPES, fromTip): in species-rules.mjs, which also reshapes each plant from them (plant forms).
 function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,clumps=0}){
- const r=rnd(seed+1),a={pos:[],nor:[],uv:[],col:[],idx:[]},own=[r()*6.283,r()*6.283],shape=outline&&OUTLINE_SHAPES[outline],
+ const r=rnd(seed+1),a={pos:[],nor:[],uv:[],col:[],idx:[],anc:[]},own=[r()*6.283,r()*6.283],shape=outline&&OUTLINE_SHAPES[outline],
   spots=[];for(let i=0;i<clumps;i++)spots.push([r()*6.283,Math.pow(r(),.75),.1+r()*.11,.55+r()*.45]);
  // the crown breaks into separate masses of foliage with dark gaps between them, as in the frames
  const bump=(y,c)=>{let v=0;for(const [sa,sy,w,amp] of spots){let d=Math.abs(c-sa);if(d>3.1416)d=6.283-d;const dx=d*.42,dy=y-sy,e=(dx*dx+dy*dy)/(w*w);if(e<5)v=Math.max(v,amp*Math.exp(-e));}return v;},
@@ -156,7 +151,7 @@ function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,
   profile=(y,c=0)=>base(y)*(1+(.13+.3*y)*Math.sin(c*2+own[0]+y*3.1)+(.1+.16*y)*Math.sin(c*3+own[1]-y*7.3)+.09*Math.sin(c*5+own[0]*2+y*13))*(clumps?.8+.42*bump(y,c):1);
  // (sprays reaching out past the mass at random make the ragged outline the frames show, not a smooth bullet)
  tuftLayer(a,r,(y,c)=>profile(y,c)*(r()<.18?1.22:1),{count,size,shadeAt:clumps?(y,c)=>.62+.62*bump(y,c):null,weight:shape?y=>fromTip(shape,y):null});
- return {leaf:fromArrays(a.pos,a.nor,a.uv,a.col,a.idx),wood:crownShell({profile:(y,c)=>profile(y,c)*.84,seed:seed+3,tufts:50,lobes:9,rows:16,sides:18,tile:4})};
+ return {leaf:fromArrays(a.pos,a.nor,a.uv,a.col,a.idx,a.anc),wood:crownShell({profile:(y,c)=>profile(y,c)*.84,seed:seed+3,tufts:50,lobes:9,rows:16,sides:18,tile:4})};
 }
 const FLAME={u0:0,u1:1,v0:0,v1:1};
 const BOUGH={u0:0,u1:1,v0:1,v1:0};

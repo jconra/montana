@@ -32,3 +32,17 @@ assert.ok(state.export().objects.overrides.length===defaults.objects.overrides.l
 console.log('Tree kinds, aspen stands, saved id migration and hand edits passed');
 // The first six kinds keep their places: saved lists and sp indices depend on the order.
 assert.deepEqual(TREE_KINDS.slice(0,6),['fir','spruce','fir_small','juniper','aspen','open_fir']);
+
+// Plant forms: four widths through the shaders' cubic; a census record's own form wins, and rule forms are stable by id.
+{const {plantForm,formWidth,FORMS}=await import('../assets/forest/species-rules.mjs');
+ const w=[1.2,.9,.6,.4];for(const [y,v] of [[0,1.2],[1/3,.9],[2/3,.6],[1,.4]])assert.ok(Math.abs(formWidth(w,y)-v)<1e-9);
+ assert.equal(formWidth(w,-1),formWidth(w,0));assert.ok(formWidth([0,0,0,0],.5)>0);
+ assert.deepEqual(plantForm('juniper_cone','a',3,[1,.99,.68,.64]),[1,.99,.68,.64]);
+ assert.deepEqual(plantForm('juniper_cone','a',3,'spire'),FORMS.spire());
+ assert.deepEqual(plantForm('juniper','b',3,{name:'parabola',s:1}),FORMS.parabola(1));
+ assert.equal(plantForm('fir','c',20),null);assert.equal(plantForm('juniper_egg','c',3),null);
+ assert.deepEqual(plantForm('juniper','x7',2.4),plantForm('juniper','x7',2.4));
+ // most junipers narrowed toward the top (the bullet shape was the complaint); every width a sane multiplier
+ let narrowed=0;for(let i=0;i<400;i++){const f=plantForm('juniper_cone','j'+i,3);assert.ok(f.every(v=>v>.3&&v<1.35));if(f[3]<.85)narrowed++;}
+ assert.ok(narrowed>250&&narrowed<380,'narrowed '+narrowed);
+ let roundKept=0;for(let i=0;i<400;i++){const f=plantForm('juniper','r'+i,3);if(f[3]>.85)roundKept++;}assert.ok(roundKept>260,'round kept '+roundKept);}

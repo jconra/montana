@@ -5,6 +5,8 @@
 export const CENSUS_KEY='montanaPlantCensus:v1';
 // Measured colour per record id: [r,g,b] multipliers over the model's own green, read from the frames.
 export const censusTone=new Map();
+// A plant's own silhouette per record id, where the frames or his marks give one: a form name, {name,s}, or four widths (species-rules plantForm).
+export const censusForm=new Map();
 
 export function censusRecord(plant,previous=null){
  const id=plant.record||'added:census-'+plant.id;
@@ -43,4 +45,4 @@ export function censusHandEdits(objects,census,baseIds,previous=[]){
  const gone=new Set(objects.removed);for(const id of census.removed)if(baseIds.has(id)&&!gone.has(id))out.add(id);
  return [...out].sort();
 }
-export async function loadCensus(url){const r=await fetch(url);if(!r.ok)throw Error('Plant census could not load.');const c=await r.json();for(const p of c.plants)if(p.tone)censusTone.set(censusId(p),p.tone);return c;}
+export async function loadCensus(url){const r=await fetch(url);if(!r.ok)throw Error('Plant census could not load.');const c=await r.json();for(const p of c.plants){if(p.tone)censusTone.set(censusId(p),p.tone);if(p.form)censusForm.set(censusId(p),p.form);}return c;}

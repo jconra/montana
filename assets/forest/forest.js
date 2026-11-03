@@ -4,7 +4,7 @@
 // the camera, each tree switching at its own distance.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { bakeImposterSteps, imposterMaterial } from './imposter.js';
+import { bakeImposterSteps, imposterMaterial, FORM_GLSL } from './imposter.js';
 import { swayMaterial } from './wind.js';
 import { shapeFoliage, SHAPE_DEFAULTS } from './foliage.js';
 import { gradeLand } from '../land-grade.mjs';
@@ -105,6 +105,7 @@ function bleedLeafMap(tex) {
 // still waiting to go (two moves before a draw) is joined to it, so neither is lost
 const PENDING = new WeakMap();
 function sent() { PENDING.delete(this); this.updateRange.count = -1; }   // (its first sending is all of it, which leaves the stretch asked for set: cleared)
+const FORM_NONE = [1, 1, 1, 1], IDENTITY = new THREE.Matrix4();
 function sendPart(a, lo, hi) {
   const w = PENDING.get(a);
   if (w) { lo = Math.min(lo, w[0]); hi = Math.max(hi, w[1]); }
@@ -129,7 +130,7 @@ export class Forest {
   // `species`: a list like FOREST_SPECIES; an entry may bring its own `root` (an Object3D, already
   // loaded) instead of a file, its own `grid` / `cell` for a cheaper atlas, `upNormals` (lit like the
   // ground, both sides of every card) and `tint: false`. `fixed`: a list of { x, z, sp (index), scale,
-  // yaw, tint (optional THREE.Color) } to plant instead of the endless tiles; `heightAt(x, z)` stands them on uneven ground.
+  // yaw, tint (optional THREE.Color), form (optional: four widths, see FORM_GLSL) } to plant instead of the endless tiles; `heightAt(x, z)` stands them on uneven ground.
   constructor(renderer, scene, { base = '/models/trees/', tile = 420, tiles = 7, perTile = 90, imposterAt = 140, band = 40, ahead = 0.75,
                                  grid = 12, cell = 192, light = false, detail = 'coarse', clear = null, sunDir = new THREE.Vector3(0.5, 1, 0.3), shadows = false,
                                  species = null, fixed = null, heightAt = null, nearCap = 400, wind = false, spread = 0, shadowEdge = null, nearBudget = Infinity, sizeRef = 0 } = {}) {
@@ -237,12 +238,12 @@ export class Forest {
   }
   layOne(f, i) {
     const r = rnd(i * 2654435761 + 7), sp = this.species[f.sp];
-    return { id: f.id, wide: f.wide ?? 1, lean: f.lean || null, hidden: f.id != null && f.id === this.hiddenId, pos: new THREE.Vector3(f.x, (this.heightAt ? this.heightAt(f.x, f.z) : 0) + (f.offset || 0), f.z), yaw: f.yaw ?? r() * Math.PI * 2, scale: f.scale ?? 0.7 + r() * 0.6,
+    return { id: f.id, wide: f.wide ?? 1, form: f.form || null, lean: f.lean || null, hidden: f.id != null && f.id === this.hiddenId, pos: new THREE.Vector3(f.x, (this.heightAt ? this.heightAt(f.x, f.z) : 0) + (f.offset || 0), f.z), yaw: f.yaw ?? r() * Math.PI * 2, scale: f.scale ?? 0.7 + r() * 0.6,
       tint: f.tint ? f.tint.clone() : sp.tint === false ? new THREE.Color(1, 1, 1).multiplyScalar(0.85 + r() * 0.3) : new THREE.Color().setHSL(0.26 + r() * 0.08, 0.35 + r() * 0.25, 0.62 + r() * 0.18), sp };
   }
   growDraws(cap) {
     for (const b of this.built) { const g = b.imposter.geometry;
-      for (const [name, size] of [['iPos', 3], ['iYaw', 1], ['iScale', 1], ['iWide', 1], ['iTint', 3], ['iFade', 1]]) { const a = new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); }
+      for (const [name, size] of [['iPos', 3], ['iYaw', 1], ['iScale', 1], ['iWide', 1], ['iTint', 3], ['iFade', 1], ['iForm', 4]]) { const a = new THREE.InstancedBufferAttribute(new Float32Array(cap * size), size); a.setUsage(THREE.DynamicDrawUsage); g.setAttribute(name, a); }
       delete g._maxInstanceCount;                                       // (three fixes the most instances it will draw at a geometry's first draw and never raises it: without this, plants past the old room were never drawn)
       g.instanceCount = 0; }
     this.cap = cap;
@@ -256,13 +257,15 @@ export class Forest {
       const geo = new THREE.InstancedBufferGeometry();
       const quad = new THREE.PlaneGeometry(1, 1); geo.index = quad.index; geo.setAttribute('position', quad.attributes.position); geo.setAttribute('uv', quad.attributes.uv);
       const n = cap;
-      for (const [name, size] of [['iPos', 3], ['iYaw', 1], ['iScale', 1], ['iWide', 1], ['iTint', 3], ['iFade', 1]]) { const a = new THREE.InstancedBufferAttribute(new Float32Array(n * size), size); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); }
+      for (const [name, size] of [['iPos', 3], ['iYaw', 1], ['iScale', 1], ['iWide', 1], ['iTint', 3], ['iFade', 1], ['iForm', 4]]) { const a = new THREE.InstancedBufferAttribute(new Float32Array(n * size), size); a.setUsage(THREE.DynamicDrawUsage); geo.setAttribute(name, a); }
       geo.instanceCount = 0;
       let glow = 0, sheen = 0; sp.root.traverse((o) => { if (!o.isMesh) return; for (const m of [].concat(o.material)) { if (m.lightMap) glow = Math.max(glow, m.lightMapIntensity); if (m.isMeshStandardMaterial) sheen = Math.max(sheen, (1 - m.metalness) * (sp.spec ?? (sp.upNormals ? 0.25 : 1))); } });      // (a tree with its own even light, as the low-poly pines have: its far versions get it too; drawn with MeshStandardMaterial: its far versions get the same faint sheen)
       const mat = imposterMaterial(sp.bake, { sunDir: this.sunDir, blend: true, depth: !this.light, shadows: this.shadows, soften: sp.soften || 0, wind: this.wind ? (sp.sway ?? 1) : 0, glow, sheen });
       gradeLand(mat); if (this.calm) for (const [k, v] of Object.entries(this.calm)) mat.uniforms[k].value = v;
       Object.assign(mat.uniforms, this.landU, this.edgeU);
       mat.uniforms.blendDist.value = this.blendDist ?? 300; if (this.useDepth !== undefined) mat.uniforms.useDepth.value = this.useDepth ? 1 : 0;
+      { let spray = false; sp.root.traverse(o => { if (o.isMesh && o.geometry.attributes.aAnchor) spray = true; });   // (see the mesh draws' plant forms)
+        mat.uniforms.formSpray.value = mat.userData.depthMaterial.uniforms.formSpray.value = spray ? 0.4 : 0; }
       const imposter = new THREE.Mesh(geo, mat); imposter.frustumCulled = false; imposter.castShadow = this.shadows; imposter.customDepthMaterial = mat.userData.depthMaterial;
       this.group.add(imposter);
       const meshes = [];
@@ -272,6 +275,20 @@ export class Forest {
         m.count = 0; m.frustumCulled = false; m.castShadow = this.shadows; m.receiveShadow = this.shadows;
         const mf = new THREE.InstancedBufferAttribute(new Float32Array(NC), 1); mf.setUsage(THREE.DynamicDrawUsage); m.geometry.setAttribute('iFade', mf);
         m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NC * 3), 3); m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        // PLANT FORMS (FORM_GLSL): each plant's width reshaped by height, about the trunk. Only for a part drawn in the model's own
+        // frame (the built species are); a card hung from a point (aAnchor: where the spray leaves its branch) moves with that
+        // point and keeps most of its size, so a narrowed crown is the same sprays closer in, not squeezed slivers
+        const mform = new THREE.InstancedBufferAttribute(new Float32Array(NC * 4).fill(1), 4); mform.setUsage(THREE.DynamicDrawUsage); m.geometry.setAttribute('iForm', mform);
+        const formOn = o.matrixWorld.equals(IDENTITY), anchor = formOn && !!o.geometry.attributes.aAnchor, formY = { value: new THREE.Vector2(sp.box0, Math.max(1e-4, sp.boxH)) };
+        const FORM_VERTEX = !formOn ? '' : `
+          { vec4 fd = abs(iForm - 1.0); if (fd.x + fd.y + fd.z + fd.w > 0.002) { float fw = formWidth(iForm, (transformed.y - formY.x) / formY.y);
+            ${anchor ? 'transformed.xz = aAnchor * fw + (transformed.xz - aAnchor) * clamp(pow(fw, 0.75), 0.45, 1.25);' : 'transformed.xz *= fw;'} } }`;
+        const formHead = !formOn ? '' : 'attribute vec4 iForm; uniform vec2 formY;' + (anchor ? ' attribute vec2 aAnchor;' : '') + '\n' + FORM_GLSL + '\n';
+        if (formOn && this.shadows) {                                     // the shadow drawn from the reshaped plant too
+          const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+          dm.onBeforeCompile = (sh) => { sh.uniforms.formY = formY; sh.vertexShader = formHead + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + FORM_VERTEX); };
+          dm.customProgramCacheKey = () => 'forest-form-depth' + (anchor ? '-a' : ''); m.customDepthMaterial = dm;
+        }
         // shaped leaves (they carry how much sky each corner sees): a sprig seen from underneath darker, and
         // sunlight through the outer leaves when you look toward the sun
         const leafy = !!(sp.shape && o.geometry.attributes.aSky), under = sp.shape?.under ?? SHAPE_DEFAULTS.under, glow = sp.shape?.glow ?? SHAPE_DEFAULTS.glow;
@@ -280,7 +297,8 @@ export class Forest {
           const cover = !!(sp.coverage && mat.alphaTest > 0 && mat.map && mat.map.image);   // (leaf cards drawn with alpha to coverage: see COVER_ALPHA)
           mat.onBeforeCompile = (sh) => {
             Object.assign(sh.uniforms, this.landU, this.edgeU);
-            sh.vertexShader = 'attribute float iFade; varying float vFade; varying vec2 vLand;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = iFade; vLand = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;');
+            sh.uniforms.formY = formY;
+            sh.vertexShader = 'attribute float iFade; varying float vFade; varying vec2 vLand;\n' + formHead + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvFade = iFade; vLand = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;' + FORM_VERTEX);
             sh.fragmentShader = 'uniform sampler2D landShade; uniform float landShadeSize; uniform vec4 landShadeK; varying vec2 vLand;\n' + EDGE_GLSL + sh.fragmentShader.replace('#include <lights_fragment_begin>', EDGE_LIGHTS).replace('#include <map_fragment>', `#include <map_fragment>
               float landSun = 1.0;   // (the hill's and the trees' shadow: the sun's light only, in EDGE_LIGHTS; the hollows darken it all)
               if (landShadeK.w > 0.5) { vec3 sd = texture2D(landShade, vLand / landShadeSize + 0.5).rgb;
@@ -307,10 +325,10 @@ export class Forest {
           };
           mat.alphaToCoverage = cover;
           if (cover) mat.extensions = { ...(mat.extensions || {}), derivatives: true };   // (WebGL1 needs asking; without it the leaf edge falls back to the plain clip)
-          mat.customProgramCacheKey = () => 'forest-mesh' + (sp.spec ?? '') + (sp.upNormals ? '-up2' : '') + (sp.soften ? '-s' + sp.soften : '') + (sp.shape ? '-shape' : '') + (leafy ? `-leaf${under}-${glow}` : '') + (cover ? '-cover' : ''); mat.needsUpdate = true;
+          mat.customProgramCacheKey = () => 'forest-mesh' + (formOn ? (anchor ? '-forma' : '-form') : '') + (sp.spec ?? '') + (sp.upNormals ? '-up2' : '') + (sp.soften ? '-s' + sp.soften : '') + (sp.shape ? '-shape' : '') + (leafy ? `-leaf${under}-${glow}` : '') + (cover ? '-cover' : ''); mat.needsUpdate = true;
           if (this.wind) { m.geometry.computeBoundingBox(); swayMaterial(mat, Math.max(0.001, m.geometry.boundingBox.max.y), sp.sway ?? 1, '-' + (sp.sway ?? 1)); }
         }
-        m.userData.local = o.matrixWorld.clone(); m.userData.fade = mf;
+        m.userData.local = o.matrixWorld.clone(); m.userData.fade = mf; m.userData.form = mform;
         this.group.add(m); meshes.push(m);
       });
       this.built.push({ sp, imposter, meshes, trees: [] });
@@ -407,13 +425,13 @@ export class Forest {
         aFade[k] = 1 - f; b.near.push(k); if (k < lo) lo = k; if (k > hi) hi = k;
         if (t.lean) tmpQ.setFromEuler(tmpE.set(t.lean, t.yaw, 0)); else tmpQ.setFromAxisAngle(Y, t.yaw);
         const sc = t.scale * sp.unit; tmpS.set(sc * t.wide, sc, sc * t.wide); tmpP.copy(t.pos); tmpP.y -= sp.baseY * sc; tmpM.compose(tmpP, tmpQ, tmpS);
-        for (const m of meshes) { m.setMatrixAt(i, tmpM.clone().multiply(m.userData.local)); m.userData.fade.array[i] = f; m.setColorAt(i, t.tint); }
+        for (const m of meshes) { m.setMatrixAt(i, tmpM.clone().multiply(m.userData.local)); m.userData.fade.array[i] = f; m.setColorAt(i, t.tint); m.userData.form.array.set(t.form || FORM_NONE, i * 4); }
       }
       this.nearCount += n;
       // sent to the graphics card: the stretch of imposter fades that changed, and only the slots in use of the near draws (the
       // whole arrays were sent each time, up to 750 KB a draw: flying, that was most frames, ~7 MB a frame and a stutter)
       if (full && live) sendPart(iFade, 0, live - 1); else if (hi >= lo) sendPart(iFade, lo, hi);
-      for (const m of meshes) { m.count = n; if (n) for (const a of [m.instanceMatrix, m.userData.fade, m.instanceColor]) sendPart(a, 0, n - 1); }
+      for (const m of meshes) { m.count = n; if (n) for (const a of [m.instanceMatrix, m.userData.fade, m.instanceColor, m.userData.form]) sendPart(a, 0, n - 1); }
     });
   }
   // the mesh circle and budget (adaptive quality); blendDist: how far the three-view blend reaches; depth: per-view depth on or off
@@ -446,13 +464,13 @@ export class Forest {
     const bySp = new Map(this.built.map(b => [b.sp, b]));
     for (const list of this.tilesLaid.values()) for (const t of list) bySp.get(t.sp).trees.push(t);
     for (const b of this.built) {
-      const { sp, imposter, trees } = b, g = imposter.geometry, aPos = g.attributes.iPos.array, aYaw = g.attributes.iYaw.array, aScl = g.attributes.iScale.array, aWide = g.attributes.iWide.array, aTint = g.attributes.iTint.array, aFade = g.attributes.iFade.array;
+      const { sp, imposter, trees } = b, g = imposter.geometry, aPos = g.attributes.iPos.array, aYaw = g.attributes.iYaw.array, aScl = g.attributes.iScale.array, aWide = g.attributes.iWide.array, aTint = g.attributes.iTint.array, aFade = g.attributes.iFade.array, aForm = g.attributes.iForm.array;
       const n = Math.min(trees.length, aYaw.length);
       for (let k = 0; k < n; k++) { const t = trees[k];
         aPos[k * 3] = t.pos.x; aPos[k * 3 + 1] = t.pos.y - sp.baseY * t.scale * sp.unit; aPos[k * 3 + 2] = t.pos.z;
-        aYaw[k] = t.yaw; aScl[k] = t.hidden ? 0 : t.scale * sp.unit; aWide[k] = t.wide; aTint[k * 3] = t.tint.r; aTint[k * 3 + 1] = t.tint.g; aTint[k * 3 + 2] = t.tint.b; aFade[k] = 1; }
+        aYaw[k] = t.yaw; aScl[k] = t.hidden ? 0 : t.scale * sp.unit; aWide[k] = t.wide; aTint[k * 3] = t.tint.r; aTint[k * 3 + 1] = t.tint.g; aTint[k * 3 + 2] = t.tint.b; aFade[k] = 1; aForm.set(t.form || FORM_NONE, k * 4); }
       g.instanceCount = n;
-      if (n) for (const a of ['iPos', 'iYaw', 'iScale', 'iWide', 'iTint', 'iFade']) sendPart(g.attributes[a], 0, n - 1);   // (this species' own plants: its arrays have room for the whole list)
+      if (n) for (const a of ['iPos', 'iYaw', 'iScale', 'iWide', 'iTint', 'iFade', 'iForm']) sendPart(g.attributes[a], 0, n - 1);   // (this species' own plants: its arrays have room for the whole list)
     }
     this.assignDirty = true;
   }
