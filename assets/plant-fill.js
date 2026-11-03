@@ -77,11 +77,11 @@ export async function createPlantFill({scene,heightAt,fill}){
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
   const nLush=lush*lush*20*live*(.55+.9*patch),nDry=dry*(5+lush*2)*live*(.45+1.1*patch),nShrub=dry*.1*live*(fine>.55?2:.4);
   const roll=(n,fn)=>{for(let q=Math.floor(n)+(R()<n%1?1:0);q>0;q--){const x=X+R(),z=Z+R();if(clear(x,z))fn(x,z);}};
-  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),pa=vnoise(x*.035+11,z*.035),pb=vnoise(x*.06-7,z*.06+3),patch=mix(mix(EMERALD,BRILLIANT,Math.min(1,Math.max(0,(pa-.25)*2))),YELLOWGREEN,Math.max(0,pb-.55)*1.2),c=mix(mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.25),patch,.6),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;const cut=driveVerge(x,z);add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72)*(1-cut*.65),[c[0]*v,c[1]*v,c[2]*v]);});
-  roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5)*(1-driveVerge(x,z)*.6),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nLush,(x,z)=>{const s=x>-60&&x<34&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),pa=vnoise(x*.035+11,z*.035),pb=vnoise(x*.06-7,z*.06+3),patch=mix(mix(EMERALD,BRILLIANT,Math.min(1,Math.max(0,(pa-.25)*2))),YELLOWGREEN,Math.max(0,pb-.55)*1.2),c=mix(mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.25),patch,.6),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;const cut=driveVerge(x,z);add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72)*(1-cut*.65),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nDry,(x,z)=>{const m=x>-60&&x<34&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5)*(1-driveVerge(x,z)*.6),[c[0]*v,c[1]*v,c[2]*v]);});
   roll(nShrub,(x,z)=>{const c=mix(SILVER,PALE,R());add('shrublet',x,z,.7+R()*.7,.75+R()*.6,c);});
   const grassy=(lush+dry*.6)*live,drift=vnoise(X*.07+31,Z*.07-9)*.7+vnoise(X*.3,Z*.3)*.3,w=at('white',X+.5,Z+.5);
-  roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>(x>-60&&x<30&&z>-25&&z<60&&campSurface(x,z).lawn>.3)||add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));
+  roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>(x>-60&&x<34&&z>-25&&z<60&&campSurface(x,z).lawn>.3)||add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));
   roll(grassy*Math.min(at('yellow',X+.5,Z+.5),1)*.35,(x,z)=>add('yellow',x,z,.9+R()*.4,1,[.95,.72,.12]));
  }
  for(const [px,pz,r] of data.yellowPatches)for(let q=r*r*7;q>0;q--){const a=R()*6.283,d=Math.sqrt(R())*r,x=px+Math.cos(a)*d,z=pz+Math.sin(a)*d;if(clear(x,z))add('yellow',x,z,.9+R()*.5,1,[.95,.72,.12]);}

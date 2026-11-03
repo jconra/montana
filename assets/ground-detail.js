@@ -77,11 +77,13 @@ export function createGroundDetail(half,driveway,sunDir){
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;
   // Each spot's place on the drive, for the tyre marks and the cut strip beside the tracks: R across the drive (±2 m), G and B the
   // sine and cosine of the distance along it over 32 m (a phase, so it wraps with no seam), A on the drive's corridor. 16 cm texels.
+  // The corridor runs 40 cm past the ±2 m the code reads, with R held at its end value, and the shader trusts only texels with A at 1:
+  // where A fell to the empty outside, R slid from +2 to -2 between texels and drew a thin false track along one edge.
   const roadUV=(()=>{const W=1024,H=768,px=RUV_SIZE.x/W,pz=RUV_SIZE.y/H,out=new Uint8Array(W*H*4),best=new Float32Array(W*H).fill(9);let s0=0;
     for(let i=1;i<driveway.length;i++){const a=driveway[i-1],b=driveway[i],dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz);
-      if(L>0&&Math.max(a.x,b.x)>-4){const c0=Math.max(0,Math.floor((Math.min(a.x,b.x)-2.2-RUV_MIN.x)/px)),c1=Math.min(W-1,Math.ceil((Math.max(a.x,b.x)+2.2-RUV_MIN.x)/px)),r0=Math.max(0,Math.floor((Math.min(a.z,b.z)-2.2-RUV_MIN.y)/pz)),r1=Math.min(H-1,Math.ceil((Math.max(a.z,b.z)+2.2-RUV_MIN.y)/pz));
+      if(L>0&&Math.max(a.x,b.x)>-4){const c0=Math.max(0,Math.floor((Math.min(a.x,b.x)-2.6-RUV_MIN.x)/px)),c1=Math.min(W-1,Math.ceil((Math.max(a.x,b.x)+2.6-RUV_MIN.x)/px)),r0=Math.max(0,Math.floor((Math.min(a.z,b.z)-2.6-RUV_MIN.y)/pz)),r1=Math.min(H-1,Math.ceil((Math.max(a.z,b.z)+2.6-RUV_MIN.y)/pz));
         for(let r=r0;r<=r1;r++)for(let q=c0;q<=c1;q++){const x=RUV_MIN.x+(q+.5)*px,z=RUV_MIN.y+(r+.5)*pz,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(L*L))),ex=x-a.x-dx*t,ez=z-a.z-dz*t,d=Math.hypot(ex,ez),k=r*W+q;
-          if(d>=2||d>=best[k])continue;best[k]=d;const off=(ex*-dz+ez*dx)/L,ph=(s0+t*L)/32*Math.PI*2;
+          if(d>=2.4||d>=best[k])continue;best[k]=d;const off=Math.max(-2,Math.min(2,(ex*-dz+ez*dx)/L)),ph=(s0+t*L)/32*Math.PI*2;
           out[k*4]=Math.round(127.5+off/2*127.5);out[k*4+1]=Math.round(127.5+127.5*Math.sin(ph));out[k*4+2]=Math.round(127.5+127.5*Math.cos(ph));out[k*4+3]=255;}}
       s0+=L;}
     const t=new THREE.DataTexture(out,W,H,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.LinearFilter;t.generateMipmaps=false;t.needsUpdate=true;return t;})();
@@ -179,7 +181,7 @@ export function createGroundDetail(half,driveway,sunDir){
       // soft), and the strip between them is grass.
       float across=0.,along=0.,onDrive=0.;
       {vec2 ruv=(landUV-roadUVMin)/roadUVSize;
-       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=step(.5,rc.a)*smoothstep(2.,5.,landUV.x);}}   // (from where the apron's east arm narrows into the tracks)
+       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=smoothstep(.97,1.,rc.a)*smoothstep(2.,5.,landUV.x);}}   // (from where the apron's east arm narrows into the tracks)
       float track=1.-smoothstep(trackAt.y*.5-.07,trackAt.y*.5+.07,abs(abs(across)-trackAt.x)+(tiny.r-.5)*.1+(fine.g-.5)*.06);
       road=mix(road,track,onDrive);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.

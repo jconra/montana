@@ -97,13 +97,16 @@ function firTree({seed,radius,boughs=72,pointed=.82,cards=8,spindle=.2,dead=0,lo
 // it reads as a fir with a ragged edge from the clearing and from the drone, and the shading by sky makes the cone (lit side,
 // shaded side, dark inside). crownBase: bare trunk below that share of the height. sparse: share of branches left out.
 // fade: the lower crown this much darker (neighbours shade it in a close stand; only the tops catch the light, so each cone reads).
-function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,pointed=.9,droop=.3,spraySize=.55,sparse=0,dead=0,fade=.6}){
+function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,pointed=.9,droop=.3,spraySize=.55,sparse=0,dead=0,fade=.6,core=1}){
  const r=rnd(seed),L={pos:[],nor:[],uv:[],col:[],idx:[]},W={pos:[],nor:[],uv:[],col:[],idx:[]},p0=r()*6.283;
  const env=y=>radius*Math.pow(Math.max(0,1-Math.max(0,y-crownBase)/(1-crownBase)),pointed)*(1+.12*Math.sin(y*17+p0));
  for(let w=0;w<whorls;w++){
-  const f=w/(whorls-1),y=crownBase+(1-crownBase)*(.015+.95*Math.pow(f,1.08))+(r()-.5)*.01,n=Math.max(2,perWhorl-(f>.8?2:f>.6?1:0)),y0=w*2.399+r();
+  const f=w/(whorls-1),yw=crownBase+(1-crownBase)*(.015+.95*Math.pow(f,1.08)),gap=(1-crownBase)/whorls,n=Math.max(2,perWhorl-(f>.8?2:f>.6?1:0)),y0=w*2.399+r();
   for(let b=0;b<n;b++){
    if(r()<sparse*(1-f*.5))continue;
+   // (each limb at its own height, up to a whorl's gap either way: limbs sharing one height drew the tree as a stack of level
+   // shelves with sky between, his picture 9 marks; the light still rises with height but no longer in bands)
+   const y=yw+(r()-.5)*gap*1.6;
    const yaw=y0+b/n*6.283+(r()-.5)*.7,len=env(y)*(.72+.5*r())+.01,dip=droop*(1.15-f)*(.6+.8*r()),cy=Math.cos(yaw),sy=Math.sin(yaw);
    // the limb: a thin dark stick from the trunk out along the droop
    const ex=len*Math.cos(dip),ey=-len*Math.sin(dip);
@@ -111,7 +114,7 @@ function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,p
    // sprays along its outer part, flat-ish so they show from above, lighter out at the tips and up high
    const light=(.35+r()*.8)*(.7+.45*f)*(1-fade+fade*Math.pow(f,.8));
    for(let k=0;k<sprays;k++){
-    const t=.3+.7*(k+.5)/sprays+(r()-.5)*.08,px=cy*ex*t,pz=sy*ex*t,py=y+ey*t,s=Math.max(len*spraySize,radius*.2*(1-f*.4))*(.7+.55*r())*(.8+.35*t)+.012;
+    const t=.3+.7*(k+.5)/sprays+(r()-.5)*.08,px=cy*ex*t,pz=sy*ex*t,py=y+ey*t+(r()-.5)*gap*.8,s=Math.max(len*spraySize,radius*.2*(1-f*.4))*(.7+.55*r())*(.8+.35*t)+.012;
     // each spray two crossed cards: one lying flat (seen from the drone), one tipped up on edge (seen from the side)
     const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t)*(t>.6&&r()<.45?1.45:1);
     const tilt=f>.6?(r()<.5?1:-1)*(.5+.6*r())*(f-.6)/.4:0;
@@ -121,6 +124,8 @@ function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,p
    const tl=len*spraySize*.9+.01;addBranch(L,[cy*ex,y+ey,sy*ex],yaw+(r()-.5)*.4,tl,tl*.7,-.15,-.06,(r()-.5)*.6,1,light*1.08,FLAME);
    // close in by the trunk: shaded sprays, so no bare pole shows up the middle
    const ci=radius*.24*(1-f*.5)+.01;addBranch(L,[cy*len*.08,y,sy*len*.08],yaw+(r()-.5),ci,ci*.7,.2,-.05,1.3+(r()-.5)*.5,1,light*.3,FLAME);
+   // a denser core where asked (the far forest firs, seen against the sky): a second shaded spray halfway out the limb
+   if(core>1){const cm=radius*.24*(core-1)*(1-f*.4)+.01;addBranch(L,[cy*ex*.45,y+ey*.45,sy*ex*.45],yaw+(r()-.5)*1.2,cm,cm*.72,.1,-.05,(r()<.5?1:-1)*(1+r()*.5),1,light*.5,FLAME);}
   }
  }
  // the leader: a few upright sprays at the very top
@@ -244,7 +249,7 @@ export async function buildTreeSpecies(baseUrl){
  const out=[];
  out.push(pack('fir','Full fir',22,sprayFir({seed:4101,radius:.28,whorls:50,perWhorl:6,sprays:6,dead:16}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
  out.push(pack('spruce','Narrow spruce',24,sprayFir({seed:4202,radius:.22,whorls:52,perWhorl:6,sprays:6,pointed:.95,droop:.4,dead:14}),sprayLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
- out.push(pack('fir_small','Young fir',9,sprayFir({seed:4303,radius:.32,whorls:22,perWhorl:5,sprays:4,pointed:.85,fade:.35}),sprayLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
+ out.push(pack('fir_small','Young fir',9,sprayFir({seed:4303,radius:.32,whorls:30,perWhorl:5,sprays:4,pointed:.85,fade:.35,core:1.6}),sprayLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,wideBase:1.3,sway:.1}));
  {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.8,.87,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
@@ -258,10 +263,12 @@ export async function buildTreeSpecies(baseUrl){
  out.push(pack('juniper_cone','Broad cone juniper',5,juniper({seed:5001,radius:.39,outline:'egg',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.09}));
  out.push(pack('juniper_pyramid','Pointed juniper',6,juniper({seed:5102,radius:.34,outline:'pyramid',clumps:26,count:500,size:.09}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.08}));
  // Deep in the forest: the same spray fir, a little lighter on sprays, since only its upper half shows past the trees in front.
- out.push(pack('fir_back','Forest fir',22,sprayFir({seed:5203,radius:.29,whorls:38,perWhorl:5,sprays:4,fade:.5}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
+ out.push(pack('fir_back','Forest fir',22,sprayFir({seed:5203,radius:.29,whorls:38,perWhorl:5,sprays:4,fade:.5,core:1.8}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
  // Tall firs whose lower trunk is bare: the crown starts a third of the way up, with grey dead stubs on the trunk below, as on the forest edge.
  out.push(pack('fir_high','Fir, bare lower trunk',20,sprayFir({seed:5304,radius:.25,whorls:28,crownBase:.32,dead:20,fade:.35}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
  // A juniper widest a third of the way up, narrower at the foot (the few the frames show that way).
  out.push(pack('juniper_egg','Egg juniper, narrow foot',4.5,juniper({seed:5405,radius:.39,outline:'eggfoot',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.09}));
+ // Forest firs with only their upper half in branches: a bare grey trunk to half height under the crown (his picture 7 question).
+ out.push(pack('fir_bare','Fir, crown on its upper half',26,sprayFir({seed:5506,radius:.27,whorls:24,crownBase:.52,dead:26,fade:.3}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,soften:.04,sway:.05}));
  return out;
 }

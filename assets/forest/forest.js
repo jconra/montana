@@ -236,9 +236,21 @@ export class Forest {
     }
     return out;
   }
+  // A plant on a slope stands at the low side of its footprint: standing it at its centre left the downhill side of the crown
+  // floating over the ground with a flat underside (his mark on picture 2). Four points round the foot, at about two thirds of
+  // the crown's radius (scale x wide is the drawn width per metre of height, roughly), and most of the way down to the lowest.
+  groundUnder(f) {
+    if (!this.heightAt) return 0;
+    const h0 = this.heightAt(f.x, f.z), r = Math.min(2, Math.max(.3, .3 * (f.scale ?? 1) * (f.wide ?? 1)));
+    let low = h0; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) low = Math.min(low, this.heightAt(f.x + a * r, f.z + b * r));
+    return h0 + (low - h0) * .8;
+  }
+  // A juniper's model ends in a level ring of foliage; on the real ones the lowest boughs run into the grass. Sunk by 5-9% of its
+  // height (its own share), the ring goes under the ground and the foot is wherever the ground meets it (his picture 2 note).
+  footSink(sp, f, i) { return sp && sp.name && sp.name.startsWith('juniper') && sp.name !== 'juniper_low' ? (f.scale ?? 1) * (.05 + .04 * ((i * .618034) % 1)) : 0; }
   layOne(f, i) {
     const r = rnd(i * 2654435761 + 7), sp = this.species[f.sp];
-    return { id: f.id, wide: f.wide ?? 1, form: f.form || null, lean: f.lean || null, hidden: f.id != null && f.id === this.hiddenId, pos: new THREE.Vector3(f.x, (this.heightAt ? this.heightAt(f.x, f.z) : 0) + (f.offset || 0), f.z), yaw: f.yaw ?? r() * Math.PI * 2, scale: f.scale ?? 0.7 + r() * 0.6,
+    return { id: f.id, wide: f.wide ?? 1, form: f.form || null, lean: f.lean || null, hidden: f.id != null && f.id === this.hiddenId, pos: new THREE.Vector3(f.x, this.groundUnder(f) + (f.offset || 0) - this.footSink(sp, f, i), f.z), yaw: f.yaw ?? r() * Math.PI * 2, scale: f.scale ?? 0.7 + r() * 0.6,
       tint: f.tint ? f.tint.clone() : sp.tint === false ? new THREE.Color(1, 1, 1).multiplyScalar(0.85 + r() * 0.3) : new THREE.Color().setHSL(0.26 + r() * 0.08, 0.35 + r() * 0.25, 0.62 + r() * 0.18), sp };
   }
   growDraws(cap) {

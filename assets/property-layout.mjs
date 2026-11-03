@@ -29,7 +29,7 @@ export function polygonDistance(x,z,points=POND_OUTLINE){
   let inside=false,distance=Infinity;
   for(let i=0,j=points.length-1;i<points.length;j=i++){
     const a=points[j],b=points[i],dx=b.x-a.x,dz=b.z-a.z;
-    const t=clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz));
+    const L=dx*dx+dz*dz,t=L?clamp(((x-a.x)*dx+(z-a.z)*dz)/L):0;   // (a repeated point is a zero-length edge, not a NaN)
     distance=Math.min(distance,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));
     if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)inside=!inside;
   }

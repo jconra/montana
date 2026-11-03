@@ -1,7 +1,7 @@
 // Which kind of tree stands where. Positions come from LiDAR and hand edits and are never changed here; only the
 // kind is chosen, from the tree's height and how crowded its surroundings are.
 import {driveLineDistance} from '../driveway-measured.mjs';
-export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone','juniper_pyramid','fir_back','fir_high','juniper_egg'];
+export const TREE_KINDS=['fir','spruce','fir_small','juniper','aspen','open_fir','juniper_column','juniper_low','snag','juniper_cone','juniper_pyramid','fir_back','fir_high','juniper_egg','fir_bare'];
 export const LEGACY_TREE_ASSETS=new Set(['tree/pine_large','tree/pine_bush','tree/pine','tree/pine_mid','tree/pine_far']);
 // Aspen stands seen in the May 2026 drone frames (scene metres; x east, z south).
 export const ASPEN_STANDS=[{x:-46,z:12,r:8.5,planted:12,hMin:8,hMax:14}];
@@ -96,7 +96,7 @@ export function migrateTreeAsset(record,kindOf){
 
 // A plant's own measured colour. A record may carry `tone`: its crown's average colour in sunlight as '#rrggbb'. The model is then tinted so
 // its average comes out at that colour; TONE_REF is a rough average of each model untinted, by eye from one render per kind, so treat a tone as close, not exact.
-export const TONE_REF={fir:'#2f3a22',fir_back:'#2f3a22',fir_high:'#2f3a22',juniper_egg:'#4c5c32',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#8d8a82'};
+export const TONE_REF={fir:'#2f3a22',fir_back:'#2f3a22',fir_high:'#2f3a22',fir_bare:'#2f3a22',juniper_egg:'#4c5c32',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#8d8a82'};
 export function toneTint(kind,tone){
  if(typeof tone!=='string'||!/^#[0-9a-f]{6}$/i.test(tone))return null;
  const ref=TONE_REF[kind]||'#4c5c32',ch=(h,i)=>Math.pow(parseInt(h.substr(1+i*2,2),16)/255,2.2);

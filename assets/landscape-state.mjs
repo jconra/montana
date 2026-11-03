@@ -50,7 +50,7 @@ export class EditHistory{
 }
 
 export function brushVertices(grid,x,z,radius){
- const {W,H,px,half}=grid,rows=[];
+ const {W,H,px,half}=grid,rows=[];x-=grid.sx||0;z-=grid.sz||0;   // (grid.sx/sz: where the grid stands in the world, index.html TERRAIN_SHIFT)
  const x0=Math.max(6,Math.floor((x-radius+half)/px)),x1=Math.min(W-7,Math.ceil((x+radius+half)/px));
  const z0=Math.max(6,Math.floor((z-radius+half)/px)),z1=Math.min(H-7,Math.ceil((z+radius+half)/px));
  for(let j=z0;j<=z1;j++)for(let i=x0;i<=x1;i++){const d=Math.hypot(i*px-half-x,j*px-half-z)/radius;if(d>=1)continue;const w=1-d*d*(3-2*d);rows.push({index:j*W+i,weight:w});}

@@ -161,6 +161,7 @@ import {createHillStones} from './assets/hill-stones.js';
 import {createPropertyLine} from './assets/property-line.js';
 import {createPlantFill,loadPlantFillMap} from './assets/plant-fill.js';
 import {roadCoverage,DRIVE_LINE,driveLineDistance} from './assets/driveway-measured.mjs';
+import {gradeDrive} from './assets/drive-grade.mjs';
 import {campSurface} from './assets/camp-approach.mjs';
 import {inCentralArea} from './assets/central-rocks.mjs';
 import {loadSageModel} from './assets/sagebrush.js';
@@ -182,6 +183,13 @@ let shedSchema=null;try{shedSchema=await (await fetch('./assets/montana-shed.jso
 const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
 const loadBin = async u => new Float32Array(await (await fetch(u)).arrayBuffer());
 const [cData, fData] = await Promise.all([loadBin('./assets/'+M.coarse.bin), loadBin('./assets/'+M.fine.bin)]);
+// The drive graded smooth before anything samples the ground (drive-grade.mjs: the survey's humps read as a lumpy road).
+// THE TERRAIN'S REGISTRATION. The height grids sit 1.35 m west and 1.63 m north of the world the solved drone cameras live in: fitted
+// against the LiDAR ground the cameras were solved on, that shift takes the two from 28 cm apart (sd) to 2.7 cm, the same in every
+// quarter of the property, with no turn or scale left over. Every photo measurement (drive, house, plants) is in the cameras' world,
+// so the grids are moved onto it rather than the other way round; on the banks the old offset stood plants half a metre off the ground.
+const TERRAIN_SHIFT={x:1.35,z:1.63};
+gradeDrive(fData,M.fine.W,M.fine.px,DRIVE_LINE.map(p=>({x:p.x-TERRAIN_SHIFT.x,z:p.z-TERRAIN_SHIFT.z})));
 
 const cHalf = (M.coarse.W-1)*M.coarse.px/2;   // ~750 m
 const fHalf = (M.fine.W-1)*M.fine.px/2;       // ~250 m
@@ -246,7 +254,7 @@ const mats=[]; const tiles=[];
 function buildTile(data,W,H,px,uvRect,pushBack){
   const half=(W-1)*px/2;
   const geo=new THREE.PlaneGeometry(2*half,2*half,W-1,H-1);
-  geo.rotateX(-Math.PI/2);
+  geo.rotateX(-Math.PI/2);geo.translate(TERRAIN_SHIFT.x,0,TERRAIN_SHIFT.z);
   const pos=geo.attributes.position, uv=geo.attributes.uv, col=new Float32Array(pos.count*3);
   const baseY=new Float32Array(pos.count);
   const [u0,v0,u1,v1]=uvRect;
@@ -261,7 +269,7 @@ function buildTile(data,W,H,px,uvRect,pushBack){
   if(pushBack){mat.polygonOffset=true;mat.polygonOffsetFactor=1;mat.polygonOffsetUnits=1;}
   const mesh=new THREE.Mesh(geo,mat);
   scene.add(mesh); mats.push(mat);
-  const t={mesh,pos,baseY,W,H,px,half,data};
+  const t={mesh,pos,baseY,W,H,px,half,data,sx:TERRAIN_SHIFT.x,sz:TERRAIN_SHIFT.z};
   tiles.push(t); return t;
 }
 const fu=fHalf/cHalf, uv0=0.5-fu*0.5, uv1=0.5+fu*0.5;
@@ -269,14 +277,14 @@ const coarse=buildTile(cData,M.coarse.W,M.coarse.H,M.coarse.px,[0,0,1,1],true);
 const fine  =buildTile(fData,M.fine.W,  M.fine.H,  M.fine.px,[uv0,uv0,uv1,uv1],false);
 // Remove the coarse underlay inside the fine tile so lowering fine vertices
 // exposes the edited surface, not the original terrain underneath it.
-{const old=coarse.mesh.geometry.index.array,indices=[];for(let i=0;i<old.length;i+=3){let inside=true;for(let j=0;j<3;j++){const n=old[i+j];inside&&=Math.abs(coarse.pos.getX(n))<fHalf&&Math.abs(coarse.pos.getZ(n))<fHalf;}if(!inside)indices.push(old[i],old[i+1],old[i+2]);}coarse.mesh.geometry.setIndex(indices);}
+{const old=coarse.mesh.geometry.index.array,indices=[];for(let i=0;i<old.length;i+=3){let inside=true;for(let j=0;j<3;j++){const n=old[i+j];inside&&=Math.abs(coarse.pos.getX(n)-TERRAIN_SHIFT.x)<fHalf&&Math.abs(coarse.pos.getZ(n)-TERRAIN_SHIFT.z)<fHalf;}if(!inside)indices.push(old[i],old[i+1],old[i+2]);}coarse.mesh.geometry.setIndex(indices);}
 for(const material of mats){groundDetail.attach(material);gradeLand(material);prepareShadowMaterial(material);}
 fine.mesh.receiveShadow=coarse.mesh.receiveShadow=true;
 
 // ---- height sampling ----------------------------------------------------
 let VEX=1;
 function sampleBase(x,z,t){
-  const i=(x+t.half)/t.px, j=(z+t.half)/t.px;
+  const i=(x-t.sx+t.half)/t.px, j=(z-t.sz+t.half)/t.px;
   if(i<0||j<0||i>t.W-1||j>t.H-1) return null;
   const i0=Math.floor(i),j0=Math.floor(j),fx=i-i0,fy=j-j0;
   const i1=Math.min(i0+1,t.W-1),j1=Math.min(j0+1,t.H-1);
@@ -284,7 +292,7 @@ function sampleBase(x,z,t){
   return (a*(1-fx)+b*fx)*(1-fy)+(cc*(1-fx)+d*fx)*fy;
 }
 function heightAt(x,z){
-  let v=(Math.abs(x)<=fine.half&&Math.abs(z)<=fine.half)?sampleBase(x,z,fine):null;
+  let v=(Math.abs(x-fine.sx)<=fine.half&&Math.abs(z-fine.sz)<=fine.half)?sampleBase(x,z,fine):null;
   if(v==null) v=sampleBase(x,z,coarse);
   return (v==null?0:v)*VEX;
 }
@@ -294,7 +302,7 @@ let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
 let landscapeCatalog=new Map(),landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
 // Read-only handle for the test rigs: the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;}};
+window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 
 // ---- building models ----------------------------------------------------
 const placed=[];
