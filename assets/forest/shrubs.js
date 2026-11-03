@@ -97,10 +97,10 @@ export function buildShrubSpecies(){
  const map=sprayTexture();
  return SAGE_FORMS.map(({name,label,defaultHeight,form})=>{
   const {leaf,wood}=sageForm(form);
-  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(1.02,1.14,.94),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
+  const woodMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,name:'bark'}),leafMat=new THREE.MeshStandardMaterial({map,color:new THREE.Color().setRGB(.9,1.02,.82),alphaTest:.42,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'});
   const root=new THREE.Group();root.add(new THREE.Mesh(wood,woodMat),new THREE.Mesh(leaf,leafMat));
   return {name,label,defaultHeight,height:1,root,parts:[{geometry:wood,material:woodMat},{geometry:leaf,material:leafMat}],tint:false,soften:.25,spec:.08,coverage:true,sway:.12,
-   shape:{lump:.14,mix:.7,dark:.5,tip:.36,olive:0,branchDark:.6,under:.28,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};
+   shape:{lump:.14,mix:.7,dark:.5,tip:.12,olive:0,branchDark:.6,under:.28,glow:.05},triangles:(wood.index.count+leaf.index.count)/3};
  });
 }
 // Which form a placed sage takes when it doesn't name one: from its height and its own id, so it stays put between visits.

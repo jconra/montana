@@ -73,10 +73,13 @@ function entryArch(){const g=new THREE.Group(),m=mat(0x8a3f24),end=mat(0xa8805a)
  box(g,[.22,.1,.02],[-span/2,1.25,.145],mat(0x2fa37a));
  mergeGroup(g);return g;}
 // Firewood rounds stacked ends-out between end stakes, after the woodpile in the Mathwood props lab: rows sit in each other's hollows.
+// The real stacks are low and loose (his note on the renders): rows shorten and wander toward the top, rounds sit crooked and some are
+// missing, no tall end stakes.
 function woodStack(len,height,seed){const g=new THREE.Group(),R=rng(seed),r=.085,up=r*1.6,rows=Math.round(height/up),n0=Math.max(2,Math.round(len/(r*1.9)));
  for(const z of[-.18,.18])box(g,[len+.12,.07,.08],[0,.035,z],mat(0x4a3d30));
- for(let row=0;row<rows;row++){const n=n0-(row%2);for(let i=0;i<n;i++)log(g,.42+R()*.1,r*(.92+R()*.18),[(i-(n-1)/2)*len/n0,.09+r+row*up,(R()-.5)*.05],[Math.PI/2,(R()-.5)*.12,0]);}
- for(const x of[-len/2-.05,len/2+.05])box(g,[.07,height+.2,.07],[x,(height+.2)/2,0],mat(0x4a3d30));
+ for(let row=0;row<rows;row++){const shrink=1-row/rows*.45*(.6+R()*.8),n=Math.max(1,Math.round((n0-(row%2))*shrink)),shift=(R()-.5)*len*.12;
+  for(let i=0;i<n;i++){if(R()<.12)continue;log(g,.38+R()*.16,r*(.85+R()*.3),[(i-(n-1)/2)*len/n0+shift+(R()-.5)*.05,.09+r+row*up*(.92+R()*.12),(R()-.5)*.14],[Math.PI/2+(R()-.5)*.25,(R()-.5)*.35,(R()-.5)*.2]);}}
+ for(let i=0;i<5;i++)log(g,.35+R()*.15,r*(.8+R()*.3),[(R()-.5)*(len+.8),r*.9,(R()<.5?-1:1)*(.35+R()*.3)],[R()*.4,R()*6.28,Math.PI/2]);
  mergeGroup(g);return g;}
 function lumber(pieces,color=0x9c8a6c){const g=new THREE.Group(),R=rng(77),m=mat(color),dk=mat(0x8d7a5c);for(let i=0;i<pieces;i++)box(g,[3.2+R()*.5,.05,.2+R()*.14],[(R()-.5)*.3,.05+Math.floor(i/4)*.06,(i%4-1.5)*.32+(R()-.5)*.06],R()<.3?dk:m,[0,(R()-.5)*.06,0]);mergeGroup(g);return g;}
 function brushPile(){const g=new THREE.Group(),R=rng(303),m=mat(0x6b5a43),d=mat(0x4a3f30);for(let i=0;i<34;i++){const a=R()*6.283,l=1.4+R()*1.6,c=new THREE.Mesh(new THREE.CylinderGeometry(.018,.045,l,5),R()<.5?m:d);c.position.set(Math.cos(a)*R()*.9,.12+R()*.55,Math.sin(a)*R()*.9);c.rotation.set((R()-.5)*1.1,R()*6.28,Math.PI/2+(R()-.5)*.8);g.add(c);}mergeGroup(g);return g;}
@@ -215,9 +218,9 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   chunk.im=chunk.meshes[0];writeTransforms(chunk);
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
- place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodStack(3.05,1.35,916),{x:-5.89,z:35.76},-.145,'prop:wood','Firewood stack');
- // the second stack, crosswise to the first (marked on picture 7, placed by ray from the solved frame)
- place(woodStack(3.05,1.35,917),{x:-8.79,z:35.52},-.145+Math.PI/2,'prop:wood-2','Firewood stack');
+ place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodStack(2.8,.85,916),{x:-5.89,z:35.76},-.145,'prop:wood','Firewood stack');
+ // the second stack, crosswise to the first in an L on its south side (marked on picture 7; he moved it south of the ray's spot)
+ place(woodStack(2.4,.8,917),{x:-6.4,z:37.9},-.145+Math.PI/2,'prop:wood-2','Firewood stack');
  // Ground clutter measured on the May mosaic and by rays from solved frames.
  [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
     [stoneRow(2.4,47),-5.28,6.9,-.25,'stones-boxes','Stone row'],[entryArch(),98.8,-101.7,-2.33,'entry-arch','Driveway entry arch'],[rockCage(.36,1,61),3.11,36.75,0,'rock-cage-1','Wire rock cage'],[rockCage(.34,.82,62),-25.4,15.7,0,'rock-cage-2','Wire rock cage'],[pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']

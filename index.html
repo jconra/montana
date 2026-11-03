@@ -192,11 +192,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,1));
 renderer.useLegacyLights=true;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 installGrade(THREE,renderer);
-// Aerial haze: in the frames the forest grows lighter and bluer with distance (at a few hundred metres it is already a grey-blue
-// green) and the far ridges are hazy blue. A capped exponential haze over the first kilometres, then the old far fade.
+// Aerial haze: in the frames the forest grows lighter and bluer with distance and the far ridges are hazy blue, while the trees
+// by the clearing stay near-black. Almost none in the first few hundred metres, building over the kilometres, then the old far fade.
 {const chunk=THREE.ShaderChunk.fog_fragment,slot='float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );';
  if(!chunk.includes(slot))throw new Error('Aerial haze: three fog chunk not found');
- THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = .62*(1.0-exp(-vFogDepth/1100.0))+.38*smoothstep( fogNear, fogFar, vFogDepth );');}
+ THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = .7*(1.0-exp(-pow(vFogDepth/1400.0,1.6)))+.3*smoothstep( fogNear, fogFar, vFogDepth );');}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fb8d0);
 const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1.5, 120000);
