@@ -91,6 +91,42 @@ function firTree({seed,radius,boughs=72,pointed=.82,cards=8,spindle=.2,dead=0,lo
  if(dead)parts.push(trunk(dead,seed));
  return {leaf:fromArrays(L.pos,L.nor,L.uv,L.col,L.idx),wood:mergeGeometries(parts.filter(Boolean))};
 }
+// A fir built the way the real ones are: whorls of branches up a straight trunk, each drooping a little and turning up at the tip,
+// carrying clumps of a real fir spray picture (no tubes, no inner pole). The crown is a cone of sprays with gaps between whorls, so
+// it reads as a fir with a ragged edge from the clearing and from the drone, and the shading by sky makes the cone (lit side,
+// shaded side, dark inside). crownBase: bare trunk below that share of the height. sparse: share of branches left out.
+// fade: the lower crown this much darker (neighbours shade it in a close stand; only the tops catch the light, so each cone reads).
+function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,pointed=.9,droop=.3,spraySize=.55,sparse=0,dead=0,fade=.6}){
+ const r=rnd(seed),L={pos:[],nor:[],uv:[],col:[],idx:[]},W={pos:[],nor:[],uv:[],col:[],idx:[]},p0=r()*6.283;
+ const env=y=>radius*Math.pow(Math.max(0,1-Math.max(0,y-crownBase)/(1-crownBase)),pointed)*(1+.12*Math.sin(y*17+p0));
+ for(let w=0;w<whorls;w++){
+  const f=w/(whorls-1),y=crownBase+(1-crownBase)*(.015+.95*Math.pow(f,1.08))+(r()-.5)*.01,n=Math.max(2,perWhorl-(f>.8?2:f>.6?1:0)),y0=w*2.399+r();
+  for(let b=0;b<n;b++){
+   if(r()<sparse*(1-f*.5))continue;
+   const yaw=y0+b/n*6.283+(r()-.5)*.7,len=env(y)*(.72+.5*r())+.01,dip=droop*(1.15-f)*(.6+.8*r()),cy=Math.cos(yaw),sy=Math.sin(yaw);
+   // the limb: a thin dark stick from the trunk out along the droop
+   const ex=len*Math.cos(dip),ey=-len*Math.sin(dip);
+   {const base=W.pos.length/3,th=.0035+len*.025;for(const [t,o] of [[0,th],[1,th*.3]])for(const e of [-1,1]){W.pos.push(cy*ex*t-sy*o*e,y+ey*t,sy*ex*t+cy*o*e);W.nor.push(0,1,0);W.uv.push(0,0);const c=.16+.06*t;W.col.push(c,c*.92,c*.82);}W.idx.push(base,base+2,base+1,base+1,base+2,base+3);}
+   // sprays along its outer part, flat-ish so they show from above, lighter out at the tips and up high
+   const light=(.62+r()*.42)*(.72+.4*f)*(1-fade+fade*Math.pow(f,.8));
+   for(let k=0;k<sprays;k++){
+    const t=.3+.7*(k+.5)/sprays+(r()-.5)*.08,px=cy*ex*t,pz=sy*ex*t,py=y+ey*t,s=Math.max(len*spraySize,radius*.2*(1-f*.4))*(.7+.55*r())*(.8+.35*t)+.012;
+    // each spray two crossed cards: one lying flat (seen from the drone), one tipped up on edge (seen from the side)
+    const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t);
+    addBranch(L,[px,py,pz],sy2,s,s*.72,dp,-.05,(r()-.5)*.7,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.62,dp,-.05,1.2+(r()-.5)*.6,1,sh*.9,FLAME);
+   }
+   const tl=len*spraySize*.9+.01;addBranch(L,[cy*ex,y+ey,sy*ex],yaw+(r()-.5)*.4,tl,tl*.7,-.15,-.06,(r()-.5)*.6,1,light*1.08,FLAME);
+   // close in by the trunk: shaded sprays, so no bare pole shows up the middle
+   const ci=radius*.24*(1-f*.5)+.01;addBranch(L,[cy*len*.08,y,sy*len*.08],yaw+(r()-.5),ci,ci*.7,.2,-.05,1.3+(r()-.5)*.5,1,light*.55,FLAME);
+  }
+ }
+ // the leader: a few upright sprays at the very top
+ for(let k=0;k<4;k++){const s=radius*.3;addBranch(L,[0,1-s*1.1,0],k*1.6,s,s*.55,-1.1,.05,1.57,1,.95,FLAME);}
+ // the trunk stops a little over halfway up: above that the real foliage hides it, and drawn it shows as a dark line through far trees
+ const parts=[fromArrays(W.pos,W.nor,W.uv,W.col,W.idx),lathe([[0,.009],[.3,.0055],[.55,.002]],5,[.15,.155,.12])];
+ if(dead)parts.push(trunk(dead,seed));
+ return {leaf:fromArrays(L.pos,L.nor,L.uv,L.col,L.idx),wood:mergeGeometries(parts)};
+}
 // Grey dead limbs and a bare grey trunk showing under the crown, as on the tall forest firs.
 function trunk(limbs,seed){const r=rnd(seed+9),grey=[.22,.21,.195],parts=[lathe([[0,.012],[.34,.009]],5,grey)];for(let i=0;i<limbs;i++){const l=.05+r()*.075,g=lathe([[0,.0035],[l*.6,.002],[l,.0006]],3,grey);g.rotateZ(-1.1-r()*.9);g.rotateY(r()*6.283);g.translate(0,.05+r()*.3,0);parts.push(g);}return mergeGeometries(parts);}
 
@@ -195,19 +231,26 @@ export async function buildTreeSpecies(baseUrl){
  const flame=tuftTexture(juniperTile.image,66),firTuft=tuftTexture(firTile.image,67),juniperMat=()=>{const m=needle(0xffffff);m.map=flame;return m;};
  const boughPic=boughTexture(68),boughLeaf=c=>{const m=needle(c);m.map=boughPic;return m;};
  const firLeaf=c=>{const m=needle(c);m.map=firTuft;m.color.multiplyScalar(2.3);return m;};
+ // a real fir spray picture (the EZ-Tree pine leaf): stem at the foot of the card, needles out to the tips
+ const sprayPic=await new THREE.TextureLoader().loadAsync(new URL('../vegetation-lab/tex/pine_leaf.png',import.meta.url).href);sprayPic.colorSpace=THREE.SRGBColorSpace;sprayPic.anisotropy=4;
+ // (the picture is a brighter, yellower green than the firs in the July frames: inside his outlines they measured 90,107,75
+ // against the photos' 70,77,75, so the sprays are darkened and cooled most of the way to that)
+ const sprayLeaf=c=>{const m=needle(c);m.map=sprayPic;m.alphaTest=.38;m.color.multiply(new THREE.Color(.5,.45,1.12));return m;};
  const lump={lump:.05,mix:.8,dark:.38,tip:.3,olive:0,branchDark:.2,under:.2,glow:.12};
  // The tall firs lit as whole cones: the leaves smeared into masses about a metre across, so a crown has a lit side, a shaded side
  // and a bright top as the frames show, instead of every bough lit on its own (which read as stripes from the clearing).
- const CONE={...lump,lump:.9,mix:.92,dark:.5,tip:.12};
+ // (the leaves smeared at crown scale, so the sky each spray sees changes smoothly from the sunny outer top to the dark inside
+ // and foot: each tree lit as one cone, not tier by tier, which read as stripes; half of each spray's own outward normal is kept)
+ const CONE={...lump,lump:2.4,mix:.55,dark:.8,tip:.28};
  const out=[];
- out.push(pack('fir','Full fir',22,firTree({seed:4101,radius:.22,boughs:110,cards:10,dead:16}),boughLeaf(0xffffff),crownMat(firTile),{shape:CONE,sway:.05}));
- out.push(pack('spruce','Narrow spruce',24,firTree({seed:4202,radius:.18,boughs:110,cards:10,pointed:.85,dead:14}),boughLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,sway:.05}));
- out.push(pack('fir_small','Young fir',9,firTree({seed:4303,radius:.3,boughs:48,pointed:.85,cards:7}),boughLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
+ out.push(pack('fir','Full fir',22,sprayFir({seed:4101,radius:.28,whorls:36,perWhorl:5,sprays:4,dead:16}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
+ out.push(pack('spruce','Narrow spruce',24,sprayFir({seed:4202,radius:.22,whorls:40,perWhorl:5,sprays:4,pointed:.95,droop:.4,dead:14}),sprayLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
+ out.push(pack('fir_small','Young fir',9,sprayFir({seed:4303,radius:.32,whorls:22,perWhorl:5,sprays:4,pointed:.85,fade:.35}),sprayLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},coverage:true,sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,wideBase:1.3,sway:.1}));
  {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.68,.71,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},coverage:true,sway:.2}));}
- out.push(pack('open_fir','Open fir',18,firTree({seed:4606,radius:.24,boughs:42,pointed:.7,cards:6,spindle:0,dead:12}),boughLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,sway:.06}));
+ out.push(pack('open_fir','Open fir',18,sprayFir({seed:4606,radius:.25,whorls:24,perWhorl:4,sparse:.3,pointed:.75,dead:12}),sprayLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,coverage:true,sway:.06}));
  out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.28,outline:'column',clumps:24,count:460,size:.075}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.07}));
 
  out.push(pack('juniper_low','Low spreading juniper',3.5,juniper({seed:4808,radius:.72,outline:'low',clumps:28,count:640,size:.11}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.1}));
@@ -215,12 +258,10 @@ export async function buildTreeSpecies(baseUrl){
   out.push({name:'snag',label:'Dead snag',defaultHeight:7,height:1,root,parts:[{geometry:g,material:m}],soften:.1,spec:.1,sway:.02});}
  out.push(pack('juniper_cone','Broad cone juniper',5,juniper({seed:5001,radius:.39,outline:'egg',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.09}));
  out.push(pack('juniper_pyramid','Pointed juniper',6,juniper({seed:5102,radius:.34,outline:'pyramid',clumps:26,count:500,size:.09}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.08}));
- // Deep in the forest, seen across the clearing from 60 m and more: a full cone of fir tufts in soft tiers over a shaded inner cone,
- // so each tree reads as a whole with its own pointed top and a lit side, as the frames show. (The bough-lobe firs above, built
- // for close looks, read as dark poles and shelves at this range.) Cheap: one tuft layer and a low inner shell.
- out.push(pack('fir_back','Forest fir',22,conifer({seed:5203,radius:.21,tiers:22,perTier:10,droop:.8,pointed:.95,fade:.5,inner:'tufts'}),(()=>{const m=needle(0xffffff);m.map=firTuft;m.color.multiplyScalar(1.1);return m;})(),crownMat(firTile),{shape:CONE,sway:.05}));
+ // Deep in the forest: the same spray fir, a little lighter on sprays, since only its upper half shows past the trees in front.
+ out.push(pack('fir_back','Forest fir',22,sprayFir({seed:5203,radius:.27,whorls:38,perWhorl:5,sprays:4,fade:.78}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
  // Tall firs whose lower trunk is bare: the crown starts a third of the way up, with grey dead stubs on the trunk below, as on the forest edge.
- out.push(pack('fir_high','Fir, bare lower trunk',20,firTree({seed:5304,radius:.24,boughs:90,cards:9,crownBase:.32,dead:20}),boughLeaf(0xffffff),crownMat(firTile),{shape:CONE,sway:.05}));
+ out.push(pack('fir_high','Fir, bare lower trunk',20,sprayFir({seed:5304,radius:.25,whorls:28,crownBase:.32,dead:20,fade:.35}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
  // A juniper widest a third of the way up, narrower at the foot (the few the frames show that way).
  out.push(pack('juniper_egg','Egg juniper, narrow foot',4.5,juniper({seed:5405,radius:.39,outline:'eggfoot',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.09}));
  return out;

@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Fir Lab</title>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+<style>html,body{margin:0;background:#9fb8d0}canvas{display:block}</style></head><body>
+<script type="module">
+// FIR LAB: the forest firs side by side, the current species model against EZ-Tree firs, lit as the property page lights them.
+// ?view=near|stand  ?models=a,b,...  (names of assets/trees/ez/*.json, or 'fir'/'spruce'/'fir_back' for the current species)
+import * as THREE from 'three';
+import {installGrade} from '../assets/land-grade.mjs';
+import {buildTreeSpecies} from '../assets/forest/species.js';
+THREE.ColorManagement.enabled=false;
+const q=new URLSearchParams(location.search),view=q.get('view')||'near',names=(q.get('models')||'fir,ezfir_a,ezfir_b,ezspruce,ezfir_high,ezfir_young').split(',');
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.useLegacyLights=true;renderer.outputColorSpace=THREE.SRGBColorSpace;installGrade(THREE,renderer);document.body.append(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xc2d4e2);
+scene.add(new THREE.HemisphereLight(0xa9c6ff,0x2c2a1e,.5));const sun=new THREE.DirectionalLight(0xffedc8,1.95);sun.position.set(-1,.65,-.2);scene.add(sun);
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(4000,4000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x4e6a2c,roughness:1})));
+const tl=new THREE.TextureLoader(),tex=u=>{const t=tl.load(u);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;};
+const leafTex=tex('../assets/vegetation-lab/tex/pine_leaf.png'),barkTex=tex('../assets/vegetation-lab/tex/pine_color.jpg');
+const dec=(s,T)=>new T(Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer);
+async function ezModel(name){const d=await (await fetch('../assets/trees/ez/'+name+'.json')).json(),g=new THREE.Group();
+ d.parts.forEach((p,i)=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(dec(p.position,Float32Array),3));geo.setAttribute('normal',new THREE.BufferAttribute(dec(p.normal,Float32Array),3));geo.setAttribute('uv',new THREE.BufferAttribute(dec(p.uv,Float32Array),2));geo.setIndex(new THREE.BufferAttribute(dec(p.index,Uint32Array),1));
+  g.add(new THREE.Mesh(geo,i?new THREE.MeshStandardMaterial({map:leafTex,color:window.LEAF||0x7f9a7a,alphaTest:.35,side:THREE.DoubleSide,roughness:1}):new THREE.MeshStandardMaterial({map:barkTex,color:0x8a7a6a,roughness:1})));});
+ return g;}
+let species=null;
+async function model(name){if(name.startsWith('ez'))return ezModel(name);species??=await buildTreeSpecies('../assets/');const sp=species.find(s=>s.name===name);return sp.root.clone();}
+const H=22;
+if(view==='near'){
+ for(let i=0;i<names.length;i++){const m=await model(names[i]);m.scale.setScalar(H);m.position.set((i-(names.length-1)/2)*14,0,0);m.rotation.y=i*1.3;scene.add(m);}
+ const cam=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,1,5000);cam.position.set(0,26,(names.length*14)*.9);cam.lookAt(0,10,0);renderer.render(scene,cam);
+}else{
+ // a stand of each model, 40 trees on a 5 m jittered grid, heights 16-28 m, seen from 120 m off and 45 m up as from the drone
+ let s=7;const R=()=>((s=Math.imul(s,1664525)+1013904223>>>0)/4294967296);
+ for(let k=0;k<names.length;k++){const m=await model(names[k]);const ox=(k-(names.length-1)/2)*48;
+  for(let i=0;i<7;i++)for(let j=0;j<6;j++){const c=m.clone(),h=16+R()*12;c.scale.setScalar(h);c.position.set(ox+(i-3)*5.4+(R()-.5)*2.5,0,(j-3)*5.4+(R()-.5)*2.5);c.rotation.y=R()*6.28;scene.add(c);}}
+ const cam=new THREE.PerspectiveCamera(40,innerWidth/innerHeight,1,5000);cam.position.set(0,55,150+names.length*18);cam.lookAt(0,8,0);renderer.render(scene,cam);
+}
+document.title='ready';
+</script></body></html>
