@@ -104,7 +104,9 @@ function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=
 // Bush silhouettes, widest = 1, listed from the tip down to the ground. The real junipers here keep their skirts: every one is
 // widest right at the ground and narrows upward, and the forms differ only in how the top closes (pointed, egg, round, low, column).
 // (The outlines drawn on the frames averaged narrower at the foot, but that was grass hiding the base and hand-drawn corners rounding.)
-const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.12,0.36,0.5,0.61,0.71,0.78,0.85,0.91,0.95,0.98,1.0],"round":[0.12,0.49,0.64,0.75,0.83,0.89,0.93,0.97,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.12,0.51,0.63,0.72,0.78,0.84,0.88,0.92,0.95,0.98,1.0]};
+const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.12,0.36,0.5,0.61,0.71,0.78,0.85,0.91,0.95,0.98,1.0],"round":[0.12,0.49,0.64,0.75,0.83,0.89,0.93,0.97,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.12,0.51,0.63,0.72,0.78,0.84,0.88,0.92,0.95,0.98,1.0],
+ // the exception he pointed out (picture 12): some are widest a third of the way up and tuck in at the foot
+ "eggfoot":[0.12,0.4,0.62,0.8,0.93,1.0,0.99,0.93,0.84,0.76,0.7]};
 const fromTip=(list,y)=>{const u=Math.max(0,Math.min(.9999,1-y))*(list.length-1),i=Math.floor(u);return list[i]+(list[i+1]-list[i])*(u-i);};
 function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,clumps=0}){
  const r=rnd(seed+1),a={pos:[],nor:[],uv:[],col:[],idx:[]},own=[r()*6.283,r()*6.283],shape=outline&&OUTLINE_SHAPES[outline],
@@ -219,5 +221,7 @@ export async function buildTreeSpecies(baseUrl){
  out.push(pack('fir_back','Forest fir',22,conifer({seed:5203,radius:.21,tiers:22,perTier:10,droop:.8,pointed:.95,fade:.5,inner:'tufts'}),(()=>{const m=needle(0xffffff);m.map=firTuft;m.color.multiplyScalar(1.1);return m;})(),crownMat(firTile),{shape:CONE,sway:.05}));
  // Tall firs whose lower trunk is bare: the crown starts a third of the way up, with grey dead stubs on the trunk below, as on the forest edge.
  out.push(pack('fir_high','Fir, bare lower trunk',20,firTree({seed:5304,radius:.24,boughs:90,cards:9,crownBase:.32,dead:20}),boughLeaf(0xffffff),crownMat(firTile),{shape:CONE,sway:.05}));
+ // A juniper widest a third of the way up, narrower at the foot (the few the frames show that way).
+ out.push(pack('juniper_egg','Egg juniper, narrow foot',4.5,juniper({seed:5405,radius:.39,outline:'eggfoot',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.09}));
  return out;
 }

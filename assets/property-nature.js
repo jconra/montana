@@ -216,6 +216,8 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  }
  function place(group,p,rotation=0,id='prop:'+props.length,label='Property prop'){group.position.set(p.x,heightAt(p.x,p.z),p.z);group.rotation.y=rotation;scene.add(group);props.push({group,baseY:group.position.y,id,label});return group;}
  place(firepit(),CAMP_PROPS.fire,0,'prop:firepit','Campfire');place(picnic(),CAMP_PROPS.picnic,.1,'prop:picnic','Picnic table');place(woodStack(3.05,1.35,916),{x:-5.89,z:35.76},-.145,'prop:wood','Firewood stack');
+ // the second stack, crosswise to the first (marked on picture 7, placed by ray from the solved frame)
+ place(woodStack(3.05,1.35,917),{x:-8.79,z:35.52},-.145+Math.PI/2,'prop:wood-2','Firewood stack');
  // Ground clutter measured on the May mosaic and by rays from solved frames.
  [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
     [stoneRow(2.4,47),-5.28,6.9,-.25,'stones-boxes','Stone row'],[entryArch(),98.8,-101.7,-2.33,'entry-arch','Driveway entry arch'],[rockCage(.36,1,61),3.11,36.75,0,'rock-cage-1','Wire rock cage'],[rockCage(.34,.82,62),-25.4,15.7,0,'rock-cage-2','Wire rock cage'],[pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']

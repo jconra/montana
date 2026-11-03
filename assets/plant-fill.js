@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import {polygonDistance} from './property-layout.mjs';
 import {roadCoverage,grassPriority} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
+import {tallGrassCoverage} from './property-refinements.mjs';
 import {gradeLand} from './land-grade.mjs';
 const CHUNK=24,RADIUS=[28,42,58,78,100],DENSITY=[.25,.45,.7,.9,1];
 const FOOTPRINTS=[{x:8.78,z:-4.88,hx:11.2,hz:5.2,yaw:.15},{x:-30.73,z:-8.2,hx:4.6,hz:4.6,yaw:1.16},{x:-38.99,z:37.7,hx:3.2,hz:4,yaw:1.6},{x:-42.75,z:43.13,hx:1.6,hz:1.6,yaw:1.64},{x:-7.28,z:-4.67,hx:.9,hz:1.2,yaw:.03}];
@@ -60,7 +61,7 @@ export async function createPlantFill({scene,heightAt,fill}){
   sh.fragmentShader=`varying vec3 vFill;\n`+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n diffuseColor.rgb*=vFill;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.12,.18,.12);');
  };
  material.customProgramCacheKey=()=>'plant-fill-v2';
- const shapes={lush:tuft({blades:20,height:.36,width:.015,spread:.42,seed:11}),dry:tuft({blades:9,height:.16,width:.013,spread:.26,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
+ const shapes={lush:tuft({blades:28,height:.3,width:.0085,spread:.42,seed:11}),dry:tuft({blades:12,height:.14,width:.0075,spread:.26,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
  const inWater=(x,z)=>{let c=false;const w=data.water;for(let i=0,j=w.length-1;i<w.length;j=i++)if((w[i][1]>z)!==(w[j][1]>z)&&x<(w[j][0]-w[i][0])*(z-w[i][1])/(w[j][1]-w[i][1])+w[i][0])c=!c;return c;};
  const road=data.road,nearRoad=(x,z)=>{for(let i=1;i<road.length;i++){const a=road[i-1],b=road[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));if(Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<1.3)return true;}return false;};
  const clear=(x,z)=>{if(nearRoad(x,z))return false;for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}return polygonDistance(x,z)<-.6&&!inWater(x,z)&&roadCoverage(x,z)<.3;};
@@ -68,8 +69,9 @@ export async function createPlantFill({scene,heightAt,fill}){
  const add=(kind,x,z,size,height,col)=>{if(kind==='lush'||kind==='dry'||kind==='shrublet'){const keep=.5+.5*grassPriority(x,z);if(R()>keep)return;size*=1+(1-keep)*.4;}const k=kind+':'+Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={kind,x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,col,turn:R()*6.283,rank:R(),vary:R()});count[kind]=(count[kind]||0)+1;};
  const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
  const DEEP=[.12,.2,.06],LIME=[.2,.3,.09],OLIVE=[.19,.24,.09],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
- for(let i=0;i<data.h;i++)for(let j=0;j<data.w;j++){const cover=data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5);if(cover<.3)continue;
-  const X=data.x0+j,Z=data.z0+i,lush=at('lush',X+.5,Z+.5),dry=at('dry',X+.5,Z+.5),bare=at('bare',X+.5,Z+.5),live=cover*(1-bare)*(1-bare);
+ for(let i=0;i<data.h;i++)for(let j=0;j<data.w;j++){const T=tallGrassCoverage(data.x0+j+.5,data.z0+i+.5),cover=Math.max(T,data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5));if(cover<.3)continue;
+  // where he marked long lush grass, it is long lush grass whatever the frames' map read
+  const X=data.x0+j,Z=data.z0+i,lush=Math.max(T,at('lush',X+.5,Z+.5)),dry=at('dry',X+.5,Z+.5)*(1-T),bare=at('bare',X+.5,Z+.5)*(1-T),live=cover*(1-bare)*(1-bare);
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
   const nLush=lush*lush*20*live*(.55+.9*patch),nDry=dry*(5+lush*2)*live*(.45+1.1*patch),nShrub=dry*.1*live*(fine>.55?2:.4);
   const roll=(n,fn)=>{for(let q=Math.floor(n)+(R()<n%1?1:0);q>0;q--){const x=X+R(),z=Z+R();if(clear(x,z))fn(x,z);}};

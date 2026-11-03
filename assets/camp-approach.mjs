@@ -2,7 +2,7 @@
 // house-facing-cabin / garage-facing-southeast photos. Units are world metres.
 // Width is the half-width of the worn lane; wear fades out toward the fire pit.
 import {grassReclaim} from './driveway-refinements.mjs';
-import {tallGrassCoverage} from './property-refinements.mjs';
+import {tallGrassCoverage,shortGrassCoverage} from './property-refinements.mjs';
 import {dirtCoverage} from './driveway-measured.mjs';
 // Centers measured from solved drone cameras, facing each other across the lawn.
 export const HORSESHOES=[{x:-8.5,z:32.05},{x:-9.05,z:23.05}];
@@ -30,7 +30,7 @@ export function campSurface(x,z){
   const a=HORSESHOES[0],b=HORSESHOES[1],dx=b.x-a.x,dz=b.z-a.z,t=clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz));
   const court=1-smooth(2.4,4.4,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));
   const tallGrass=tallGrassCoverage(x,z);
-  const lawn=Math.max(grassReclaim(x,z),laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass);
+  const lawn=Math.max(Math.max(grassReclaim(x,z),laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass),shortGrassCoverage(x,z));
   const gravel=dirtCoverage(x,z);
   return {gravel,lawn,tallGrass,clear:gravel>.45,distance:best.distance,along:best.along};
 }

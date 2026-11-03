@@ -14,7 +14,7 @@ const FOOTPRINTS=[{x:8.78,z:-4.88,hx:11.2,hz:5.2,yaw:.15},{x:-30.73,z:-8.2,hx:4.
 export const STRAW_BUNCHES=[[-8.9,13.3,1.5],[-9.2,17.2,1.5],[-11,14.6,.8]];
 const hash=(x,z)=>{const s=Math.sin(x*127.1+z*311.7)*43758.5453;return s-Math.floor(s);};
 const vnoise=(x,z)=>{const i=Math.floor(x),j=Math.floor(z),f=x-i,g=z-j,u=f*f*(3-2*f),v=g*g*(3-2*g),a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;};
-function tuftGeometry(blades=13,segs=2,height=.22,width=.019,spread=.34){
+function tuftGeometry(blades=18,segs=2,height=.19,width=.0105,spread=.34){
  const pos=[],nor=[],aH=[],idx=[];let seed=7;const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
  for(let b=0;b<blades;b++){const a=rnd()*6.283,d=Math.sqrt(rnd())*spread,bx=Math.cos(a)*d,bz=Math.sin(a)*d,face=rnd()*6.283,lean=(rnd()-.5)*1.1,h=height*(.6+.8*rnd()),bend=(.55+.6*rnd())*h,c=Math.cos(face),s=Math.sin(face),lx=Math.cos(lean),lz=Math.sin(lean),base=pos.length/3;
   for(let i=0;i<=segs;i++){const t=i/segs,w=width*(1-.82*t),x=t*t*bend,y=(2*(1-t)*t*.62+t*t)*h;for(const e of [-1,1]){pos.push(bx+c*w*e+lx*x,y,bz-s*w*e+lz*x);nor.push(0,1,0);aH.push(t);}}
