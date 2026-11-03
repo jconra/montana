@@ -222,7 +222,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  // the second stack, crosswise to the first in an L on its south side (marked on picture 7; he moved it south of the ray's spot)
  place(woodStack(2.4,.8,917),{x:-6.4,z:37.9},-.145+Math.PI/2,'prop:wood-2','Firewood stack');
  // Ground clutter measured on the May mosaic and by rays from solved frames.
- [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-16,45.2,0,'brush-lawn','Brush pile'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
+ [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
     [stoneRow(2.4,47),-5.28,6.9,-.25,'stones-boxes','Stone row'],[entryArch(),98.8,-101.7,-2.33,'entry-arch','Driveway entry arch'],[rockCage(.36,1,61),3.11,36.75,0,'rock-cage-1','Wire rock cage'],[rockCage(.34,.82,62),-25.4,15.7,0,'rock-cage-2','Wire rock cage'],[pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
  ].forEach(([g,x,z,yaw,id,label])=>place(g,{x,z},yaw,'prop:'+id,label));
  // The two pale poles by the entry, measured on the drone mosaic. They lie along the slope: a straight piece levelled at its middle would dip under the ground and show as dashes.
