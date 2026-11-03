@@ -195,7 +195,7 @@ export function createGroundDetail(half,driveway,sunDir){
       // Pink-red bare soil on the back hill.
       {float pinkD=length((landUV-vec2(190.,-73.))/vec2(26.,16.));near=mix(near,vec3(.68,.55,.5)*(.86+fine.g*.28),(1.-smoothstep(.55,1.05,pinkD+(mid.r-.5)*.5+(fine.b-.5)*.35))*.85);}
       // (.74: the near ground measured 20-30% brighter than the July frames outside his outlines, views 01-03 most)
-      near=pow(max(near,vec3(.0)),vec3(2.2))/1.8*.74*mix(vec3(1.),vec3(1.,1.02,.8),greenish);
+      near=pow(max(near,vec3(.0)),vec3(2.2))/1.8*mix(.74,1.,road)*mix(vec3(1.),vec3(1.,1.02,.8),greenish*(1.-road));   // (the gravel keeps its own measured grey)
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
       vec4 moisture=texture2D(paintMoisture,paintUV),surfacePaint=texture2D(paintSurface,paintUV);
       near=mix(near,mix(${shown('#a89d72')},${shown('#578c30')},moisture.r)*(.8+fine.r*.4),moisture.a*.85);

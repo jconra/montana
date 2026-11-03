@@ -197,7 +197,7 @@ installGrade(THREE,renderer);
 {const chunk=THREE.ShaderChunk.fog_fragment,slot='float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );';
  if(!chunk.includes(slot))throw new Error('Aerial haze: three fog chunk not found');
  // (the haze is a mid blue, not the pale sky: the far ridges in the frames are about 86,93,111)
- THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = smoothstep( fogNear, fogFar, vFogDepth ); gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( .45, .5, .58 ), .72 * ( 1.0 - exp( - pow( vFogDepth / 600.0, 2.0 ) ) ) );');}
+ THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = smoothstep( fogNear, fogFar, vFogDepth ); gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( .42, .47, .58 ), .52 * ( 1.0 - exp( - pow( vFogDepth / 600.0, 2.0 ) ) ) );');}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fb8d0);
 const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1.5, 120000);
