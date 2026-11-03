@@ -142,7 +142,7 @@ function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=
 // Bush silhouettes, widest = 1, listed from the tip down to the ground. The real junipers here keep their skirts: every one is
 // widest right at the ground and narrows upward, and the forms differ only in how the top closes (pointed, egg, round, low, column).
 // (The outlines drawn on the frames averaged narrower at the foot, but that was grass hiding the base and hand-drawn corners rounding.)
-const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.12,0.36,0.5,0.61,0.71,0.78,0.85,0.91,0.95,0.98,1.0],"round":[0.12,0.49,0.64,0.75,0.83,0.89,0.93,0.97,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.12,0.51,0.63,0.72,0.78,0.84,0.88,0.92,0.95,0.98,1.0],
+const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.06,0.26,0.42,0.56,0.67,0.76,0.84,0.9,0.95,0.98,1.0],"round":[0.08,0.38,0.56,0.7,0.8,0.87,0.92,0.96,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.06,0.3,0.48,0.62,0.72,0.8,0.86,0.91,0.95,0.98,1.0],
  // the exception he pointed out (picture 12): some are widest a third of the way up and tuck in at the foot
  "eggfoot":[0.12,0.4,0.62,0.8,0.93,1.0,0.99,0.93,0.84,0.76,0.7]};
 const fromTip=(list,y)=>{const u=Math.max(0,Math.min(.9999,1-y))*(list.length-1),i=Math.floor(u);return list[i]+(list[i+1]-list[i])*(u-i);};
@@ -154,7 +154,8 @@ function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,
   base=y=>Math.max(.002,radius*(shape?fromTip(shape,y):egg?Math.pow(Math.max(0,1-Math.pow(y,egg)),.62):Math.pow(Math.max(0,1-y),1/pointed)*Math.min(1,.72+y*2.4))),
   // no two plants one shape: big masses bulge out and bite in round the crown, more so toward the top
   profile=(y,c=0)=>base(y)*(1+(.13+.3*y)*Math.sin(c*2+own[0]+y*3.1)+(.1+.16*y)*Math.sin(c*3+own[1]-y*7.3)+.09*Math.sin(c*5+own[0]*2+y*13))*(clumps?.8+.42*bump(y,c):1);
- tuftLayer(a,r,profile,{count,size,shadeAt:clumps?(y,c)=>.62+.62*bump(y,c):null,weight:shape?y=>fromTip(shape,y):null});
+ // (sprays reaching out past the mass at random make the ragged outline the frames show, not a smooth bullet)
+ tuftLayer(a,r,(y,c)=>profile(y,c)*(r()<.18?1.22:1),{count,size,shadeAt:clumps?(y,c)=>.62+.62*bump(y,c):null,weight:shape?y=>fromTip(shape,y):null});
  return {leaf:fromArrays(a.pos,a.nor,a.uv,a.col,a.idx),wood:crownShell({profile:(y,c)=>profile(y,c)*.84,seed:seed+3,tufts:50,lobes:9,rows:16,sides:18,tile:4})};
 }
 const FLAME={u0:0,u1:1,v0:0,v1:1};
@@ -206,7 +207,8 @@ function aspen({seed}){
  const r=rnd(seed),pos=[],nor=[],uv=[],col=[],idx=[];
  // Stems of one clone: thin, white, leaning a little apart, sharing a crown.
  const stems=[];for(let i=0;i<5;i++){const a=r()*6.283,d=i?.03+r()*.1:0;stems.push({x:Math.cos(a)*d,z:Math.sin(a)*d,lx:Math.cos(a)*(.07+r()*.13),lz:Math.sin(a)*(.07+r()*.13),h:i?.62+r()*.33:1,th:i?.004+r()*.0025:.006});}
- const clumps=[];for(let i=0;i<240;i++){const s=stems[Math.floor(r()*stems.length)],t=.3+r()*.7,y=t*s.h,sp=.24*(1-Math.abs(t-.58)*1.1),a=r()*6.283;clumps.push([s.x+s.lx*t+Math.cos(a)*sp*(.3+r()),y,s.z+s.lz*t+Math.sin(a)*sp*(.3+r()),.05+r()*.04]);}
+ // (the groves in the frames are opaque bright masses down to near the ground, white stems only showing at the foot)
+ const clumps=[];for(let i=0;i<380;i++){const s=stems[Math.floor(r()*stems.length)],t=.2+r()*.8,y=t*s.h,sp=.27*(1-Math.abs(t-.56)*1.05),a=r()*6.283;clumps.push([s.x+s.lx*t+Math.cos(a)*sp*(.3+r()),y,s.z+s.lz*t+Math.sin(a)*sp*(.3+r()),.06+r()*.05]);}
  const card=(cx,cy,cz,nx,ny,nz,s,shade)=>{const q=pos.length/3,u=[r()-.5,r()-.5,r()-.5],lu=Math.hypot(...u)||1;u.forEach((_,i)=>u[i]/=lu);
   const v=[u[1]*nz-u[2]*ny,u[2]*nx-u[0]*nz,u[0]*ny-u[1]*nx],lv=Math.hypot(...v)||1;v.forEach((_,i)=>v[i]/=lv);
   for(const [e,f] of [[-1,-1],[1,-1],[-1,1],[1,1]]){pos.push(cx+(u[0]*e+v[0]*f)*s,cy+(u[1]*e+v[1]*f)*s,cz+(u[2]*e+v[2]*f)*s);nor.push(nx,ny,nz);uv.push((e+1)/2,(f+1)/2);col.push(shade,shade,shade);}
@@ -250,7 +252,7 @@ export async function buildTreeSpecies(baseUrl){
  out.push(pack('fir_small','Young fir',9,sprayFir({seed:4303,radius:.32,whorls:22,perWhorl:5,sprays:4,pointed:.85,fade:.35}),sprayLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,wideBase:1.3,sway:.1}));
- {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.68,.71,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
+ {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.8,.87,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.36,tip:.3,olive:0,under:0,glow:0},coverage:true,sway:.2}));}
  out.push(pack('open_fir','Open fir',18,sprayFir({seed:4606,radius:.27,whorls:40,perWhorl:6,sprays:5,sparse:.08,pointed:.8,dead:12}),sprayLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,sway:.06}));
  out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.28,outline:'column',clumps:24,count:460,size:.075}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.07}));

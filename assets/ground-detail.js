@@ -187,9 +187,10 @@ export function createGroundDetail(half,driveway,sunDir){
       grain=mix(grain,(gA*.45+gB*.25+texture2D(tileGreen,w2/1.7).rgb*.3),mown);
       grain=mix(grain,texture2D(tileRoad,landUV/3.3).rgb*.6+texture2D(tileRoad,w2/8.3).rgb*.4,road);
       near*=mix(vec3(1.),grain*2.,close);
-      // Hill ground: an olive green with tan in it, as the July frames show; no lime up on the slopes. The low ground keeps its full green.
+      // Hill ground: an olive green with some tan in it, as the July frames show (the critic found it too straw); no lime up on
+      // the slopes. The low ground keeps its full green.
       float upHill=smoothstep(.012,.06,1.-abs(normalize(detailNormal).y))*smoothstep(146.,158.,detailWorld.y)*(1.-road)*(1.-mown);
-      near=mix(near,vec3(dot(near,vec3(.36,.42,.22)))*vec3(1.,1.05,.66),max(upHill*.62,greenish<.5?.3*(1.-road)*(1.-mown):0.));
+      near=mix(near,vec3(dot(near,vec3(.36,.42,.22)))*vec3(.94,1.08,.62),max(upHill*.42,greenish<.5?.22*(1.-road)*(1.-mown):0.));
       // Pink-red bare soil on the back hill.
       {float pinkD=length((landUV-vec2(190.,-73.))/vec2(26.,16.));near=mix(near,vec3(.68,.55,.5)*(.86+fine.g*.28),(1.-smoothstep(.55,1.05,pinkD+(mid.r-.5)*.5+(fine.b-.5)*.35))*.85);}
       near=pow(max(near,vec3(.0)),vec3(2.2))/1.8;
