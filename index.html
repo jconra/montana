@@ -727,7 +727,7 @@ const treeAssetsReady=(async()=>{
   try{
     treeSpecies=await buildTreeSpecies();
     // WebGL1 can only make the smaller copies of a square power-of-two atlas: 8 views of 256 px.
-    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:16,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,shadows:true,wind:true,
+    forest=new Forest(renderer,scene,{species:treeSpecies,fixed:[],heightAt,grid:WEBGL2?12:8,cell:WEBGL2?192:256,imposterAt:LOD_DIST,band:16,ahead:.6,spread:.5,nearCap:500,nearBudget:MAX_DETAIL,sizeRef:14,shadows:true,wind:true,
       sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;

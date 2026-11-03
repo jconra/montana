@@ -132,9 +132,9 @@ export class Forest {
   // yaw, tint (optional THREE.Color) } to plant instead of the endless tiles; `heightAt(x, z)` stands them on uneven ground.
   constructor(renderer, scene, { base = '/models/trees/', tile = 420, tiles = 7, perTile = 90, imposterAt = 140, band = 40, ahead = 0.75,
                                  grid = 12, cell = 192, light = false, detail = 'coarse', clear = null, sunDir = new THREE.Vector3(0.5, 1, 0.3), shadows = false,
-                                 species = null, fixed = null, heightAt = null, nearCap = 400, wind = false, spread = 0, shadowEdge = null, nearBudget = Infinity } = {}) {
+                                 species = null, fixed = null, heightAt = null, nearCap = 400, wind = false, spread = 0, shadowEdge = null, nearBudget = Infinity, sizeRef = 0 } = {}) {
     this.wind = wind;                   // sway in the shared breeze (src/objects/wind.js); a species' `sway` (0..1, default 1) says how much
-    Object.assign(this, { renderer, scene, base, tile, tiles, perTile, imposterAt: light ? 0 : imposterAt, band, ahead, spread, grid: light ? 8 : grid, cell, detail, clear, sunDir, shadows: shadows && !light, light, fixed, heightAt, nearCap, nearBudget });
+    Object.assign(this, { renderer, scene, base, tile, tiles, perTile, imposterAt: light ? 0 : imposterAt, band, ahead, spread, grid: light ? 8 : grid, cell, detail, clear, sunDir, shadows: shadows && !light, light, fixed, heightAt, nearCap, nearBudget , sizeRef});
     this.group = new THREE.Group(); scene.add(this.group);
     this.species = (species || FOREST_SPECIES).map(s => ({ ...s }));
     this.tilesLaid = new Map();          // "tx,tz" -> [{ pos, yaw, scale, tint, sp }]
@@ -378,7 +378,11 @@ export class Forest {
       for (let k = 0; k < trees.length; k++) { const t = trees[k], p = t.pos, dx = p.x - cam.x, dy = p.y - cam.y, dz = p.z - cam.z, d2 = dx * dx + dy * dy + dz * dz;
         if (d2 >= reach2 || t.hidden) continue;
         if (t.sw === undefined) t.sw = switchHash(p.x, p.z);              // (0..1, fixed by where the tree stands)
-        cand.push({ bi, k, t, rank: Math.sqrt(d2) - (dx * fwd.x + dz * fwd.z) * lean, sw: t.sw - 0.5 }); } }
+        // a tall tree fills more of the view than a short one at the same distance: its rank is shortened, a small one's
+        // lengthened, so the meshes go to the trees that would show the imposter's blur (a big fir beside the camera stayed an
+        // imposter while the budget went to small trees under the canopy). sizeRef (option, metres): the height ranked as plain distance.
+        const hM = t.scale * (this.built[bi].sp.unit || 1) * (this.built[bi].sp.boxH || 1), sizeK = this.sizeRef ? THREE.MathUtils.clamp(Math.sqrt(this.sizeRef / Math.max(hM, 1)), 0.55, 1.6) : 1;
+        cand.push({ bi, k, t, rank: (Math.sqrt(d2) - (dx * fwd.x + dz * fwd.z) * lean) * sizeK, sw: t.sw - 0.5 }); } }
     // the circle that holds the budget: the budget-th rank, band included. (Eased, so one tree crossing can't jerk it.)
     let cut = D;
     if (cand.length > this.nearBudget) { const ranks = cand.map(c => c.rank + c.sw * S * cut0).sort((a, b) => a - b); cut = Math.max(4, ranks[Math.max(0, this.nearBudget - 1)]); }

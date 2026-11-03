@@ -113,7 +113,8 @@ function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,p
     const t=.3+.7*(k+.5)/sprays+(r()-.5)*.08,px=cy*ex*t,pz=sy*ex*t,py=y+ey*t,s=Math.max(len*spraySize,radius*.2*(1-f*.4))*(.7+.55*r())*(.8+.35*t)+.012;
     // each spray two crossed cards: one lying flat (seen from the drone), one tipped up on edge (seen from the side)
     const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t);
-    addBranch(L,[px,py,pz],sy2,s,s*.72,dp,-.05,(r()-.5)*.7,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.62,dp,-.05,1.2+(r()-.5)*.6,1,sh*.9,FLAME);
+    const tilt=f>.6?(r()<.5?1:-1)*(.5+.6*r())*(f-.6)/.4:0;
+    addBranch(L,[px,py,pz],sy2,s,s*.72,dp-(f>.6?.35*(f-.6)/.4:0),-.05,(r()-.5)*.7+tilt,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.62,dp,-.05,1.2+(r()-.5)*.6,1,sh*.9,FLAME);
    }
    const tl=len*spraySize*.9+.01;addBranch(L,[cy*ex,y+ey,sy*ex],yaw+(r()-.5)*.4,tl,tl*.7,-.15,-.06,(r()-.5)*.6,1,light*1.08,FLAME);
    // close in by the trunk: shaded sprays, so no bare pole shows up the middle
@@ -243,8 +244,8 @@ export async function buildTreeSpecies(baseUrl){
  // and foot: each tree lit as one cone, not tier by tier, which read as stripes; half of each spray's own outward normal is kept)
  const CONE={...lump,lump:2.4,mix:.55,dark:.8,tip:.28};
  const out=[];
- out.push(pack('fir','Full fir',22,sprayFir({seed:4101,radius:.28,whorls:36,perWhorl:5,sprays:4,dead:16}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
- out.push(pack('spruce','Narrow spruce',24,sprayFir({seed:4202,radius:.22,whorls:40,perWhorl:5,sprays:4,pointed:.95,droop:.4,dead:14}),sprayLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
+ out.push(pack('fir','Full fir',22,sprayFir({seed:4101,radius:.28,whorls:50,perWhorl:6,sprays:6,dead:16}),sprayLeaf(0xffffff),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
+ out.push(pack('spruce','Narrow spruce',24,sprayFir({seed:4202,radius:.22,whorls:52,perWhorl:6,sprays:6,pointed:.95,droop:.4,dead:14}),sprayLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,coverage:true,sway:.05}));
  out.push(pack('fir_small','Young fir',9,sprayFir({seed:4303,radius:.32,whorls:22,perWhorl:5,sprays:4,pointed:.85,fade:.35}),sprayLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},coverage:true,sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,wideBase:1.3,sway:.1}));
