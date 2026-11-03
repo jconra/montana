@@ -96,7 +96,7 @@ export function migrateTreeAsset(record,kindOf){
 
 // A plant's own measured colour. A record may carry `tone`: its crown's average colour in sunlight as '#rrggbb'. The model is then tinted so
 // its average comes out at that colour; TONE_REF is a rough average of each model untinted, by eye from one render per kind, so treat a tone as close, not exact.
-export const TONE_REF={fir:'#2f3a22',fir_back:'#2f3a22',fir_high:'#2f3a22',fir_bare:'#2f3a22',juniper_egg:'#4c5c32',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#8d8a82'};
+export const TONE_REF={fir:'#2f3a22',fir_back:'#2f3a22',fir_high:'#2f3a22',fir_bare:'#2f3a22',juniper_egg:'#4c5c32',spruce:'#2c382c',fir_small:'#36422a',juniper:'#4c5c32',aspen:'#7d8652',open_fir:'#3a4628',juniper_column:'#4c5c32',juniper_low:'#4c5c32',juniper_cone:'#4c5c32',juniper_pyramid:'#4c5c32',snag:'#6e6b66'};
 export function toneTint(kind,tone){
  if(typeof tone!=='string'||!/^#[0-9a-f]{6}$/i.test(tone))return null;
  const ref=TONE_REF[kind]||'#4c5c32',ch=(h,i)=>Math.pow(parseInt(h.substr(1+i*2,2),16)/255,2.2);

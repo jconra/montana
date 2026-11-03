@@ -181,16 +181,18 @@ function tuftTexture(image,seed){
  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;return t;
 }
 // A dead tree as the census crop shows it: a silver trunk whose limbs fork again and again, the upper ones broken short.
+// A big dead conifer as the drone frames show the swing tree: a dark barked trunk, grey limbs all the way up (the lower ones
+// drooping, the upper ones shorter and reaching up), each forking twice. (It was a pale trunk with a few limbs: it read as a birch.)
 function snag({seed}){
- const r=rnd(seed),silver=[.62,.60,.55],parts=[],Y=new THREE.Vector3(0,1,0),q=new THREE.Quaternion(),d=new THREE.Vector3();
+ const r=rnd(seed),silver=[.33,.325,.31],bark=[.075,.05,.038],parts=[],Y=new THREE.Vector3(0,1,0);
  const limb=(x,y,z,dir,len,rad,depth)=>{
-  d.copy(dir).normalize();const g=lathe([[0,rad],[len,rad*.62]],depth>1?3:5,silver);q.setFromUnitVectors(Y,d);g.applyQuaternion(q);g.translate(x,y,z);parts.push(g);
-  const ex=x+d.x*len,ey=y+d.y*len,ez=z+d.z*len;if(depth>=3)return;
-  const forks=depth===0?1:2;
-  for(let i=0;i<forks;i++){const a=r()*6.283,k=.55+r()*.5,n=new THREE.Vector3(d.x+Math.cos(a)*k,d.y*.8+(r()-.35)*.4,d.z+Math.sin(a)*k);limb(ex,ey,ez,n,len*(.5+r()*.25),rad*.6,depth+1);}
+  const d=dir.clone().normalize(),g=lathe([[0,rad],[len,rad*.62]],depth>1?3:4,silver);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(Y,d));g.translate(x,y,z);parts.push(g);
+  if(depth>=3)return;const ex=x+d.x*len,ey=y+d.y*len,ez=z+d.z*len;
+  for(let i=0;i<2;i++){const a=r()*6.283,k=.5+r()*.5;limb(ex,ey,ez,new THREE.Vector3(d.x+Math.cos(a)*k,d.y*.7+(r()-.4)*.5,d.z+Math.sin(a)*k),len*(.45+r()*.25),rad*.6,depth+1);}
  };
- parts.push(lathe([[0,.024],[.35,.017],[.7,.01],[.95,.003]],6,silver));
- for(let i=0;i<13;i++){const y=.22+i*.055+r()*.03,a=i*2.399+r(),l=(.2+r()*.14)*(1.1-y*.75);limb(0,y,0,new THREE.Vector3(Math.cos(a),.35+r()*.7,Math.sin(a)),l*.55,.0075*(1.15-y*.6),1);}
+ parts.push(lathe([[0,.024],[.35,.017],[.7,.01],[.95,.003]],6,bark));
+ for(let i=0;i<24;i++){const y=.14+i*.034+r()*.02,a=i*2.399+r(),l=(.16+r()*.12)*(1.15-y*.8),up=y<.45?-.45+r()*.4:-.1+r()*.8;
+  limb(0,y,0,new THREE.Vector3(Math.cos(a),up,Math.sin(a)),l*.6,.0068*(1.15-y*.6),1);}
  return mergeGeometries(parts);
 }
 
