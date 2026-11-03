@@ -41,7 +41,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
    vec3 transformed=iPos+vec3(mc*p.x+ms*p.z,p.y,-ms*p.x+mc*p.z);
    transformed.xz+=vec2(sin(meadowTime*1.3+iPos.x*.31+iPos.z*.17),cos(meadowTime*1.1+iPos.z*.27))*aH*aH*p.y*.22;
    vTone=iTone;vH=aH;vRoot=iPos.xz;`);
-  sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12);').replace('#include <color_fragment>',`
+  sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.07,.15,.05);').replace('#include <color_fragment>',`
    float wet=vTone.x;vec4 moisture=texture2D(paintMoisture,vec2(vRoot.x/(2.*paintHalf)+.5,.5-vRoot.y/(2.*paintHalf)));wet=mix(wet,mix(.12,.92,moisture.r),moisture.a*.85);
    vec3 c=mix(${shown('#ab9a70')},${shown('#a2a06c')},smoothstep(.15,.36,wet));c=mix(c,${shown('#8c9a55')},smoothstep(.36,.52,wet));c=mix(c,${shown('#6f9440')},smoothstep(.52,.68,wet));c=mix(c,${shown('#567f34')},smoothstep(.68,.95,wet));
    // the July frames: brilliant green in some patches, deeper or yellower green in others, never one flat colour
@@ -50,7 +50,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
    patchGreen=mix(patchGreen,${shown('#2f6a2a')},smoothstep(.6,.95,pc)*.45);
    c=mix(c,patchGreen,smoothstep(.45,.8,wet)*.9);
    c=mix(c,${shown('#c2b080')},vTone.y);
-   c*=mix(.74,1.28,smoothstep(.0,1.,vH))*(.86+.28*fract(vTone.z*7.3));
+   c*=vec3(1.,1.03,.76)*mix(.54,.98,smoothstep(.0,1.,vH))*(.86+.28*fract(vTone.z*7.3));   // (blades were 15-30% brighter than the July frames' grass)
    diffuseColor.rgb=c;
    vec2 castUV=vRoot/(2.*castHalf)+.5;vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
    vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;

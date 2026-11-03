@@ -207,7 +207,8 @@ controls.enableDamping = true;
 
 // Evening sun from just north of west, as in the May frames: long shadows across the lawn. Warm sun, cool shade.
 const SUN_DIR=new THREE.Vector3(-1,.65,-.2).normalize();
-scene.add(new THREE.HemisphereLight(0xa9c6ff,0x2c2a1e,0.5));
+// (sky light less blue than it was: every model's ground came out 20-30 bluer than the frames, measured outside his outlines)
+scene.add(new THREE.HemisphereLight(0xb6c5d6,0x2c2a1e,0.5));
 const sun = new THREE.DirectionalLight(0xffedc8,1.95); sun.position.copy(SUN_DIR); scene.add(sun);scene.add(sun.target);
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;
 sun.shadow.bias=-.00015;sun.shadow.normalBias=.12;

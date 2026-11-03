@@ -57,8 +57,8 @@ export async function createPlantFill({scene,heightAt,fill}){
    float mc=cos(iTurn.x),ms=sin(iTurn.x);vec3 p=position*iTurn.y*fillGrow;p.y*=iTurn.z;
    vec3 transformed=iPos+vec3(mc*p.x+ms*p.z,p.y,-ms*p.x+mc*p.z);
    transformed.xz+=vec2(sin(fillTime*1.2+iPos.x*.31+iPos.z*.17),cos(fillTime*1.05+iPos.z*.27))*aH*aH*p.y*.16;
-   vFill=iCol*mix(.84,1.08,aH);`);
-  sh.fragmentShader=`varying vec3 vFill;\n`+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n diffuseColor.rgb*=vFill;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.12,.18,.12);');
+   vFill=iCol*vec3(1.,1.03,.78)*mix(.64,.88,aH);`);
+  sh.fragmentShader=`varying vec3 vFill;\n`+sh.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\n diffuseColor.rgb*=vFill;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.09,.14,.05);');
  };
  material.customProgramCacheKey=()=>'plant-fill-v2';
  const shapes={lush:tuft({blades:28,height:.3,width:.0085,spread:.42,seed:11}),dry:tuft({blades:12,height:.14,width:.0075,spread:.26,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};

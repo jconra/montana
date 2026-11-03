@@ -160,8 +160,9 @@ export function createGroundDetail(half,driveway,sunDir){
       road*=1.-smoothstep(9.,18.5,landUV.y)*smoothstep(.15,.55,fine.b*.6+tiny.g*.4+(landUV.y-14.)*.05)*step(landUV.x,-8.);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
       float drawn=road*smoothstep(-1.,2.,landUV.x);
-      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);drawn=max(drawn,centre*(1.-tuftsHere));
-      near=mix(near,vec3(.79,.76,.71)*(.88+fine.r*.24),drawn*.95);
+      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);near*=1.-centre*tuftsHere*.25;drawn=max(drawn,centre*(1.-tuftsHere));
+      // (the gravel measured 143,141,141 in the July frames, a neutral mid grey; it was drawn 176,173,153)
+      near=mix(near,vec3(.66,.65,.64)*(.88+fine.r*.24),drawn*.95);
       // The apron: its colour is drawn, so the shadows the drone caught on it stay out of the map. Pale scuffed middle, tyre arcs, gravel grain.
       float apron=road*(1.-smoothstep(-1.,3.,landUV.x));
       if(apron>0.){vec2 apronUV=(landUV-apronMin)/apronSize;vec2 apronMark=texture2D(apronMap,vec2(apronUV.x,1.-apronUV.y)).rg;
@@ -193,7 +194,8 @@ export function createGroundDetail(half,driveway,sunDir){
       near=mix(near,vec3(dot(near,vec3(.36,.42,.22)))*vec3(.94,1.08,.62),max(upHill*.42,greenish<.5?.22*(1.-road)*(1.-mown):0.));
       // Pink-red bare soil on the back hill.
       {float pinkD=length((landUV-vec2(190.,-73.))/vec2(26.,16.));near=mix(near,vec3(.68,.55,.5)*(.86+fine.g*.28),(1.-smoothstep(.55,1.05,pinkD+(mid.r-.5)*.5+(fine.b-.5)*.35))*.85);}
-      near=pow(max(near,vec3(.0)),vec3(2.2))/1.8;
+      // (.74: the near ground measured 20-30% brighter than the July frames outside his outlines, views 01-03 most)
+      near=pow(max(near,vec3(.0)),vec3(2.2))/1.8*.74*mix(vec3(1.),vec3(1.,1.02,.8),greenish);
       vec2 paintUV=vec2(landUV.x/(2.*paintHalf)+.5,.5-landUV.y/(2.*paintHalf));
       vec4 moisture=texture2D(paintMoisture,paintUV),surfacePaint=texture2D(paintSurface,paintUV);
       near=mix(near,mix(${shown('#a89d72')},${shown('#578c30')},moisture.r)*(.8+fine.r*.4),moisture.a*.85);
