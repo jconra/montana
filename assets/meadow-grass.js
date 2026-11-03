@@ -44,6 +44,11 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
   sh.fragmentShader=`uniform sampler2D paintMoisture,castShade;uniform float paintHalf,castHalf,castStrength;varying vec3 vTone;varying float vH;varying vec2 vRoot;\n`+sh.fragmentShader.replace('#include <normal_fragment_begin>','vec3 normal=normalize(vNormal);vec3 nonPerturbedNormal=normal;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vec3(.08,.2,.12);').replace('#include <color_fragment>',`
    float wet=vTone.x;vec4 moisture=texture2D(paintMoisture,vec2(vRoot.x/(2.*paintHalf)+.5,.5-vRoot.y/(2.*paintHalf)));wet=mix(wet,mix(.12,.92,moisture.r),moisture.a*.85);
    vec3 c=mix(${shown('#ab9a70')},${shown('#a2a06c')},smoothstep(.15,.36,wet));c=mix(c,${shown('#8c9a55')},smoothstep(.36,.52,wet));c=mix(c,${shown('#6f9440')},smoothstep(.52,.68,wet));c=mix(c,${shown('#567f34')},smoothstep(.68,.95,wet));
+   // the July frames: brilliant green in some patches, deeper or yellower green in others, never one flat colour
+   float pa=sin(vRoot.x*.105+sin(vRoot.y*.067)*2.1)*.5+.5,pb=sin(vRoot.y*.13-vRoot.x*.052+sin(vRoot.x*.088)*1.7)*.5+.5,pc=sin((vRoot.x+vRoot.y)*.031+1.3)*.5+.5;
+   vec3 patchGreen=mix(mix(${shown('#3f7f22')},${shown('#64b02c')},smoothstep(.25,.75,pa)),${shown('#8fac34')},smoothstep(.55,.95,pb)*.55);
+   patchGreen=mix(patchGreen,${shown('#2f6a2a')},smoothstep(.6,.95,pc)*.45);
+   c=mix(c,patchGreen,smoothstep(.45,.8,wet)*.9);
    c=mix(c,${shown('#c2b080')},vTone.y);
    c*=mix(.74,1.28,smoothstep(.0,1.,vH))*(.86+.28*fract(vTone.z*7.3));
    diffuseColor.rgb=c;

@@ -168,10 +168,11 @@ export function createGroundDetail(half,driveway,sunDir){
        vec3 gravel=mix(vec3(.72,.65,.6),vec3(.84,.78,.72),apronMark.g)*(.9+fine.r*.12+tiny.b*.1);gravel*=1.-apronMark.r*.27*smoothstep(.32,.62,fine.b*.6+tiny.g*.4);near=mix(near,gravel,apron);apronLift=apron;}
       // Lush ground has no dirt showing: a green mat under the blades, wherever the frames' plant map says lush.
       vec2 lushUV=(landUV-lushMin)/lushSize;float lushHere=texture2D(lushMap,lushUV).r*step(0.,lushUV.x)*step(lushUV.x,1.)*step(0.,lushUV.y)*step(lushUV.y,1.);
-      near=mix(near,vec3(.4,.53,.23)*(.82+fine.g*.26+tiny.r*.12),smoothstep(.1,.42,lushHere+(fine.r-.5)*.25)*(1.-road)*.92);
+      vec3 lushMat=mix(mix(vec3(.27,.5,.12),vec3(.4,.67,.13),smoothstep(.3,.7,fine.b)),vec3(.5,.6,.17),smoothstep(.55,.8,mid.g)*.5);
+      near=mix(near,lushMat*(.84+fine.g*.24+tiny.r*.12),smoothstep(.1,.42,lushHere+(fine.r-.5)*.25)*(1.-road)*.92);
       // Mown lawn: no stripes. A dull soft green with pale dry mottling and the odd worn spot, as in the July frames.
       float mown=smoothstep(.25,.6,masks.g)*(1.-smoothstep(.05,.4,masks.r));
-      if(mown>0.){float mott=mid.g*.55+fine.b*.45;vec3 sward=mix(vec3(.43,.585,.24),vec3(.5,.645,.28),smoothstep(.3,.7,fine.r));sward=mix(sward,vec3(.56,.62,.32),smoothstep(.56,.74,mott)*.55);sward=mix(sward,vec3(.64,.6,.4),smoothstep(.68,.76,mid.a*.6+tiny.g*.4)*.6);near=mix(near,sward,mown*.93);}
+      if(mown>0.){float mott=mid.g*.55+fine.b*.45;vec3 sward=mix(vec3(.34,.6,.15),vec3(.44,.69,.17),smoothstep(.3,.7,fine.r));sward=mix(sward,vec3(.5,.64,.22),smoothstep(.56,.74,mott)*.5);sward=mix(sward,vec3(.28,.52,.14),smoothstep(.6,.85,mid.b)*.5);sward=mix(sward,vec3(.64,.6,.4),smoothstep(.68,.76,mid.a*.6+tiny.g*.4)*.6);near=mix(near,sward,mown*.93);}
       // Past the grass blades (they end some 60 m out), tall lush grass still shows its texture as in the July frames: streaks where it
       // lies over in the wind, paler tips, darker hollows. Costs nothing but two texture reads, so the far lawn is never a flat colour.
       float grassFar=smoothstep(.1,.42,lushHere)*(1.-road)*(1.-mown)*smoothstep(35.,65.,distance(cameraPosition,detailWorld));

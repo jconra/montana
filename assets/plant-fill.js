@@ -68,14 +68,14 @@ export async function createPlantFill({scene,heightAt,fill}){
  const cells=new Map(),count={};
  const add=(kind,x,z,size,height,col)=>{if(kind==='lush'||kind==='dry'||kind==='shrublet'){const keep=.5+.5*grassPriority(x,z);if(R()>keep)return;size*=1+(1-keep)*.4;}const k=kind+':'+Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={kind,x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,col,turn:R()*6.283,rank:R(),vary:R()});count[kind]=(count[kind]||0)+1;};
  const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
- const DEEP=[.12,.2,.06],LIME=[.2,.3,.09],OLIVE=[.19,.24,.09],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
+ const DEEP=[.12,.2,.06],LIME=[.2,.3,.09],OLIVE=[.19,.24,.09],BRILLIANT=[.2,.38,.06],EMERALD=[.09,.24,.06],YELLOWGREEN=[.27,.33,.07],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
  for(let i=0;i<data.h;i++)for(let j=0;j<data.w;j++){const T=tallGrassCoverage(data.x0+j+.5,data.z0+i+.5),cover=Math.max(T,data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5));if(cover<.3)continue;
   // where he marked long lush grass, it is long lush grass whatever the frames' map read
   const X=data.x0+j,Z=data.z0+i,lush=Math.max(T,at('lush',X+.5,Z+.5)),dry=at('dry',X+.5,Z+.5)*(1-T),bare=at('bare',X+.5,Z+.5)*(1-T),live=cover*(1-bare)*(1-bare);
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
   const nLush=lush*lush*20*live*(.55+.9*patch),nDry=dry*(5+lush*2)*live*(.45+1.1*patch),nShrub=dry*.1*live*(fine>.55?2:.4);
   const roll=(n,fn)=>{for(let q=Math.floor(n)+(R()<n%1?1:0);q>0;q--){const x=X+R(),z=Z+R();if(clear(x,z))fn(x,z);}};
-  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),c=mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.45),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),pa=vnoise(x*.035+11,z*.035),pb=vnoise(x*.06-7,z*.06+3),patch=mix(mix(EMERALD,BRILLIANT,Math.min(1,Math.max(0,(pa-.25)*2))),YELLOWGREEN,Math.max(0,pb-.55)*1.2),c=mix(mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.25),patch,.6),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72),[c[0]*v,c[1]*v,c[2]*v]);});
   roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5),[c[0]*v,c[1]*v,c[2]*v]);});
   roll(nShrub,(x,z)=>{const c=mix(SILVER,PALE,R());add('shrublet',x,z,.7+R()*.7,.75+R()*.6,c);});
   const grassy=(lush+dry*.6)*live,drift=vnoise(X*.07+31,Z*.07-9)*.7+vnoise(X*.3,Z*.3)*.3,w=at('white',X+.5,Z+.5);
