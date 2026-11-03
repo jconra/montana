@@ -203,7 +203,7 @@ const LOOKUP = `
       varying vec2 vQuad; varying vec2 vFrame; varying vec3 vTint; varying float vFade; varying float vYaw; varying vec3 vViewPos; varying vec3 vToCamView; varying float vRadius; varying vec4 vShadowToCam; varying vec4 vShadowToSun; varying vec2 vLand;
       varying vec2 vC0; varying vec2 vC1; varying vec2 vC2; varying vec3 vW; varying vec2 vP0; varying vec2 vP1; varying vec2 vP2;
       uniform mat4 projectionMatrix; uniform float useDepth; uniform float parallax; uniform float halfWc; uniform float halfHc;
-      vec4 cellSampleAt(sampler2D t, vec2 cell, vec2 q) { vec2 uv = (cell + clamp(q, 0.002, 0.998)) / grid; return texture2D(t, uv); }
+      vec4 cellSampleAt(sampler2D t, vec2 cell, vec2 q) { vec2 uv = (cell + clamp(q, 0.002, 0.998)) / grid; return texture2D(t, uv, -0.75); }   // (a sharper mip: the far firs read as soft cut-outs, the frames show their branch texture)
       vec4 cellSample(sampler2D t, vec2 cell) { return cellSampleAt(t, cell, vQuad); }
       // one cell's colour and normal, the sample shifted by the pixel's depth times the view offset
       // (the depth read first at the unshifted spot: one extra read)

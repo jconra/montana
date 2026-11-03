@@ -72,8 +72,9 @@ export function toneTint(kind,tone){
 // 64,70,68, so this darkened the warm channels; the critic's third round measured the forest as a whole at L 68-78 against
 // the photos' 42-58; seen from above (view 05) the near canopy is a deep plain green (44,52,38), the blue-grey comes only
 // with distance, from the haze. So the firs are dark green and the haze does the cooling. Junipers turn a little cooler: the frames show
-// them blue-green, the model drew them olive.
-const FIR_SKY=[.45,.47,.75],FIR_SKY0=[.8,.98,1.22];
+// them blue-green, the model drew them olive; the critic's fifth round measured sunlit junipers yellow-olive (70,76,40) and the
+// model's ~10 L too dark and grey, so they are lifted and warmed.
+const FIR_SKY=[.45,.47,.75],FIR_SKY0=[1.08,1.14,.86];
 export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
 export function evergreenTone(id,juniper=false){
  const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.06?0:a<.26?1:a<.66?2:a<.98?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.8:.74)+b*.3,red=juniper?.9:.97;

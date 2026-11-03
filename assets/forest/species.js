@@ -112,7 +112,7 @@ function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,p
    for(let k=0;k<sprays;k++){
     const t=.3+.7*(k+.5)/sprays+(r()-.5)*.08,px=cy*ex*t,pz=sy*ex*t,py=y+ey*t,s=Math.max(len*spraySize,radius*.2*(1-f*.4))*(.7+.55*r())*(.8+.35*t)+.012;
     // each spray two crossed cards: one lying flat (seen from the drone), one tipped up on edge (seen from the side)
-    const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t);
+    const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t)*(t>.6&&r()<.45?1.45:1);
     const tilt=f>.6?(r()<.5?1:-1)*(.5+.6*r())*(f-.6)/.4:0;
     // (rolled well off the flat both ways, so a fir seen level from the side, as down the hill, is foliage and not a ladder of slabs)
     addBranch(L,[px,py,pz],sy2,s,s*.72,dp-(f>.6?.35*(f-.6)/.4:0),-.05,(r()-.5)*1.6+tilt,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.66,dp,-.05,(r()<.5?1:-1)*(1.15+r()*.45),1,sh*.9,FLAME);
