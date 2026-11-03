@@ -56,33 +56,38 @@ function lathe(profile,sides,color){
  return fromArrays(pos,nor,uv,col,idx);
 }
 
-function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46,open=false,dead=0}){
- const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]};
+// fade (0..1): the lower crown this much darker, top full: in a close stand the neighbours shade every tree's lower half and only the cones' upper parts catch light.
+// inner:'tufts': the inside of the crown is a second, darker layer of tufts instead of a smooth shell, so the gaps show deeper foliage, never a solid core.
+function conifer({seed,radius,tiers,perTier,droop,pointed=.9,core=.46,open=false,dead=0,fade=0,inner=null}){
+ const r=rnd(seed),a={pos:[],nor:[],uv:[],col:[],idx:[]},shadeY=y=>1-fade+fade*Math.pow(Math.max(0,y),.7);
   const layers=Math.max(7,Math.round(tiers*.34)),p0=seed*.7,crown=(y,c=0)=>{const u=y*layers+.6*Math.sin(c*2+p0);return Math.max(.002,radius*1.02*Math.pow(1-y*.99,pointed)*(.68+.5*(1-(u-Math.floor(u))))*(1+.14*Math.sin(c*3+p0+y*5)));};
- if(!open)tuftLayer(a,r,crown,{count:Math.round(tiers*perTier*1.5),size:Math.max(.03,radius*.3),up:[-.5,.5],shade:[.72,1.2],tiers:layers});
+ if(!open)tuftLayer(a,r,crown,{count:Math.round(tiers*perTier*1.5),size:Math.max(.03,radius*.3),up:[-.5,.5],shade:[.72,1.2],tiers:layers,shadeAt:fade?y=>shadeY(y):null});
  else for(let t=0;t<tiers;t++){const f=t/(tiers-1),y=.05+f*.94,reach=radius*Math.pow(1-f*.985,pointed)*(.86+.3*Math.sin(t*2.7+seed))+.008,n=Math.max(3,Math.round(perTier*(1-f*.55)));
   for(let i=0;i<n;i++){if(f<.14||r()<.12+.2*(.5+.5*Math.sin(t*1.9+seed)))continue;const yaw=(i+r()*.8)/n*Math.PI*2+t*2.399,limb=reach*(.74+r()*r()*.55);for(let k=1;k<=3;k++){const d=limb*k/3*.95,len=Math.max(.05,Math.min(.1,limb*.7));addBranch(a,[Math.cos(yaw)*d,y-d*.25,Math.sin(yaw)*d],yaw+(r()-.5)*.7,len,len,droop*.5,0,(r()-.5)*.6,1,.72+r()*.4,FLAME);}}}
+ if(!open&&inner==='tufts')tuftLayer(a,r,(y,c)=>crown(y,c)*.6,{count:Math.round(tiers*perTier*.9),size:Math.max(.03,radius*.34),up:[-.5,.5],shade:[.3,.52],shadeAt:fade?y=>shadeY(y):null});
  const leaf=fromArrays(a.pos,a.nor,a.uv,a.col,a.idx);
  if(open)return {leaf,wood:lathe([[0,.016],[.3,.012],[.65,.008],[.97,.002]],6,[.2,.14,.09])};
- const inner=crownShell({profile:y=>Math.max(.002,radius*.74*Math.pow(1-y*.99,pointed)),seed:seed+3,tufts:40,lobes:8,rows:18,sides:14,tile:9});
- return {leaf,wood:dead?mergeGeometries([inner,trunk(dead,seed)]):inner};
+ if(inner==='tufts')return {leaf,wood:lathe([[0,.012],[.4,.008],[.8,.004],[.985,.0012]],5,[.12,.095,.075])};
+ const shell=crownShell({profile:y=>Math.max(.002,radius*.74*Math.pow(1-y*.99,pointed)),seed:seed+3,tufts:40,lobes:8,rows:18,sides:14,tile:9});
+ if(fade){const c=shell.attributes.color,p=shell.attributes.position;for(let i=0;i<c.count;i++){const k=shadeY(p.getY(i));c.setXYZ(i,c.getX(i)*k,c.getY(i)*k,c.getZ(i)*k);}}
+ return {leaf,wood:dead?mergeGeometries([shell,trunk(dead,seed)]):shell};
 }
 // A fir as the frames show it, built bough by bough with no solid core: each bough is a thick bushy lobe of mesh that droops and lifts at its tip, with see-through bough cards fanning off it for a soft edge. Gaps between boughs show the dark of the boughs behind.
-function firTree({seed,radius,boughs=72,pointed=.82,cards=8,spindle=.2,dead=0,lobes=true}){
+function firTree({seed,radius,boughs=72,pointed=.82,cards=8,spindle=.2,dead=0,lobes=true,crownBase=0}){
  const r=rnd(seed),L={pos:[],nor:[],uv:[],col:[],idx:[]},W={pos:[],nor:[],uv:[],col:[],idx:[]},p0=r()*6.283,p1=r()*6.283,
-  reach=(y,c=0)=>radius*Math.pow(Math.max(0,1-y),pointed)*(1+.2*Math.sin(y*11+p0)*Math.sin(c+p1)+.13*Math.sin(c*2+p0+y*7)+.1*Math.sin(y*23+p1)),SEG=3,SIDES=5,WID=[.3,1,.72,.1];
- for(let i=0;i<boughs;i++){const f=i/(boughs-1),y=.04+.93*Math.pow(f,1.12)+(r()-.5)*.018,yaw=i*2.399+(r()-.5)*.9,R=reach(y,yaw)*(.76+r()*.5)+.012,cy=Math.cos(yaw),sy=Math.sin(yaw),light=(.72+r()*.5)*(.86+f*.2);
+  reach=(y,c=0)=>radius*Math.pow(Math.max(0,1-Math.max(0,y-crownBase)/(1-crownBase)),pointed)*(1+.2*Math.sin(y*11+p0)*Math.sin(c+p1)+.13*Math.sin(c*2+p0+y*7)+.1*Math.sin(y*23+p1)),SEG=3,SIDES=5,WID=[.3,1,.72,.1];
+ for(let i=0;i<boughs;i++){const f=i/(boughs-1),y=crownBase+(1-crownBase)*(.04+.93*Math.pow(f,1.12))+(r()-.5)*.018,yaw=i*2.399+(r()-.5)*.9,R=reach(y,yaw)*(.76+r()*.5)+.012,cy=Math.cos(yaw),sy=Math.sin(yaw),light=(.72+r()*.5)*(.86+f*.2);
   let ang=(.55*(1-f)-.2)*(.7+r()*.6),x=R*.04,h=y;const path=[],base=W.pos.length/3;
   for(let k=0;k<=SEG;k++){path.push([cy*x,h,sy*x,ang]);const w=R*.34*WID[k],th=w*.62,ca=Math.cos(ang),sa=Math.sin(ang);
    for(let j=0;j<=SIDES;j++){const a=j/SIDES*6.283,cs=Math.cos(a),sn=Math.sin(a),off=w*cs,up=th*sn*(sn>0?1:.55),bump=1+.16*Math.sin(a*2+i+k*2);
-    W.pos.push(cy*x-sy*off*bump+cy*sa*up,h+ca*up,sy*x+cy*off*bump+sy*sa*up);const nx=cy*sa*sn-sy*cs,ny=ca*sn+.35,nz=sy*sa*sn+cy*cs,l=Math.hypot(nx,ny,nz);W.nor.push(nx/l,ny/l,nz/l);W.uv.push(j/SIDES*2,(k/SEG)*1.4+i*.37);const c=light*(sn>0?.5+.2*sn:.24)*(.74+.26*k/SEG);W.col.push(c,c,c);}
+    W.pos.push(cy*x-sy*off*bump+cy*sa*up,h+ca*up,sy*x+cy*off*bump+sy*sa*up);const nx=cy*sa*sn-sy*cs,ny=ca*sn+.35,nz=sy*sa*sn+cy*cs,l=Math.hypot(nx,ny,nz);W.nor.push(nx/l,ny/l,nz/l);W.uv.push(j/SIDES*2,(k/SEG)*1.4+i*.37);const c=light*(sn>0?.5+.2*sn:.4)*(.8+.2*k/SEG);W.col.push(c,c,c);}
    x+=Math.cos(ang)*R/SEG;h-=Math.sin(ang)*R/SEG;ang-=.2;}
   if(lobes)for(let k=0;k<SEG;k++)for(let j=0;j<SIDES;j++){const q=base+k*(SIDES+1)+j,o=SIDES+1;W.idx.push(q,q+o,q+1,q+1,q+o,q+o+1);}
   for(let k=0;k<cards;k++){const t=(k+.6)/cards,u=t*SEG,n=Math.min(SEG-1,Math.floor(u)),m=u-n,A=path[n],B=path[n+1],side=k%2?1:-1,len=R*(lobes?.62-.4*t:.95-.5*t)*(.8+r()*.45)+.012,a2=yaw+side*(.62+r()*.6);
    addBranch(L,[A[0]+(B[0]-A[0])*m,A[1]+(B[1]-A[1])*m+R*.02,A[2]+(B[2]-A[2])*m],a2,len,len*.86,A[3]*.6+.14,-.04,(r()-.5)*.9,1,light*(.8+r()*.34),BOUGH);}
   const E=path[SEG];addBranch(L,[E[0],E[1],E[2]],yaw,R*.34,R*.3+.008,E[3],-.04,(r()-.5)*.5,1,light*1.08,BOUGH);}
  const parts=[lobes?fromArrays(W.pos,W.nor,W.uv,W.col,W.idx):null,lathe([[0,.012],[.4,.008],[.8,.004],[.985,.0012]],5,[.12,.095,.075])];
- if(spindle)parts.push(lathe([.06,.25,.5,.75,.92].map(y=>[y,Math.max(.002,radius*Math.pow(1-y,pointed)*spindle)]),6,[.07,.085,.065]));
+ if(spindle)parts.push(lathe([.06,.25,.5,.75,.92].map(u=>{const y=crownBase+(1-crownBase)*u;return [y,Math.max(.002,radius*Math.pow(1-u,pointed)*spindle)];}),6,[.11,.14,.09]));
  if(dead)parts.push(trunk(dead,seed));
  return {leaf:fromArrays(L.pos,L.nor,L.uv,L.col,L.idx),wood:mergeGeometries(parts.filter(Boolean))};
 }
@@ -91,12 +96,15 @@ function trunk(limbs,seed){const r=rnd(seed+9),grey=[.22,.21,.195],parts=[lathe(
 
 // A juniper as the census crops show it: a solid dense mass to the ground, fine lumpy surface, with short sprays on it for a soft broken edge.
 // Overlapping tufts cut from real crown pictures, tips up and out, laid over a dark inner mass that closes every gap. The tufts make the lumpy opaque surface and the soft edge; larger ones are the lobes.
-function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=0,shadeAt=null}){
- for(let i=0;i<count;i++){const y=Math.pow(r(),.82)*.985,yaw=r()*6.283,R=profile(y,yaw),big=r()<.14?1.55:1,sz=size*(.72+r()*.56)*big,lift=up[0]+r()*(up[1]-up[0]),cy=Math.cos(yaw),sy=Math.sin(yaw);
+// `weight(y)` (0..1), when given, thins the sprays where the crown is narrow so a wide skirt is as full as the top.
+function tuftLayer(a,r,profile,{count,size,up=[.35,1.25],shade=[.72,1.12],tiers=0,shadeAt=null,weight=null}){
+ for(let i=0;i<count;i++){let y=Math.pow(r(),.82)*.985;if(weight)for(let k=0;k<8&&r()>weight(y);k++)y=r()*.985;const yaw=r()*6.283,R=profile(y,yaw),big=r()<.14?1.55:1,sz=size*(.72+r()*.56)*big,lift=up[0]+r()*(up[1]-up[0]),cy=Math.cos(yaw),sy=Math.sin(yaw);
   addBranch(a,[cy*R*.8,Math.max(.012,y-sz*.3),sy*R*.8],yaw+(r()-.5)*.9,sz,sz*(1+r()*.35),-lift,.08,(r()-.5)*.9,1,(shade[0]+r()*(shade[1]-shade[0]))*(.8+y*.3)*(tiers?.72+.56*(1-((y*tiers+.6*Math.sin(yaw*2))%1)):1)*(shadeAt?shadeAt(y,yaw):1),FLAME);}
 }
-// Silhouettes averaged from outlines drawn on the solved drone frames, widest = 1, listed from the tip down to the ground.
-const OUTLINE_SHAPES={"low":[0.12,0.4,0.58,0.72,0.84,0.93,0.99,0.98,0.83,0.72,0.74],"round":[0.12,0.35,0.48,0.61,0.72,0.84,0.93,1.0,0.98,0.72,0.74],"egg":[0.12,0.37,0.58,0.78,0.92,1.0,0.96,0.8,0.72,0.72,0.74],"pyramid":[0.12,0.57,0.77,0.9,0.96,1.0,0.98,0.91,0.75,0.72,0.74],"column":[0.12,0.66,0.86,0.98,0.99,0.95,0.84,0.63,0.72,0.72,0.74]};
+// Bush silhouettes, widest = 1, listed from the tip down to the ground. The real junipers here keep their skirts: every one is
+// widest right at the ground and narrows upward, and the forms differ only in how the top closes (pointed, egg, round, low, column).
+// (The outlines drawn on the frames averaged narrower at the foot, but that was grass hiding the base and hand-drawn corners rounding.)
+const OUTLINE_SHAPES={"pyramid":[0.1,0.24,0.35,0.44,0.53,0.62,0.7,0.78,0.85,0.93,1.0],"egg":[0.12,0.36,0.5,0.61,0.71,0.78,0.85,0.91,0.95,0.98,1.0],"round":[0.12,0.49,0.64,0.75,0.83,0.89,0.93,0.97,0.99,1.0,1.0],"low":[0.15,0.59,0.73,0.82,0.88,0.93,0.96,0.98,0.99,1.0,1.0],"column":[0.12,0.51,0.63,0.72,0.78,0.84,0.88,0.92,0.95,0.98,1.0]};
 const fromTip=(list,y)=>{const u=Math.max(0,Math.min(.9999,1-y))*(list.length-1),i=Math.floor(u);return list[i]+(list[i+1]-list[i])*(u-i);};
 function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,clumps=0}){
  const r=rnd(seed+1),a={pos:[],nor:[],uv:[],col:[],idx:[]},own=[r()*6.283,r()*6.283],shape=outline&&OUTLINE_SHAPES[outline],
@@ -106,7 +114,7 @@ function juniper({seed,radius,pointed=1.25,egg=0,count=520,size=.1,outline=null,
   base=y=>Math.max(.002,radius*(shape?fromTip(shape,y):egg?Math.pow(Math.max(0,1-Math.pow(y,egg)),.62):Math.pow(Math.max(0,1-y),1/pointed)*Math.min(1,.72+y*2.4))),
   // no two plants one shape: big masses bulge out and bite in round the crown, more so toward the top
   profile=(y,c=0)=>base(y)*(1+(.13+.3*y)*Math.sin(c*2+own[0]+y*3.1)+(.1+.16*y)*Math.sin(c*3+own[1]-y*7.3)+.09*Math.sin(c*5+own[0]*2+y*13))*(clumps?.8+.42*bump(y,c):1);
- tuftLayer(a,r,profile,{count,size,shadeAt:clumps?(y,c)=>.62+.62*bump(y,c):null});
+ tuftLayer(a,r,profile,{count,size,shadeAt:clumps?(y,c)=>.62+.62*bump(y,c):null,weight:shape?y=>fromTip(shape,y):null});
  return {leaf:fromArrays(a.pos,a.nor,a.uv,a.col,a.idx),wood:crownShell({profile:(y,c)=>profile(y,c)*.84,seed:seed+3,tufts:50,lobes:9,rows:16,sides:18,tile:4})};
 }
 const FLAME={u0:0,u1:1,v0:0,v1:1};
@@ -186,15 +194,18 @@ export async function buildTreeSpecies(baseUrl){
  const boughPic=boughTexture(68),boughLeaf=c=>{const m=needle(c);m.map=boughPic;return m;};
  const firLeaf=c=>{const m=needle(c);m.map=firTuft;m.color.multiplyScalar(2.3);return m;};
  const lump={lump:.05,mix:.8,dark:.38,tip:.3,olive:0,branchDark:.2,under:.2,glow:.12};
+ // The tall firs lit as whole cones: the leaves smeared into masses about a metre across, so a crown has a lit side, a shaded side
+ // and a bright top as the frames show, instead of every bough lit on its own (which read as stripes from the clearing).
+ const CONE={...lump,lump:.9,mix:.92,dark:.5,tip:.12};
  const out=[];
- out.push(pack('fir','Full fir',22,firTree({seed:4101,radius:.22,boughs:110,cards:10,dead:16}),boughLeaf(0xffffff),crownMat(firTile),{shape:lump,sway:.05}));
- out.push(pack('spruce','Narrow spruce',24,firTree({seed:4202,radius:.18,boughs:110,cards:10,pointed:.85,dead:14}),boughLeaf(0xe4eaf0),crownMat(firTile),{shape:lump,sway:.05}));
+ out.push(pack('fir','Full fir',22,firTree({seed:4101,radius:.22,boughs:110,cards:10,dead:16}),boughLeaf(0xffffff),crownMat(firTile),{shape:CONE,sway:.05}));
+ out.push(pack('spruce','Narrow spruce',24,firTree({seed:4202,radius:.18,boughs:110,cards:10,pointed:.85,dead:14}),boughLeaf(0xe4eaf0),crownMat(firTile),{shape:CONE,sway:.05}));
  out.push(pack('fir_small','Young fir',9,firTree({seed:4303,radius:.3,boughs:48,pointed:.85,cards:7}),boughLeaf(0xf6f8e8),crownMat(firTile),{shape:{...lump,lump:.13},sway:.08}));
  // Junipers: the sprays are the branch picture of the big bush model; that model stays in the catalog as its own object.
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,wideBase:1.3,sway:.1}));
- {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:0xf0f0e0,alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
+ {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.68,.71,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.5,tip:.3,olive:0,under:0,glow:0},coverage:true,sway:.2}));}
- out.push(pack('open_fir','Open fir',18,firTree({seed:4606,radius:.24,boughs:42,pointed:.7,cards:6,spindle:0,dead:12}),boughLeaf(0xf4f6e6),crownMat(firTile),{shape:lump,sway:.06}));
+ out.push(pack('open_fir','Open fir',18,firTree({seed:4606,radius:.24,boughs:42,pointed:.7,cards:6,spindle:0,dead:12}),boughLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,sway:.06}));
  out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.28,outline:'column',clumps:24,count:460,size:.075}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.07}));
 
  out.push(pack('juniper_low','Low spreading juniper',3.5,juniper({seed:4808,radius:.72,outline:'low',clumps:28,count:640,size:.11}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.1}));
@@ -202,7 +213,11 @@ export async function buildTreeSpecies(baseUrl){
   out.push({name:'snag',label:'Dead snag',defaultHeight:7,height:1,root,parts:[{geometry:g,material:m}],soften:.1,spec:.1,sway:.02});}
  out.push(pack('juniper_cone','Broad cone juniper',5,juniper({seed:5001,radius:.39,outline:'egg',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.09}));
  out.push(pack('juniper_pyramid','Pointed juniper',6,juniper({seed:5102,radius:.34,outline:'pyramid',clumps:26,count:500,size:.09}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.25,olive:0},soften:.15,coverage:true,sway:.08}));
- // Deep in the forest only the tops show past the trees in front, so these are cards alone.
- out.push(pack('fir_back','Forest fir',22,firTree({seed:5203,radius:.22,boughs:44,cards:4,spindle:.34,lobes:false}),boughLeaf(0xffffff),crownMat(firTile),{shape:{...lump,lump:.03},sway:.05}));
+ // Deep in the forest, seen across the clearing from 60 m and more: a full cone of fir tufts in soft tiers over a shaded inner cone,
+ // so each tree reads as a whole with its own pointed top and a lit side, as the frames show. (The bough-lobe firs above, built
+ // for close looks, read as dark poles and shelves at this range.) Cheap: one tuft layer and a low inner shell.
+ out.push(pack('fir_back','Forest fir',22,conifer({seed:5203,radius:.21,tiers:22,perTier:10,droop:.8,pointed:.95,fade:.5,inner:'tufts'}),(()=>{const m=needle(0xffffff);m.map=firTuft;m.color.multiplyScalar(1.1);return m;})(),crownMat(firTile),{shape:CONE,sway:.05}));
+ // Tall firs whose lower trunk is bare: the crown starts a third of the way up, with grey dead stubs on the trunk below, as on the forest edge.
+ out.push(pack('fir_high','Fir, bare lower trunk',20,firTree({seed:5304,radius:.24,boughs:90,cards:9,crownBase:.32,dead:20}),boughLeaf(0xffffff),crownMat(firTile),{shape:CONE,sway:.05}));
  return out;
 }

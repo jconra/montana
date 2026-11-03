@@ -86,9 +86,9 @@ export function createGroundDetail(half,driveway,sunDir){
   function setTrees(trees){
     const g=shadeContext,scale=shade.width/(half*2);g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,shade.width,shade.height);
     g.setTransform(scale,0,0,scale,half*scale,half*scale);
-    for(const t of trees){const radius=Math.max(1.5,Math.min(12,Math.max(t.editorScale?.[0]||t.h,t.editorScale?.[2]||t.h)*.35));
+    for(const t of trees){const radius=Math.max(1.8,Math.min(14,Math.max(t.editorScale?.[0]||t.h,t.editorScale?.[2]||t.h)*.45));
       const gradient=g.createRadialGradient(t.x,t.z,0,t.x,t.z,radius);
-      gradient.addColorStop(0,'rgba(0,0,0,.48)');gradient.addColorStop(.45,'rgba(0,0,0,.28)');gradient.addColorStop(1,'rgba(0,0,0,0)');
+      gradient.addColorStop(0,'rgba(0,0,0,.6)');gradient.addColorStop(.5,'rgba(0,0,0,.36)');gradient.addColorStop(1,'rgba(0,0,0,0)');
       g.fillStyle=gradient;g.fillRect(t.x-radius,t.z-radius,radius*2,radius*2);
     }shadeTexture.needsUpdate=true;
     // long shadows near the buildings, for the levels with no shadow map
@@ -172,6 +172,11 @@ export function createGroundDetail(half,driveway,sunDir){
       // Mown lawn: no stripes. A dull soft green with pale dry mottling and the odd worn spot, as in the July frames.
       float mown=smoothstep(.25,.6,masks.g)*(1.-smoothstep(.05,.4,masks.r));
       if(mown>0.){float mott=mid.g*.55+fine.b*.45;vec3 sward=mix(vec3(.43,.585,.24),vec3(.5,.645,.28),smoothstep(.3,.7,fine.r));sward=mix(sward,vec3(.56,.62,.32),smoothstep(.56,.74,mott)*.55);sward=mix(sward,vec3(.64,.6,.4),smoothstep(.68,.76,mid.a*.6+tiny.g*.4)*.6);near=mix(near,sward,mown*.93);}
+      // Past the grass blades (they end some 60 m out), tall lush grass still shows its texture as in the July frames: streaks where it
+      // lies over in the wind, paler tips, darker hollows. Costs nothing but two texture reads, so the far lawn is never a flat colour.
+      float grassFar=smoothstep(.1,.42,lushHere)*(1.-road)*(1.-mown)*smoothstep(35.,65.,distance(cameraPosition,detailWorld));
+      if(grassFar>0.){vec2 sw=vec2(landUV.x*.9+landUV.y*.42,landUV.y*.16-landUV.x*.05);float streak=texture2D(patchMap,sw*.3).g*.55+texture2D(patchMap,landUV*.9).r*.45;
+       near*=mix(vec3(1.),vec3(.72,.77,.7)+vec3(.5,.46,.38)*streak,grassFar*.85);}
       // Real ground from the drone stills, in two sizes so it does not repeat, by what the map says is here.
       float close=1.-smoothstep(70.,300.,distance(cameraPosition,detailWorld));
       vec2 w2=vec2(landUV.x*.8-landUV.y*.6,landUV.x*.6+landUV.y*.8);
@@ -199,7 +204,7 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
-      diffuseColor.rgb*=1.-min(1.,canopy*1.5)*.72;
+      diffuseColor.rgb*=1.-min(1.,canopy*1.5)*.84;
       vec2 castUV=detailWorld.xz/(2.*castHalf)+.5;
       vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
       vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;
@@ -221,7 +226,8 @@ export function rockGeometry(seed,detail=2){
   }
   g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();g.computeBoundingSphere();return g;
 }
-export function rockMaterial(){const t=surface(2);return new THREE.MeshStandardMaterial({map:t,color:0xa8a49a,vertexColors:true,flatShading:true,roughness:1});}
+// Rock colour against the July frames: the real rocks are a neutral grey, the model's had a greenish-yellow cast.
+export function rockMaterial(){const t=surface(2);return new THREE.MeshStandardMaterial({map:t,color:new THREE.Color().setRGB(.6,.6,.61),vertexColors:true,flatShading:true,roughness:1});}
 export async function loadShrub(name,broadleaf){
   const base='./assets/vegetation-lab/',response=await fetch(base+name+'.json');if(!response.ok)throw new Error(`Shrub ${name}: HTTP ${response.status}`);
   const data=await response.json(),loader=new THREE.TextureLoader();

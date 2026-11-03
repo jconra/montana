@@ -6,7 +6,7 @@ import {LandscapeState} from '../assets/landscape-state.mjs';
 const at={x:300,z:300,neighbours:12,id:'lidar:1'};
 assert.equal(treeKind({...at,h:3}),'juniper');
 assert.ok(['fir','spruce','fir_back'].includes(treeKind({...at,h:25})));
-assert.ok(['fir_small','spruce'].includes(treeKind({...at,h:10})));
+assert.equal(treeKind({...at,h:10}),'fir_back');   // a mid-height tree deep in a close stand: the tufted cone
 assert.ok(['juniper','open_fir'].includes(treeKind({...at,neighbours:2,h:10})));
 for(let i=0;i<200;i++)assert.ok(TREE_KINDS.includes(treeKind({id:'lidar:'+i,x:i,z:i,h:2+i/5,neighbours:i%20})));
 assert.equal(treeKind({...at,h:9}),treeKind({...at,h:9}));

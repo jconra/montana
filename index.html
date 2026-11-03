@@ -286,6 +286,8 @@ const pondLevel=preparePond(tiles,heightAt);
 let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
 let landscapeCatalog=new Map(),landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
+// Read-only handle for the test rigs: the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
+window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;}};
 
 // ---- building models ----------------------------------------------------
 const placed=[];
@@ -712,7 +714,9 @@ function treeTint(kind,id,tint,tone){
   if(kind==='aspen'){const m=measured||[1,1,1],base=measured?[.97,.95,.87]:[.8+.34*a,.88+.14*b,.72+.3*c];return new THREE.Color(tint*base[0]*m[0],tint*base[1]*m[1],tint*base[2]*m[2]);}
   if(kind==='snag')return new THREE.Color(tint,tint,tint);
   const t=evergreenTone(id,kind.startsWith('juniper')),m=measured||[1,1,1];
-  return new THREE.Color(tint*t[0]*m[0],tint*t[1]*m[1],tint*t[2]*m[2]);
+  // the smaller trees under the forest canopy stand in its shade: the frames show the gaps between crowns dark, not lit
+  const shade=String(id).startsWith('under:')?.5:1;
+  return new THREE.Color(tint*t[0]*m[0]*shade,tint*t[1]*m[1]*shade,tint*t[2]*m[2]*shade);
 }
 const treeAssetsReady=(async()=>{
   try{
@@ -1305,7 +1309,7 @@ const landscapeReady=(async()=>{
   }
   landscapeCatalog=catalog;
   // Scatter records (sage2:*, pebble:*) come from a frozen list. They were once dealt from one seed in a loop that drew numbers only for spots passing `free`, so any change to the road, lawn or pond re-dealt every id after it, and census removals and saved edits then pointed at other plants. The list holds the deal the census was written against; `free` only hides a row, it never moves an id.
-  {const free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25;
+  {const free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25&&(x<-30||driveLineDistance(x,z)>1.6);
    for(const [id,asset,x,z,offset,rotation,scale,tint] of await (await fetch('./assets/scatter-frozen.json')).json())if(free(x,z)&&(id.startsWith('sage2:')?propertyNature.models.sage.length:(campSurface(x,z).tallGrass<=.2)))base.push({id,asset,x,z,offset,rotation,scale,tint});}
   for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
   // Bake each prop in its own local coordinates, then register it with the

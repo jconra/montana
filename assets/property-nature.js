@@ -5,7 +5,7 @@ import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,CAMP_PROPS,
 import {loadSagebrush} from './sagebrush.js';
 import {TALL_GRASS_PATCHES,tallGrassCoverage,frontDoorGravel} from './property-refinements.mjs';
 import {campSurface,HORSESHOES} from './camp-approach.mjs';
-import {roadCoverage} from './driveway-measured.mjs';
+import {roadCoverage,driveLineDistance} from './driveway-measured.mjs';
 import {rockGeometry} from './ground-detail.js';
 const rng=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 const mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.92});
@@ -198,7 +198,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   // Trim after generating the stable scatter: changing this footprint must not
   // renumber the sagebrush objects in existing exported landscape edits.
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){
-    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(Math.abs(t.x+7.28)<1&&Math.abs(t.z+4.67)<1.2||roadCoverage(t.x,t.z)>.3||correctedRoute.nearest(t.x,t.z).distance<.5||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
+    chunk.list=chunk.list.filter(t=>{const s=campSurface(t.x,t.z);if(Math.abs(t.x+7.28)<1&&Math.abs(t.z+4.67)<1.2||roadCoverage(t.x,t.z)>.3||correctedRoute.nearest(t.x,t.z).distance<.5||(t.x>-30&&driveLineDistance(t.x,t.z)<1.6)||HORSESHOES.some(p=>Math.hypot(t.x-p.x,t.z-p.z)<1.1))return false;
       if(chunk.kind!=='grass')return false;   // the big meadow flowers gave way to the small real flecks in plant-fill.js
       // Open ground now has the meadow grass; these full tufts stay only in the marked tall patches and reclaimed corners.
       if(!t.tallPatch&&!(t.s>=.8&&grassReclaim(t.x,t.z)>.5)&&s.tallGrass<.1)return false;
