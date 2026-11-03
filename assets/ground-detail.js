@@ -205,7 +205,7 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 canopyUV=detailWorld.xz/(2.*canopyHalf)+.5;
       float canopy=texture2D(canopyShade,vec2(canopyUV.x,1.-canopyUV.y)).a;
       canopy*=step(0.,canopyUV.x)*step(canopyUV.x,1.)*step(0.,canopyUV.y)*step(canopyUV.y,1.);
-      diffuseColor.rgb*=1.-min(1.,canopy*1.5)*.84;
+      diffuseColor.rgb*=1.-min(1.,canopy*1.8)*.9;
       vec2 castUV=detailWorld.xz/(2.*castHalf)+.5;
       vec2 castIn=step(vec2(0.),castUV)*step(castUV,vec2(1.));
       vec3 baked=texture2D(castShade,vec2(castUV.x,1.-castUV.y)).rgb*castIn.x*castIn.y;

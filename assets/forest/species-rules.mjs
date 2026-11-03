@@ -68,9 +68,11 @@ export function toneTint(kind,tone){
 // Evergreen tones as the frames show them, tree to tree: yellow-olive, olive, grey-green, blue-grey, a rusty one now and then. r g b multipliers over the model's own colour.
 // Firs and spruce against the July frames: inside his outlines the model drew them a third darker and much warmer than the photos
 // (photo 70,76,73 against 52,58,43 at 40-150 m); with the spray-picture firs (2026-11-03) they came out 79,89,69 against
-// 64,70,68, so this now darkens the warm channels and keeps the blue. Junipers turn a little cooler: the frames show
+// 64,70,68, so this darkened the warm channels; the critic's third round measured the forest as a whole at L 68-78 against
+// the photos' 42-58; seen from above (view 05) the near canopy is a deep plain green (44,52,38), the blue-grey comes only
+// with distance, from the haze. So the firs are dark green and the haze does the cooling. Junipers turn a little cooler: the frames show
 // them blue-green, the model drew them olive.
-const FIR_SKY=[1.0,.88,2.1],FIR_SKY0=[.88,1,1.14];
+const FIR_SKY=[.55,.56,.95],FIR_SKY0=[.88,1,1.14];
 export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
 export function evergreenTone(id,juniper=false){
  const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.06?0:a<.26?1:a<.66?2:a<.98?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.8:.74)+b*.3,red=juniper?.9:.97;
