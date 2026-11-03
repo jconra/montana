@@ -34,7 +34,8 @@ export function treeKind({id,x,z,h,neighbours,authored=false}){
  // The open hill in the May frames: mostly round junipers from shrub to column size, some open firs and pines; spruce only in deep forest.
  if(h<=4)return 'juniper';
  if(open){if(h<=9)return r<.9?'juniper':'fir_small';if(h<=14)return r<.55?'juniper':'open_fir';return r<.7?'open_fir':'fir';}
- if(neighbours<=11){if(h<=7)return r<.7?'juniper':'fir_small';if(h<=13)return r<.45?'juniper':r<.8?'open_fir':'fir_small';return r<.45?'fir':r<.8?'open_fir':'spruce';}
+ // At the forest edge the frames show grey lower trunks under the big firs' crowns: a share of the tall edge trees have them.
+ if(neighbours<=11){if(h<=7)return r<.7?'juniper':'fir_small';if(h<=13)return r<.45?'juniper':r<.8?'open_fir':'fir_small';if(h>16&&treeHash(id,23)<.3)return 'fir_high';return r<.45?'fir':r<.8?'open_fir':'spruce';}
  if(h<=6)return r<.45?'juniper':'fir_small';
  // Deep in a close stand nobody looks at a tree up close: the full tufted cone, which reads right across the clearing.
  if(h<=13)return 'fir_back';
@@ -72,7 +73,7 @@ export function toneTint(kind,tone){
 // the photos' 42-58; seen from above (view 05) the near canopy is a deep plain green (44,52,38), the blue-grey comes only
 // with distance, from the haze. So the firs are dark green and the haze does the cooling. Junipers turn a little cooler: the frames show
 // them blue-green, the model drew them olive.
-const FIR_SKY=[.55,.56,.95],FIR_SKY0=[.8,.98,1.22];
+const FIR_SKY=[.45,.47,.75],FIR_SKY0=[.8,.98,1.22];
 export const EVERGREEN_TONES=[[1.14,1.05,.7],[1.04,1.02,.76],[.95,1.,.86],[.86,.97,.98],[1.16,.95,.68]];
 export function evergreenTone(id,juniper=false){
  const a=treeHash(id,31),b=treeHash(id,32),i=juniper?(a<.5?0:a<.8?1:a<.95?2:4):(a<.06?0:a<.26?1:a<.66?2:a<.98?3:4),t=EVERGREEN_TONES[i],lift=(juniper?.8:.74)+b*.3,red=juniper?.9:.97;

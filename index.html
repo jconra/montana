@@ -196,7 +196,8 @@ installGrade(THREE,renderer);
 // by the clearing stay near-black. Almost none in the first few hundred metres, building over the kilometres, then the old far fade.
 {const chunk=THREE.ShaderChunk.fog_fragment,slot='float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );';
  if(!chunk.includes(slot))throw new Error('Aerial haze: three fog chunk not found');
- THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = .8*(1.0-exp(-pow(vFogDepth/650.0,2.4)))+.2*smoothstep( fogNear, fogFar, vFogDepth );');}
+ // (the haze is a mid blue, not the pale sky: the far ridges in the frames are about 86,93,111)
+ THREE.ShaderChunk.fog_fragment=chunk.replace(slot,'float fogFactor = smoothstep( fogNear, fogFar, vFogDepth ); gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( .38, .44, .6 ), .7 * ( 1.0 - exp( - pow( vFogDepth / 560.0, 2.0 ) ) ) );');}
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fb8d0);
 const cam = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1.5, 120000);
@@ -821,6 +822,17 @@ function buildTreeMesh(){
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
     fixed.push({id:t.id,x:t.x,z:t.z,offset:t.offset||0,sp:sp<0?0:sp,scale:t.h,wide:t.wide||1,yaw:t.r,lean:t.lean||0,tint:treeTint(kind,t.id??t.x,t.tint,t.tone)});
   }
+  // Shade between trees: from the drone the real forest is lit crowns over near-black gaps, and a tree standing in taller
+  // neighbours' shade is dark all over. Each conifer is darkened by how much taller trees stand round it (most toward the sun),
+  // and given its own small brightness swing, so the forest is not one even tone. (Imposters carry no tree-on-tree shadow.)
+  {const cell=8,grid=new Map(),key=(x,z)=>Math.floor(x/cell)+':'+Math.floor(z/cell);
+   for(const f of fixed){const k=key(f.x,f.z);let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(f);}
+   const sx=-SUN_DIR.x,sz=-SUN_DIR.z,sl=Math.hypot(sx,sz)||1;
+   for(const f of fixed){const kind=TREE_KINDS[f.sp]||'';if(kind==='aspen'||kind==='snag'||kind.startsWith('juniper')&&f.scale<4)continue;
+    let shade=0;const cx=Math.floor(f.x/cell),cz=Math.floor(f.z/cell);
+    for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const o of grid.get((cx+i)+':'+(cz+j))||[]){if(o===f)continue;const dx=o.x-f.x,dz=o.z-f.z,d=Math.hypot(dx,dz);if(d>9||d<.5)continue;
+     const taller=(o.scale-f.scale*.7)/Math.max(4,f.scale);if(taller<=0)continue;const toSun=(dx*sx+dz*sz)/(d*sl)*-1;shade+=taller*(1-d/9)*(.45+.55*Math.max(0,toSun));}
+    const k=(1-Math.min(.5,shade*.5))*(.86+.28*treeHash(f.id??f.x,77));f.tint=f.tint.clone().multiplyScalar(k);}}
   groundDetail.setTrees(trees.concat(groveList));
   forest.setFixed(fixed);
 }
