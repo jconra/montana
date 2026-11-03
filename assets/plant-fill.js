@@ -5,7 +5,7 @@
 // knee except cattails and thistles. Chunks of instanced plants that grow up as the camera nears. WebGL1 safe.
 import * as THREE from 'three';
 import {polygonDistance} from './property-layout.mjs';
-import {roadCoverage,grassPriority} from './driveway-measured.mjs';
+import {roadCoverage,grassPriority,driveLineDistance,driveVerge,TRACK_OFFSET,TRACK_WIDTH} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
 import {tallGrassCoverage} from './property-refinements.mjs';
 import {gradeLand} from './land-grade.mjs';
@@ -63,7 +63,9 @@ export async function createPlantFill({scene,heightAt,fill}){
  material.customProgramCacheKey=()=>'plant-fill-v2';
  const shapes={lush:tuft({blades:28,height:.3,width:.0085,spread:.42,seed:11}),dry:tuft({blades:12,height:.14,width:.0075,spread:.26,seed:23}),shrublet:tuft({blades:12,height:.26,width:.028,spread:.14,seed:37}),white:flecks(6,41),yellow:flecks(6,43),cattail:bakedPlant(models.cattail),thistle:bakedPlant(models.thistle)};
  const inWater=(x,z)=>{let c=false;const w=data.water;for(let i=0,j=w.length-1;i<w.length;j=i++)if((w[i][1]>z)!==(w[j][1]>z)&&x<(w[j][0]-w[i][0])*(z-w[i][1])/(w[j][1]-w[i][1])+w[i][0])c=!c;return c;};
- const road=data.road,nearRoad=(x,z)=>{for(let i=1;i<road.length;i++){const a=road[i-1],b=road[i],dx=b[0]-a[0],dz=b[1]-a[1],t=Math.max(0,Math.min(1,((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz)));if(Math.hypot(x-a[0]-dx*t,z-a[1]-dz*t)<1.3)return true;}return false;};
+ // (off the drive's wheel tracks as they are now measured: the map's own copy of the road line, data.road, is the older one; the
+ // grass strip between the tracks grows, cut short)
+ const nearRoad=(x,z)=>x>-30&&Math.abs(driveLineDistance(x,z)-TRACK_OFFSET)<TRACK_WIDTH/2+.05;
  const clear=(x,z)=>{if(nearRoad(x,z))return false;for(const f of FOOTPRINTS){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),lx=(x-f.x)*c-(z-f.z)*s,lz=(x-f.x)*s+(z-f.z)*c;if(Math.abs(lx)<f.hx&&Math.abs(lz)<f.hz)return false;}return polygonDistance(x,z)<-.6&&!inWater(x,z)&&roadCoverage(x,z)<.3;};
  const cells=new Map(),count={};
  const add=(kind,x,z,size,height,col)=>{if(kind==='lush'||kind==='dry'||kind==='shrublet'){const keep=.5+.5*grassPriority(x,z);if(R()>keep)return;size*=1+(1-keep)*.4;}const k=kind+':'+Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={kind,x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,col,turn:R()*6.283,rank:R(),vary:R()});count[kind]=(count[kind]||0)+1;};
@@ -75,8 +77,8 @@ export async function createPlantFill({scene,heightAt,fill}){
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
   const nLush=lush*lush*20*live*(.55+.9*patch),nDry=dry*(5+lush*2)*live*(.45+1.1*patch),nShrub=dry*.1*live*(fine>.55?2:.4);
   const roll=(n,fn)=>{for(let q=Math.floor(n)+(R()<n%1?1:0);q>0;q--){const x=X+R(),z=Z+R();if(clear(x,z))fn(x,z);}};
-  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),pa=vnoise(x*.035+11,z*.035),pb=vnoise(x*.06-7,z*.06+3),patch=mix(mix(EMERALD,BRILLIANT,Math.min(1,Math.max(0,(pa-.25)*2))),YELLOWGREEN,Math.max(0,pb-.55)*1.2),c=mix(mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.25),patch,.6),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72),[c[0]*v,c[1]*v,c[2]*v]);});
-  roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nLush,(x,z)=>{const s=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z):{lawn:0},m=s.lawn;if(m>.3)return;const t=vnoise(x*.2,z*.2),pa=vnoise(x*.035+11,z*.035),pb=vnoise(x*.06-7,z*.06+3),patch=mix(mix(EMERALD,BRILLIANT,Math.min(1,Math.max(0,(pa-.25)*2))),YELLOWGREEN,Math.max(0,pb-.55)*1.2),c=mix(mix(mix(mix(DEEP,LIME,t),OLIVE,R()*.25),patch,.6),LIME,m),v=(.82+R()*.36)*(1+m*.35);if(m>.5&&R()<.45)return;const cut=driveVerge(x,z);add('lush',x,z,(.85+R()*.5)*(1-m*.35),(.8+R()*.65)*(1-m*.72)*(1-cut*.65),[c[0]*v,c[1]*v,c[2]*v]);});
+  roll(nDry,(x,z)=>{const m=x>-60&&x<30&&z>-25&&z<60?campSurface(x,z).lawn:0;if(m>.3)return;const c=mix(mix(STRAW,TAN,R()),PALE,R()*.7*(1-dry*.3)),v=.85+R()*.3;add('dry',x,z,.75+R()*.6,(.7+R()*.75)*(1-m*.5)*(1-driveVerge(x,z)*.6),[c[0]*v,c[1]*v,c[2]*v]);});
   roll(nShrub,(x,z)=>{const c=mix(SILVER,PALE,R());add('shrublet',x,z,.7+R()*.7,.75+R()*.6,c);});
   const grassy=(lush+dry*.6)*live,drift=vnoise(X*.07+31,Z*.07-9)*.7+vnoise(X*.3,Z*.3)*.3,w=at('white',X+.5,Z+.5);
   roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>(x>-60&&x<30&&z>-25&&z<60&&campSurface(x,z).lawn>.3)||add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import {createRoute,POND_OUTLINE} from './property-layout.mjs';
 import {grassReclaim} from './driveway-refinements.mjs';
 import {campSurface} from './camp-approach.mjs';
-import {DIRT_OUTLINE,RUTS,TRACK_OFFSET} from './driveway-measured.mjs';
+import {DIRT_OUTLINE,RUTS,TRACK_OFFSET,TRACK_WIDTH,VERGE} from './driveway-measured.mjs';
 const random=seed=>()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 // Small repeatable detail maps; no remote texture dependencies.
 function surface(kind){
@@ -38,6 +38,12 @@ function detailTile(file){const t=colourMap(file);t.wrapS=t.wrapT=THREE.RepeatWr
 // Baked tree shadows round the buildings: red cast shadow (long, lumpy, away from the sun), green soft contact shade.
 const CAST_HALF=128;
 const APRON_MIN=new THREE.Vector2(-32,-14),APRON_SIZE=40;
+const RUV_MIN=new THREE.Vector2(-26,-108),RUV_SIZE=new THREE.Vector2(164,122);   // (the drive's corridor, for its own coordinates)
+// value noise that repeats every `per` cells along x (the tyre marks' along coordinate wraps), with no texture and so no mip seams
+const TYRE_GLSL=`float tyreHash(vec2 i){return fract(sin(dot(i,vec2(127.1,311.7)))*43758.5453);}
+float tyreNoise(vec2 p,float per){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);float x0=mod(i.x,per),x1=mod(i.x+1.,per);
+ return mix(mix(tyreHash(vec2(x0,i.y)),tyreHash(vec2(x1,i.y)),f.x),mix(tyreHash(vec2(x0,i.y+1.)),tyreHash(vec2(x1,i.y+1.)),f.x),f.y);}
+`;
 export function createGroundDetail(half,driveway,sunDir){
   const c=document.createElement('canvas');c.width=c.height=2048;const g=c.getContext('2d');g.fillStyle='black';g.fillRect(0,0,c.width,c.height);
   const maskMin=new THREE.Vector2(-160,-480),maskSize=new THREE.Vector2(370,660),route=createRoute(driveway);
@@ -49,8 +55,8 @@ export function createGroundDetail(half,driveway,sunDir){
   g.globalCompositeOperation='lighter';g.filter='blur(5px)';g.strokeStyle='#0000ff';g.lineWidth=3.2;g.beginPath();POND_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.stroke();g.filter='none';g.globalCompositeOperation='source-over';
   // Red: the drive. The apron and arms as traced; elsewhere two pale wheel tracks and a weak value down the middle, which fine noise breaks into a patchy grass strip.
   let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=-2)farEnd=d;
-  g.globalCompositeOperation='lighter';path(2.1,'#3a0000',0,0,farEnd);g.globalCompositeOperation='source-over';
-  for(const side of [-1,1])path(1.05,'#ff0000',side*TRACK_OFFSET,0,farEnd);
+  g.globalCompositeOperation='lighter';path(TRACK_OFFSET*2+.2,'#3a0000',0,0,farEnd);g.globalCompositeOperation='source-over';
+  for(const side of [-1,1])path(TRACK_WIDTH,'#ff0000',side*TRACK_OFFSET,0,farEnd);
   g.fillStyle='#ff0000';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
@@ -69,12 +75,22 @@ export function createGroundDetail(half,driveway,sunDir){
   for(let i=0;i<data.length;i+=4)data[i+1]=sm[i];
   g.putImageData(pixels,0,0);
   const mask=new THREE.CanvasTexture(c);mask.generateMipmaps=false;mask.minFilter=THREE.LinearFilter;
+  // Each spot's place on the drive, for the tyre marks and the cut strip beside the tracks: R across the drive (±2 m), G and B the
+  // sine and cosine of the distance along it over 32 m (a phase, so it wraps with no seam), A on the drive's corridor. 16 cm texels.
+  const roadUV=(()=>{const W=1024,H=768,px=RUV_SIZE.x/W,pz=RUV_SIZE.y/H,out=new Uint8Array(W*H*4),best=new Float32Array(W*H).fill(9);let s0=0;
+    for(let i=1;i<driveway.length;i++){const a=driveway[i-1],b=driveway[i],dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz);
+      if(L>0&&Math.max(a.x,b.x)>-4){const c0=Math.max(0,Math.floor((Math.min(a.x,b.x)-2.2-RUV_MIN.x)/px)),c1=Math.min(W-1,Math.ceil((Math.max(a.x,b.x)+2.2-RUV_MIN.x)/px)),r0=Math.max(0,Math.floor((Math.min(a.z,b.z)-2.2-RUV_MIN.y)/pz)),r1=Math.min(H-1,Math.ceil((Math.max(a.z,b.z)+2.2-RUV_MIN.y)/pz));
+        for(let r=r0;r<=r1;r++)for(let q=c0;q<=c1;q++){const x=RUV_MIN.x+(q+.5)*px,z=RUV_MIN.y+(r+.5)*pz,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(L*L))),ex=x-a.x-dx*t,ez=z-a.z-dz*t,d=Math.hypot(ex,ez),k=r*W+q;
+          if(d>=2||d>=best[k])continue;best[k]=d;const off=(ex*-dz+ez*dx)/L,ph=(s0+t*L)/32*Math.PI*2;
+          out[k*4]=Math.round(127.5+off/2*127.5);out[k*4+1]=Math.round(127.5+127.5*Math.sin(ph));out[k*4+2]=Math.round(127.5+127.5*Math.cos(ph));out[k*4+3]=255;}}
+      s0+=L;}
+    const t=new THREE.DataTexture(out,W,H,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.LinearFilter;t.generateMipmaps=false;t.needsUpdate=true;return t;})();
   // The apron's own marks: red tyre arcs, green the pale scuffed middle of the Y.
   const apronCanvas=document.createElement('canvas');apronCanvas.width=apronCanvas.height=512;{const a=apronCanvas.getContext('2d'),k=512/APRON_SIZE,r=random(5151);a.fillStyle='black';a.fillRect(0,0,512,512);a.setTransform(k,0,0,k,-APRON_MIN.x*k,-APRON_MIN.y*k);a.globalCompositeOperation='lighter';a.filter='blur(9px)';a.strokeStyle='#00a000';a.lineCap='round';a.lineWidth=2.6;
     for(const l of [[[-22,-3],[-15,0],[-6,3.6],[3,5.4]],[[-15.5,1],[-17.5,8],[-19,15]]]){a.beginPath();l.forEach(([x,z],i)=>a[i?'lineTo':'moveTo'](x,z));a.stroke();}
     a.filter='blur(1.2px)';for(const line of RUTS.slice(0,7)){a.strokeStyle=`rgba(${190+r()*65|0},0,0,1)`;a.lineWidth=.2+r()*.14;a.beginPath();a.moveTo(line[0].x,line[0].z);for(let i=1;i<line.length-1;i++){const m=line[i],n=line[i+1];a.quadraticCurveTo(m.x,m.z,(m.x+n.x)/2,(m.z+n.z)/2);}const e=line[line.length-1];a.lineTo(e.x,e.z);a.stroke();}}
   const apronMap=new THREE.CanvasTexture(apronCanvas);apronMap.generateMipmaps=false;apronMap.minFilter=THREE.LinearFilter;
-  const uniforms={greenness:{value:.85},detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},patchMap:{value:patchNoise()},colourHi:{value:colourMap('./ground-colour-hi.jpg')},colourMid:{value:colourMap('./ground-colour-mid.jpg')},tileDry:{value:detailTile('./tile-dry.jpg')},tileGreen:{value:detailTile('./tile-green.jpg')},tileRoad:{value:detailTile('./tile-road.jpg')},hiMin:{value:HI_MIN},hiSize:{value:HI_SIZE},midHalf:{value:MID_HALF},lushMap:{value:null},lushMin:{value:new THREE.Vector2()},lushSize:{value:new THREE.Vector2(1,1)},apronMap:{value:apronMap},apronMin:{value:APRON_MIN},apronSize:{value:APRON_SIZE}};
+  const uniforms={greenness:{value:.85},detailEnabled:{value:1},roadMask:{value:mask},groundMaskMin:{value:maskMin},groundMaskSize:{value:maskSize},patchMap:{value:patchNoise()},colourHi:{value:colourMap('./ground-colour-hi.jpg')},colourMid:{value:colourMap('./ground-colour-mid.jpg')},tileDry:{value:detailTile('./tile-dry.jpg')},tileGreen:{value:detailTile('./tile-green.jpg')},tileRoad:{value:detailTile('./tile-road.jpg')},hiMin:{value:HI_MIN},hiSize:{value:HI_SIZE},midHalf:{value:MID_HALF},lushMap:{value:null},lushMin:{value:new THREE.Vector2()},lushSize:{value:new THREE.Vector2(1,1)},apronMap:{value:apronMap},apronMin:{value:APRON_MIN},apronSize:{value:APRON_SIZE},roadUV:{value:roadUV},roadUVMin:{value:RUV_MIN},roadUVSize:{value:RUV_SIZE},trackAt:{value:new THREE.Vector3(TRACK_OFFSET,TRACK_WIDTH,VERGE)}};
   // Static soft canopy contact shadows: one small mask, no shadow-map pass.
   const shade=document.createElement('canvas');shade.width=shade.height=1024;
   const shadeContext=shade.getContext('2d'),shadeTexture=new THREE.CanvasTexture(shade);
@@ -140,7 +156,7 @@ export function createGroundDetail(half,driveway,sunDir){
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
-    sh.fragmentShader='float apronLift=0.;float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D lushMap;uniform vec2 lushMin;uniform vec2 lushSize;uniform sampler2D apronMap;uniform vec2 apronMin;uniform float apronSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.fragmentShader;
+    sh.fragmentShader='float apronLift=0.;float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D lushMap;uniform vec2 lushMin;uniform vec2 lushSize;uniform sampler2D apronMap;uniform vec2 apronMin;uniform float apronSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D roadUV;uniform vec2 roadUVMin;uniform vec2 roadUVSize;uniform vec3 trackAt;varying vec3 detailWorld;varying vec3 detailNormal;\n'+TYRE_GLSL+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
       // Light bounced round the meadow: shaded grass stays a living blue-green.
       totalEmissiveRadiance+=diffuseColor.rgb*vec3(.09,.12,.1)+diffuseColor.rgb*apronLift*vec3(.3,.22,.14);`).replace('#include <map_fragment>',`#include <map_fragment>
@@ -158,11 +174,30 @@ export function createGroundDetail(half,driveway,sunDir){
       vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
       float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
       road*=1.-smoothstep(9.,18.5,landUV.y)*smoothstep(.15,.55,fine.b*.6+tiny.g*.4+(landUV.y-14.)*.05)*step(landUV.x,-8.);
+      // THE DRIVE'S OWN COORDINATES (roadUV, 16 cm texels): across it and along it. On the two-track the wheel tracks are drawn
+      // from them, their measured width exactly with a slightly ragged edge (the ground mask, 30 cm texels, drew them broad and
+      // soft), and the strip between them is grass.
+      float across=0.,along=0.,onDrive=0.;
+      {vec2 ruv=(landUV-roadUVMin)/roadUVSize;
+       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=step(.5,rc.a)*smoothstep(2.,5.,landUV.x);}}   // (from where the apron's east arm narrows into the tracks)
+      float track=1.-smoothstep(trackAt.y*.5-.07,trackAt.y*.5+.07,abs(abs(across)-trackAt.x)+(tiny.r-.5)*.1+(fine.g-.5)*.06);
+      road=mix(road,track,onDrive);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
       float drawn=road*smoothstep(-1.,2.,landUV.x);
-      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);near*=1.-centre*tuftsHere*.25;drawn=max(drawn,centre*(1.-tuftsHere));
+      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x)*(1.-onDrive),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);near*=1.-centre*tuftsHere*.25;drawn=max(drawn,centre*(1.-tuftsHere));
       // (the gravel measured 143,141,141 in the July frames, a neutral mid grey; it was drawn 176,173,153)
       near=mix(near,vec3(.66,.65,.64)*(.88+fine.r*.24),drawn*.95);
+      // TYRE MARKS AND THE CUT VERGE, from the drive's own coordinates (roadUV): in each track the tyres' long streaks, a darker packed
+      // middle and loose paler gravel at its edges, as the July frames show; beside it a foot or two of short mown green.
+      {if(onDrive>0.){float side=abs(across),fade=1.-smoothstep(25.,70.,distance(cameraPosition,detailWorld));
+         float inTrack=clamp(abs(side-trackAt.x)/(trackAt.y*.5),0.,1.);
+         float st=tyreNoise(vec2(along*16.,across*22.),16.)*.6+tyreNoise(vec2(along*48.,across*57.+3.7),48.)*.4;
+         near*=mix(1.,mix(.86,1.08,smoothstep(.3,.95,inTrack))*(.88+st*.24),drawn*fade);
+         float edge=trackAt.x+trackAt.y*.5,verge=smoothstep(edge-.05,edge+.08,side)*(1.-smoothstep(edge+trackAt.z-.1,edge+trackAt.z+.12,side))*(1.-road);
+         near=mix(near,mix(vec3(.36,.56,.17),vec3(.46,.64,.2),smoothstep(.3,.7,fine.r))*(.86+tiny.g*.28),verge*.7*onDrive);
+         // the strip between the tracks: grass, a little thinner where the wheels drift onto it
+         float median=(1.-smoothstep(trackAt.x-trackAt.y*.5-.06,trackAt.x-trackAt.y*.5+.04,side))*(1.-road);
+         near=mix(near,mix(vec3(.4,.53,.2),vec3(.5,.6,.26),fine.b)*(.8+tiny.r*.4),median*.8*onDrive*smoothstep(.3,.6,fine.g*.6+tiny.b*.4+.25));}}
       // The apron: its colour is drawn, so the shadows the drone caught on it stay out of the map. Pale scuffed middle, tyre arcs, gravel grain.
       float apron=road*(1.-smoothstep(-1.,3.,landUV.x));
       if(apron>0.){vec2 apronUV=(landUV-apronMin)/apronSize;vec2 apronMark=texture2D(apronMap,vec2(apronUV.x,1.-apronUV.y)).rg;
