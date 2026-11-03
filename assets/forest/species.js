@@ -114,7 +114,8 @@ function sprayFir({seed,radius=.22,whorls=46,perWhorl=6,sprays=6,crownBase=.03,p
     // each spray two crossed cards: one lying flat (seen from the drone), one tipped up on edge (seen from the side)
     const sy2=yaw+(r()-.5)*1.1,dp=dip*.5-.1+(r()-.5)*.3,sh=light*(.7+.35*t);
     const tilt=f>.6?(r()<.5?1:-1)*(.5+.6*r())*(f-.6)/.4:0;
-    addBranch(L,[px,py,pz],sy2,s,s*.72,dp-(f>.6?.35*(f-.6)/.4:0),-.05,(r()-.5)*.7+tilt,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.62,dp,-.05,1.2+(r()-.5)*.6,1,sh*.9,FLAME);
+    // (rolled well off the flat both ways, so a fir seen level from the side, as down the hill, is foliage and not a ladder of slabs)
+    addBranch(L,[px,py,pz],sy2,s,s*.72,dp-(f>.6?.35*(f-.6)/.4:0),-.05,(r()-.5)*1.6+tilt,1,sh,FLAME);addBranch(L,[px,py,pz],sy2+(r()-.5)*.6,s*.9,s*.66,dp,-.05,(r()<.5?1:-1)*(1.15+r()*.45),1,sh*.9,FLAME);
    }
    const tl=len*spraySize*.9+.01;addBranch(L,[cy*ex,y+ey,sy*ex],yaw+(r()-.5)*.4,tl,tl*.7,-.15,-.06,(r()-.5)*.6,1,light*1.08,FLAME);
    // close in by the trunk: shaded sprays, so no bare pole shows up the middle
@@ -251,7 +252,7 @@ export async function buildTreeSpecies(baseUrl){
  out.push(pack('juniper','Round juniper',4,juniper({seed:4404,radius:.47,outline:'round',clumps:26}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,wideBase:1.3,sway:.1}));
  {const g=aspen({seed:4505}),leafMat=new THREE.MeshStandardMaterial({map:(()=>{const t=leafTexture(77);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;})(),color:new THREE.Color().setRGB(.68,.71,.72),alphaTest:.45,side:THREE.DoubleSide,roughness:1,metalness:0,vertexColors:true,name:'leaf'}),trunk=new THREE.MeshStandardMaterial({map:bark,color:0xf6f6ec,vertexColors:true,roughness:1,metalness:0,name:'bark'});
   out.push(pack('aspen','Lime aspen',12,g,leafMat,trunk,{shape:{...lump,lump:.06,dark:.36,tip:.3,olive:0,under:0,glow:0},coverage:true,sway:.2}));}
- out.push(pack('open_fir','Open fir',18,sprayFir({seed:4606,radius:.25,whorls:24,perWhorl:4,sparse:.3,pointed:.75,dead:12}),sprayLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,sway:.06}));
+ out.push(pack('open_fir','Open fir',18,sprayFir({seed:4606,radius:.27,whorls:40,perWhorl:6,sprays:5,sparse:.08,pointed:.8,dead:12}),sprayLeaf(0xf4f6e6),crownMat(firTile),{shape:CONE,sway:.06}));
  out.push(pack('juniper_column','Column juniper',7,juniper({seed:4707,radius:.28,outline:'column',clumps:24,count:460,size:.075}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.07}));
 
  out.push(pack('juniper_low','Low spreading juniper',3.5,juniper({seed:4808,radius:.72,outline:'low',clumps:28,count:640,size:.11}),juniperMat(),crownMat(juniperTile),{shape:{...lump,lump:.05,dark:.62,branchDark:0,tip:.12,olive:0},soften:.32,coverage:true,sway:.1}));
