@@ -128,7 +128,7 @@
 // (building positions, ground shaping, object ids, house designs) moves buildings, raises mounds and hides
 // props, so set it aside once per LAYOUT: kept under montanaSetAside:<key>, not deleted. Bump LAYOUT when published edits
 // supersede what browsers may hold. Quality settings stay.
-{const LAYOUT='2026-11-04',KEYS=['montanaLandscapeDraft:v1','montanaBuildingTransforms:v1','montanaTerrainPaint:v1','montanaHouse','montanaGarage','montanaShed'];
+{const LAYOUT='2026-11-04b',KEYS=['montanaLandscapeDraft:v1','montanaBuildingTransforms:v1','montanaTerrainPaint:v1','montanaHouse','montanaGarage','montanaShed'];
  try{if(localStorage.getItem('montanaLayout')!==LAYOUT){
   for(const k of KEYS){const v=localStorage.getItem(k);if(v===null)continue;localStorage.removeItem(k);try{localStorage.setItem('montanaSetAside:'+k,v);}catch(e){}}
   for(const k of ['montanaPlantCensus:v1','montanaReferenceEdits:v1'])localStorage.removeItem(k);
@@ -394,10 +394,20 @@ function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
   const bb=new THREE.Box3().setFromObject(out),cx=src.userData.origin?src.userData.origin[0]*FT:(bb.min.x+bb.max.x)/2,cz=src.userData.origin?src.userData.origin[1]*FT:(bb.min.z+bb.max.z)/2;
   out.children.forEach(m=>m.geometry.translate(-cx,0,-cz));
   return out; }
+// The house's ground-floor outline in its own metres (bakedFt centres it on the design origin), for the foundation and the ground cut.
+function houseOutline(spec){const o=spec.origin||[0,0];return spec.floors[0].outline.map(([x,z])=>new THREE.Vector3((x-o[0])*FT,0,(z-o[1])*FT));}
+// A concrete foundation band round the ground floor, 1.6 m below the floor line to 8 cm above it, so ground that dips under the
+// walls shows foundation, not a gap (the photos put the front's ground at the floor, the grid cannot hold it exactly).
+function withSkirt(g,spec){const P=houseOutline(spec);let area=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];area+=a.x*b.z-b.x*a.z;}
+  const out=area>0?-1:1,pos=[],idx=[];
+  for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length],dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz);if(!L)continue;const nx=out*dz/L*.02,nz=-out*dx/L*.02,k=pos.length/3;
+    pos.push(a.x+nx,-1.6,a.z+nz, b.x+nx,-1.6,b.z+nz, b.x+nx,.08,b.z+nz, a.x+nx,.08,a.z+nz);idx.push(k,k+1,k+2,k,k+2,k+3);}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
+  g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x6b6862,roughness:.95,side:THREE.DoubleSide})));g.userData.outline=P;return g;}
 function makeHouse(){
   const saved=localStorage.getItem('montanaHouse');                  // live design from the Home Designer (same-origin)
   if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return bakedFt(h); }catch(e){} }
-  if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length) return bakedFt(h); }catch(e){} }   // committed montana-home.json
+  if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length) return withSkirt(bakedFt(h),houseSchema); }catch(e){} }   // committed montana-home.json
   const g=new THREE.Group(), w=15,d=9,wh=6.2,rh=4.6,eave=0.7,fh=0.6;
   const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
         stone=MAT(COL.stone),tank=MAT(COL.tank,.5,.2),wood=MAT(COL.wood),pipe=MAT(0x242424,.5,.4);
@@ -1107,10 +1117,13 @@ function endDrive({preserveView=false}={}){ driveMode=false; carMode='idle'; int
   // Editor tools must not disturb a carefully aligned photo camera.
   if(!preserveView){controls.target.set(0,heightAt(0,0),0); controls.update();}
   document.getElementById('drive').textContent='drive the RAV4'; }
-// The intro opens 15 m outside the entry arch (the measured line's first point), so the car drives in under it.
-// A hand-made route that never passes the arch plays from its own start.
-function introRoute(){const arch=DRIVE_LINE[0],i=routePts.findIndex(p=>Math.hypot(p.x-arch.x,p.z-arch.z)<.5);if(i<1)return routePts;
-  const a=routePts[i-1],b=routePts[i],t=1-Math.min(15,Math.hypot(b.x-a.x,b.z-a.z))/Math.hypot(b.x-a.x,b.z-a.z);
+// The intro opens 15 m outside the entry arch (measured in the July 2022 frames; prop:entry-arch), so the car drives in under it.
+// A hand-made route that never passes within 4 m of the arch plays from its own start.
+const ENTRY_ARCH={x:128.15,z:-55.9};
+function introRoute(){let best={d:4,s:0},s=0;const S=[0];
+  for(let i=1;i<routePts.length;i++){const a=routePts[i-1],b=routePts[i],L=Math.hypot(b.x-a.x,b.z-a.z);if(L>0){const t=Math.max(0,Math.min(1,((ENTRY_ARCH.x-a.x)*(b.x-a.x)+(ENTRY_ARCH.z-a.z)*(b.z-a.z))/(L*L))),d=Math.hypot(a.x+(b.x-a.x)*t-ENTRY_ARCH.x,a.z+(b.z-a.z)*t-ENTRY_ARCH.z);if(d<best.d)best={d,s:s+t*L};}s+=L;S.push(s);}
+  if(best.d>=4)return routePts;const s0=best.s-15;if(s0<=0)return routePts;
+  const i=S.findIndex(v=>v>s0),a=routePts[i-1],b=routePts[i],t=(s0-S[i-1])/(S[i]-S[i-1]);
   return [{x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t},...routePts.slice(i)];}
 function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypoints first';return;}
   if(!beginDrive('route',introRoute()))return;const y=heightAt(car.x,car.z);cam.position.set(car.x+35,y+55,car.z+35);introActive=true;introT=0; }
@@ -1356,7 +1369,11 @@ const landscapeReady=(async()=>{
   // Scatter records (sage2:*, pebble:*) come from a frozen list. They were once dealt from one seed in a loop that drew numbers only for spots passing `free`, so any change to the road, lawn or pond re-dealt every id after it, and census removals and saved edits then pointed at other plants. The list holds the deal the census was written against; `free` only hides a row, it never moves an id.
   {const free=(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25&&(x<-30||driveLineDistance(x,z)>1.6);
    for(const [id,asset,x,z,offset,rotation,scale,tint] of await (await fetch('./assets/scatter-frozen.json')).json())if(free(x,z)&&(id.startsWith('sage2:')?propertyNature.models.sage.length:(campSurface(x,z).tallGrass<=.2)))base.push({id,asset,x,z,offset,rotation,scale,tint});}
-  for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list)base.push(row('sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
+  // The sage scatter keeps 3.5 m from the old drive outline, and the measured tracks run up to a few metres from it. Sage on the
+  // measured tracks stays in the base (saved edits and the census name sage by id) but starts removed, unless an edit places it.
+  const trackSage=[],driveRoute=correctedDriveway(DRIVEWAY),routeDistance=(x,z)=>{let d=Infinity;for(let i=1;i<driveRoute.length;i++)d=Math.min(d,_pSeg(x,z,driveRoute[i-1].x,driveRoute[i-1].z,driveRoute[i].x,driveRoute[i].z));return d;};
+  for(const c of propertyNature.chunks.values())if(c.kind==='sage')for(const t of c.list){const id='sage:'+t.x.toFixed(5)+':'+t.z.toFixed(5),r=1.1+t.s*.45;base.push(row(id,'bush/sage',t,[t.s*(t.sx||1),t.s,t.s*(t.sz||1)]));
+    if(roadCoverage(t.x,t.z)>.1||routeDistance(t.x,t.z)<r||(t.x>-30&&driveLineDistance(t.x,t.z)<r))trackSage.push(id);}
   // Bake each prop in its own local coordinates, then register it with the
   // same persistent object IDs and instanced editor used for vegetation.
   for(const p of propertyNature.props){
@@ -1382,7 +1399,7 @@ const landscapeReady=(async()=>{
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[]),...(shrubForest?landscapeRecords.filter(o=>landscapeCatalog.get(o.asset)?.shrub).map(o=>o.id):[])]);},
   };
-  const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
+  const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,autoRemoved:trackSage,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
     enter(){endDrive({preserveView:true});dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();setPanel(false);},
     leave(){quality.reset(3);setPanel(true);},
   });
@@ -1416,6 +1433,7 @@ const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VI
 const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);toolDock?.open('photo');});
 const _treeLook=new THREE.Vector3();
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
+let houseCutKey='';
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
   updateQuality(elapsed,dt);
@@ -1423,6 +1441,10 @@ let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getEle
   photoMatch.applyRoll();
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);
   landscapeLayer?.update(cam);
+  // Keep the ground cut on the house as it stands (the editor can move it).
+  {const h=placed.find(r=>r.type==='house'&&!r.deleted&&r.group.userData.outline);if(h){h.group.updateMatrixWorld();const m=h.group.matrixWorld.elements,key=m.join(',');
+    if(key!==houseCutKey){houseCutKey=key;groundDetail.setCut(h.group.userData.outline.map(p=>p.clone().applyMatrix4(h.group.matrixWorld)),h.group.position.y+.02);}}
+   else if(houseCutKey){houseCutKey='';groundDetail.setCut([],1e9);}}
   if(forest){const look=cam.getWorldDirection(_treeLook).add(cam.position);forest.update(cam,look,cam.position,dt);shrubForest?.update(cam,look,cam.position,dt);if(!treeAssetsSettled&&forest.ready){treeAssetsSettled=true;quality.reset();}}
   tickWind(dt);updateTreeShadows();cloudSky.update(cam,dt);
   const v=new THREE.Vector3(0,0,-1).project(cam);

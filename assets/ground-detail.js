@@ -154,10 +154,20 @@ export function createGroundDetail(half,driveway,sunDir){
       diffuseColor.rgb=c;`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
       vec2 hillBump=(texture2D(patchMap,hillWorld.xz*.0031).rg-.5)*.16+(texture2D(patchMap,hillWorld.xz*.019).rg-.5)*.07;normal=normalize(normal+(viewMatrix*vec4(hillBump.x,0.,hillBump.y,0.)).xyz);`);
   };material.customProgramCacheKey=()=>'montana-far-hills-v4';}
-  return {uniforms,paint,setTrees,attachHills,attach(material){material.onBeforeCompile=sh=>{
+  // The house cut: no ground inside the house's walls above its floor. The grid is a metre apart and the house sits into a slope (the
+  // back wall holds 2.5 m of hill), so its triangles cannot follow the walls; the shader drops ground inside the footprint instead, at
+  // the wall line exactly. setCut takes the closed outline in world x,z and the floor's world height.
+  uniforms.cutPoly={value:Array.from({length:24},()=>new THREE.Vector2())};uniforms.cutCount={value:0};uniforms.cutFloor={value:1e9};
+  function setCut(points,floorY){const n=Math.min(points.length,23);if(n<3){uniforms.cutCount.value=0;return;}for(let i=0;i<=n;i++){const p=points[i%n];uniforms.cutPoly.value[i].set(p.x,p.z);}uniforms.cutCount.value=n;uniforms.cutFloor.value=floorY;}
+  return {uniforms,paint,setTrees,attachHills,setCut,attach(material){material.onBeforeCompile=sh=>{
     Object.assign(sh.uniforms,uniforms);
     sh.vertexShader='varying vec3 detailWorld;varying vec3 detailNormal;\n'+sh.vertexShader;
     sh.vertexShader=sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ndetailWorld=(modelMatrix*vec4(position,1.)).xyz;detailNormal=normalize(mat3(modelMatrix)*normal);');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+      {bool cutIn=false;for(int i=0;i<23;i++){if(i>=cutCount)break;vec2 a=cutPoly[i],b=cutPoly[i+1];
+        if((a.y>detailWorld.z)!=(b.y>detailWorld.z)&&detailWorld.x<(b.x-a.x)*(detailWorld.z-a.y)/(b.y-a.y)+a.x)cutIn=!cutIn;}
+       if(cutIn&&detailWorld.y>cutFloor)discard;}`);
+    sh.fragmentShader='uniform vec2 cutPoly[24];uniform int cutCount;uniform float cutFloor;\n'+sh.fragmentShader;
     sh.fragmentShader='float apronLift=0.;float detailRoad=0.;uniform sampler2D patchMap;uniform sampler2D colourHi;uniform sampler2D colourMid;uniform sampler2D tileDry;uniform sampler2D tileGreen;uniform sampler2D tileRoad;uniform vec2 hiMin;uniform float hiSize;uniform float midHalf;uniform sampler2D lushMap;uniform vec2 lushMin;uniform vec2 lushSize;uniform sampler2D apronMap;uniform vec2 apronMin;uniform float apronSize;uniform sampler2D castShade;uniform float castHalf;uniform float castStrength;uniform sampler2D paintMoisture;uniform sampler2D paintSurface;uniform float paintHalf;uniform sampler2D canopyShade;uniform float canopyHalf;uniform float detailEnabled;uniform vec2 groundMaskMin;uniform vec2 groundMaskSize;uniform sampler2D roadMask;uniform sampler2D roadUV;uniform vec2 roadUVMin;uniform vec2 roadUVSize;uniform vec3 trackAt;varying vec3 detailWorld;varying vec3 detailNormal;\n'+TYRE_GLSL+sh.fragmentShader;
     sh.fragmentShader=sh.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
       // Light bounced round the meadow: shaded grass stays a living blue-green.
@@ -175,13 +185,14 @@ export function createGroundDetail(half,driveway,sunDir){
       vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 inMask=step(vec2(0.),localMask)*step(localMask,vec2(1.));
       vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
       float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
-      road*=1.-smoothstep(9.,18.5,landUV.y)*smoothstep(.15,.55,fine.b*.6+tiny.g*.4+(landUV.y-14.)*.05)*step(landUV.x,-8.);
+      // the camp arm thins out into the lawn: a smooth fade with a finely ragged edge (coarse noise here drew blotchy squares)
+      road*=1.-smoothstep(10.,18.,landUV.y+(tiny.g-.5)*1.1+(fine.b-.5)*.5)*step(landUV.x,-8.);
       // THE DRIVE'S OWN COORDINATES (roadUV, 16 cm texels): across it and along it. On the two-track the wheel tracks are drawn
       // from them, their measured width exactly with a slightly ragged edge (the ground mask, 30 cm texels, drew them broad and
       // soft), and the strip between them is grass.
       float across=0.,along=0.,onDrive=0.;
       {vec2 ruv=(landUV-roadUVMin)/roadUVSize;
-       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=smoothstep(.97,1.,rc.a)*smoothstep(2.,5.,landUV.x);}}   // (from where the apron's east arm narrows into the tracks)
+       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=smoothstep(.97,1.,rc.a)*smoothstep(2.5,7.5,landUV.x+(tiny.r-.5)*.8);}}   // (from where the apron's east arm narrows into the tracks)
       float track=1.-smoothstep(trackAt.y*.5-.07,trackAt.y*.5+.07,abs(abs(across)-trackAt.x)+(tiny.r-.5)*.1+(fine.g-.5)*.06);
       road=mix(road,track,onDrive);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
@@ -201,7 +212,7 @@ export function createGroundDetail(half,driveway,sunDir){
          float median=(1.-smoothstep(trackAt.x-trackAt.y*.5-.06,trackAt.x-trackAt.y*.5+.04,side))*(1.-road);
          near=mix(near,mix(vec3(.4,.53,.2),vec3(.5,.6,.26),fine.b)*(.8+tiny.r*.4),median*.8*onDrive*smoothstep(.3,.6,fine.g*.6+tiny.b*.4+.25));}}
       // The apron: its colour is drawn, so the shadows the drone caught on it stay out of the map. Pale scuffed middle, tyre arcs, gravel grain.
-      float apron=road*(1.-smoothstep(-1.,3.,landUV.x));
+      float apron=road*(1.-smoothstep(0.,6.5,landUV.x+(fine.r-.5)*.8));   // the apron's pale gravel greys into the tracks over 6 m
       if(apron>0.){vec2 apronUV=(landUV-apronMin)/apronSize;vec2 apronMark=texture2D(apronMap,vec2(apronUV.x,1.-apronUV.y)).rg;
        vec3 gravel=mix(vec3(.72,.65,.6),vec3(.84,.78,.72),apronMark.g)*(.9+fine.r*.12+tiny.b*.1);gravel*=1.-apronMark.r*.27*smoothstep(.32,.62,fine.b*.6+tiny.g*.4);near=mix(near,gravel,apron);apronLift=apron;}
       // Lush ground has no dirt showing: a green mat under the blades, wherever the frames' plant map says lush.

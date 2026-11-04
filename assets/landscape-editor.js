@@ -6,13 +6,15 @@ import {applyCensusToObjects,censusHandEdits,loadCensus,CENSUS_KEY} from './plan
 
 const clone=o=>JSON.parse(JSON.stringify(o));
 const DRAFT_KEY='montanaLandscapeDraft:v1';
-export async function createLandscapeEditor({scene,camera,controls,canvas,fine,catalog,base,reference,bridge,getVex,enter,leave,migrate=null}){
+export async function createLandscapeEditor({scene,camera,controls,canvas,fine,catalog,base,reference,bridge,getVex,enter,leave,migrate=null,autoRemoved=[]}){
  const state=new LandscapeState(base,catalog.keys(),reference,migrate),history=new EditHistory(),baseline=fine.baseY.slice();
  let published=state.export();
  const response=await fetch(new URL('./landscape-defaults.json',import.meta.url));
  if(!response.ok)throw Error('Published landscape defaults could not load.');
  const defaults=await response.json();let census=null;defaults.objects=applyRockBorders(defaults.objects);
  try{census=await loadCensus(new URL('./plant-census.json',import.meta.url));defaults.objects=applyCensusToObjects(defaults.objects,census,state.base,defaults.censusKeep||[]);}catch(e){console.error('Plant census not applied:',e);}
+ // Base records the page knows are misplaced (sage on the drive's tracks) start removed, unless an edit or the census places them.
+ {const placed=new Set(defaults.objects.overrides.map(o=>o.id)),gone=new Set(defaults.objects.removed);for(const id of autoRemoved)if(!placed.has(id)&&!gone.has(id))defaults.objects.removed.push(id);}
  let censusKeep=defaults.censusKeep||[];
  // A saved or exported document says which census plants were edited by hand, so the census never undoes them.
  const documentOut=()=>{const doc=state.export();if(census){censusKeep=censusHandEdits(doc.objects,census,state.base,censusKeep);doc.censusKeep=censusKeep;}return doc;};
