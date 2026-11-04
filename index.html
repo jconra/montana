@@ -123,6 +123,17 @@
 <div id="stats" class="card">–</div>
 <div id="err"></div>
 <script>window.onerror=(m,s,l)=>{const e=document.getElementById('err');e.style.display='block';e.textContent+=m+' @'+l+'\n';};</script>
+<script>
+// Editor work saved in this browser loads over the published layout. Work saved before the published layout last changed
+// (building positions, ground shaping, object ids, house designs) moves buildings, raises mounds and hides
+// props, so set it aside once per LAYOUT: kept under montanaSetAside:<key>, not deleted. Bump LAYOUT when published edits
+// supersede what browsers may hold. Quality settings stay.
+{const LAYOUT='2026-11-04',KEYS=['montanaLandscapeDraft:v1','montanaBuildingTransforms:v1','montanaTerrainPaint:v1','montanaHouse','montanaGarage','montanaShed'];
+ try{if(localStorage.getItem('montanaLayout')!==LAYOUT){
+  for(const k of KEYS){const v=localStorage.getItem(k);if(v===null)continue;localStorage.removeItem(k);try{localStorage.setItem('montanaSetAside:'+k,v);}catch(e){}}
+  for(const k of ['montanaPlantCensus:v1','montanaReferenceEdits:v1'])localStorage.removeItem(k);
+  localStorage.setItem('montanaLayout',LAYOUT);}}catch(e){}}
+</script>
 <script type="importmap">
 { "imports": {
   "three": "./vendor/three/three.module.js",
