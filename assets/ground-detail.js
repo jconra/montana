@@ -58,11 +58,10 @@ export function createGroundDetail(half,driveway,sunDir){
   g.globalCompositeOperation='lighter';path(TRACK_OFFSET*2+.2,'#3a0000',0,0,farEnd);g.globalCompositeOperation='source-over';
   for(const side of [-1,1])path(TRACK_WIDTH,'#ff0000',side*TRACK_OFFSET,0,farEnd);
   g.fillStyle='#ff0000';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
-  // The camp arm wears out into the lawn as a ragged fan along the worn lane (the May frames), not a box: gravel holds near the lane's
-  // middle while the wear is high and frays to its edges as the wear falls toward the fire pit.
+  // The camp arm runs its full width (gravel up to the rock ring, as the May frames show) and frays into the lawn at its far end along
+  // a ragged line, with a few worn patches just before it.
   const hash=(x,z)=>{const h=Math.sin(x*127.1+z*311.7)*43758.5453;return h-Math.floor(h);},vn=(x,z)=>{const i=Math.floor(x),j=Math.floor(z),u=x-i,v=z-j,a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1),su=u*u*(3-2*u),sv=v*v*(3-2*v);return a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;};
-  function campArmGravel(x,z,s){if(x>-8||z<9)return 1;const n=vn(x*.9,z*.9)*.65+vn(x*2.3+7,z*2.3)*.35-.5,core=s.width*.5*(.35+.9*s.wear)+n*1.4,k=Math.min(1,(z-9)/5);
-    const fan=Math.max(0,Math.min(1,(core-s.distance)/1.2+.5))*Math.max(0,Math.min(1,(s.wear-.12+n*.35)/.3));return 1-k*k*(3-2*k)*(1-fan);}   // from z 9 on
+  function campArmGravel(x,z){if(x>-8||z<11)return 1;const n=vn(x*.55,z*.55)*.6+vn(x*1.7+7,z*1.7)*.4-.5,end=17.4+n*3.2;return Math.max(0,Math.min(1,(end-z)/1.6+.5));}
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
   const pixels=g.getImageData(0,0,c.width,c.height),data=pixels.data;
@@ -71,7 +70,7 @@ export function createGroundDetail(half,driveway,sunDir){
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
     data[i+1]=Math.round(s.lawn*255);
-    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim)*campArmGravel(x,z,s));
+    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim)*campArmGravel(x,z));
   }
   // Feather only moisture, preserving the narrow gravel wheel tracks.
   const green=document.createElement('canvas');green.width=green.height=c.width;const gg=green.getContext('2d'),gp=gg.createImageData(c.width,c.height);
