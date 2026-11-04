@@ -32,5 +32,5 @@ export function campSurface(x,z){
   const tallGrass=tallGrassCoverage(x,z);
   const lawn=Math.max(Math.max(grassReclaim(x,z),laneLawn,1-smooth(.84,1.08,oval),court)*(1-tallGrass),shortGrassCoverage(x,z));
   const gravel=dirtCoverage(x,z);
-  return {gravel,lawn,tallGrass,clear:gravel>.45,distance:best.distance,along:best.along};
+  return {gravel,lawn,tallGrass,clear:gravel>.45,distance:best.distance,along:best.along,width:best.width,wear:best.wear};
 }

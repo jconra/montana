@@ -6,7 +6,7 @@ const pts=a=>a.map(([x,z])=>({x,z}));
 // Packed dirt: the Y as the mosaic shows it. The garage arm runs up to the slab, the south arm fades out toward camp, the east arm narrows into the two wheel tracks.
 // (the east arm's north side follows the north track's outer edge, 1.1 m off the centre line: drawn on the mosaic's grass line, it
 // left the track's last 8 m on lawn, a sharp green wedge into the drive just before the apron)
-export const DIRT_OUTLINE=pts([[-18.4,-7.1],[-17.3,-4.8],[-13.75,-2.4],[-9.8,-.5],[-7.4,-1.6],[-5.5,-1.75],[-2.3,-1.75],[-1.7,-.3],[-5.2,-.05],[-5.9,1.9],[-1.25,2.75],[3,3.3],[5.5,3.4],[7.5,3.55],[7.5,5.75],[5.5,5.85],[3,6.15],[-1.25,5.6],[-8.3,4.7],[-13.4,5.2],[-14.7,7],[-15,11.25],[-15.9,14.4],[-17.8,16.7],[-19.6,18.7],[-22.7,18.1],[-21.7,13.2],[-20,8.5],[-18.6,4.4],[-19.1,2.3],[-21.6,.7],[-24,-.5],[-27.6,-2.2],[-24.2,-9.4],[-21.5,-8.9]]);
+export const DIRT_OUTLINE=pts([[-18.4,-7.1],[-17.3,-4.8],[-13.75,-2.4],[-9.8,-.5],[-7.4,-2.0],[-5.5,-2.3],[-0.75,-2.65],[-0.45,-0.2],[-5.2,-.05],[-5.9,1.9],[-4.6,2.35],[-3.8,2.6],[-3.8,4.15],[-4.6,4.45],[-8.3,4.7],[-13.4,5.2],[-14.7,7],[-15,11.25],[-15.9,14.4],[-17.8,16.7],[-19.6,18.7],[-22.7,18.1],[-21.7,13.2],[-20,8.5],[-18.6,4.4],[-19.1,2.3],[-21.6,.7],[-24,-.5],[-27.6,-2.2],[-24.2,-9.4],[-21.5,-8.9]]);
 // Centre of the two-track, gate side first, read from 390 solved July 2022 frames on LiDAR ground (every 3 m; a few stretches behind trees interpolated); ends on the apron.
 // Corrected 2026-11-03 from the gravel traced in the Spot Check pictures 1-4 and shot onto the ground: 94-145 m from the gate the
 // line ran up to 1.7 m wide of the real road (the S-bend he saw in picture 1); elsewhere it moved under half a metre.
@@ -43,7 +43,7 @@ export function correctedDriveway(points){
 function lineDistance(x,z,line){let best=Infinity;for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz)));best=Math.min(best,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));}return best;}
 export const driveLineDistance=(x,z)=>lineDistance(x,z,DRIVE_LINE);
 // 0..1: the short grass of the drive: the cut strip beside the tracks, and the strip between them (not on the apron or the camp arms)
-export function driveVerge(x,z){if(x<-2||x>136||z<-107)return 0;const d=lineDistance(x,z,DRIVE_LINE),e=TRACK_OFFSET+TRACK_WIDTH/2,m=TRACK_OFFSET-TRACK_WIDTH/2;return Math.max(smooth(e-.05,e+.08,d)*(1-smooth(e+VERGE-.1,e+VERGE+.12,d)),1-smooth(m-.08,m+.04,d));}
+export function driveVerge(x,z){if(x<-5.5||x>136||z<-107)return 0;const d=lineDistance(x,z,DRIVE_LINE),e=TRACK_OFFSET+TRACK_WIDTH/2,m=TRACK_OFFSET-TRACK_WIDTH/2;return Math.max(smooth(e-.05,e+.08,d)*(1-smooth(e+VERGE-.1,e+VERGE+.12,d)),1-smooth(m-.08,m+.04,d));}
 // Where grass density is spent: round the buildings, along the drive and at the fire pit. 0 elsewhere, 1 there.
 export function grassPriority(x,z){
  let p=1-smooth(10,26,driveLineDistance(x,z));p=Math.max(p,1-smooth(12,24,Math.hypot(x-FIRE.x,z-FIRE.z)));

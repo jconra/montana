@@ -54,10 +54,15 @@ export function createGroundDetail(half,driveway,sunDir){
   // Blue: the damp bank round the pond.
   g.globalCompositeOperation='lighter';g.filter='blur(5px)';g.strokeStyle='#0000ff';g.lineWidth=3.2;g.beginPath();POND_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.stroke();g.filter='none';g.globalCompositeOperation='source-over';
   // Red: the drive. The apron and arms as traced; elsewhere two pale wheel tracks and a weak value down the middle, which fine noise breaks into a patchy grass strip.
-  let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=-2)farEnd=d;
+  let farEnd=0;for(let d=0;d<=route.total;d+=1)if(route.at(d).x>=-5.5)farEnd=d;
   g.globalCompositeOperation='lighter';path(TRACK_OFFSET*2+.2,'#3a0000',0,0,farEnd);g.globalCompositeOperation='source-over';
   for(const side of [-1,1])path(TRACK_WIDTH,'#ff0000',side*TRACK_OFFSET,0,farEnd);
   g.fillStyle='#ff0000';g.beginPath();DIRT_OUTLINE.forEach((p,i)=>g[i?'lineTo':'moveTo'](p.x,p.z));g.closePath();g.fill();
+  // The camp arm wears out into the lawn as a ragged fan along the worn lane (the May frames), not a box: gravel holds near the lane's
+  // middle while the wear is high and frays to its edges as the wear falls toward the fire pit.
+  const hash=(x,z)=>{const h=Math.sin(x*127.1+z*311.7)*43758.5453;return h-Math.floor(h);},vn=(x,z)=>{const i=Math.floor(x),j=Math.floor(z),u=x-i,v=z-j,a=hash(i,j),b=hash(i+1,j),c=hash(i,j+1),d=hash(i+1,j+1),su=u*u*(3-2*u),sv=v*v*(3-2*v);return a+(b-a)*su+(c-a)*sv+(a-b-c+d)*su*sv;};
+  function campArmGravel(x,z,s){if(x>-8||z<9)return 1;const n=vn(x*.9,z*.9)*.65+vn(x*2.3+7,z*2.3)*.35-.5,core=s.width*.5*(.35+.9*s.wear)+n*1.4,k=Math.min(1,(z-9)/5);
+    const fan=Math.max(0,Math.min(1,(core-s.distance)/1.2+.5))*Math.max(0,Math.min(1,(s.wear-.12+n*.35)/.3));return 1-k*k*(3-2*k)*(1-fan);}   // from z 9 on
   // Blend the wider garage apron into a short green lawn. Sample the same
   // footprint as the grass renderer, so blades cannot sprout through gravel.
   const pixels=g.getImageData(0,0,c.width,c.height),data=pixels.data;
@@ -66,7 +71,7 @@ export function createGroundDetail(half,driveway,sunDir){
   for(let py=top;py<=bottom;py++)for(let px=left;px<=right;px++){
     const x=maskMin.x+(px+.5)/c.width*maskSize.x,z=maskMin.y+(py+.5)/c.height*maskSize.y,s=campSurface(x,z),i=(py*c.width+px)*4;
     data[i+1]=Math.round(s.lawn*255);
-    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim));
+    const reclaim=grassReclaim(x,z);data[i]=Math.round(data[i]*(1-reclaim)*campArmGravel(x,z,s));
   }
   // Feather only moisture, preserving the narrow gravel wheel tracks.
   const green=document.createElement('canvas');green.width=green.height=c.width;const gg=green.getContext('2d'),gp=gg.createImageData(c.width,c.height);
@@ -81,7 +86,7 @@ export function createGroundDetail(half,driveway,sunDir){
   // where A fell to the empty outside, R slid from +2 to -2 between texels and drew a thin false track along one edge.
   const roadUV=(()=>{const W=1024,H=768,px=RUV_SIZE.x/W,pz=RUV_SIZE.y/H,out=new Uint8Array(W*H*4),best=new Float32Array(W*H).fill(9);let s0=0;
     for(let i=1;i<driveway.length;i++){const a=driveway[i-1],b=driveway[i],dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz);
-      if(L>0&&Math.max(a.x,b.x)>-4){const c0=Math.max(0,Math.floor((Math.min(a.x,b.x)-2.6-RUV_MIN.x)/px)),c1=Math.min(W-1,Math.ceil((Math.max(a.x,b.x)+2.6-RUV_MIN.x)/px)),r0=Math.max(0,Math.floor((Math.min(a.z,b.z)-2.6-RUV_MIN.y)/pz)),r1=Math.min(H-1,Math.ceil((Math.max(a.z,b.z)+2.6-RUV_MIN.y)/pz));
+      if(L>0&&Math.max(a.x,b.x)>-7.5){const c0=Math.max(0,Math.floor((Math.min(a.x,b.x)-2.6-RUV_MIN.x)/px)),c1=Math.min(W-1,Math.ceil((Math.max(a.x,b.x)+2.6-RUV_MIN.x)/px)),r0=Math.max(0,Math.floor((Math.min(a.z,b.z)-2.6-RUV_MIN.y)/pz)),r1=Math.min(H-1,Math.ceil((Math.max(a.z,b.z)+2.6-RUV_MIN.y)/pz));
         for(let r=r0;r<=r1;r++)for(let q=c0;q<=c1;q++){const x=RUV_MIN.x+(q+.5)*px,z=RUV_MIN.y+(r+.5)*pz,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(L*L))),ex=x-a.x-dx*t,ez=z-a.z-dz*t,d=Math.hypot(ex,ez),k=r*W+q;
           if(d>=2.4||d>=best[k])continue;best[k]=d;const off=Math.max(-2,Math.min(2,(ex*-dz+ez*dx)/L)),ph=(s0+t*L)/32*Math.PI*2;
           out[k*4]=Math.round(127.5+off/2*127.5);out[k*4+1]=Math.round(127.5+127.5*Math.sin(ph));out[k*4+2]=Math.round(127.5+127.5*Math.cos(ph));out[k*4+3]=255;}}
@@ -184,35 +189,34 @@ export function createGroundDetail(half,driveway,sunDir){
       vec4 mid=texture2D(patchMap,landUV*.0094),fine=texture2D(patchMap,landUV*.041),tiny=texture2D(patchMap,landUV*.33);
       vec2 localMask=(landUV-groundMaskMin)/groundMaskSize;vec2 inMask=step(vec2(0.),localMask)*step(localMask,vec2(1.));
       vec3 masks=texture2D(roadMask,vec2(localMask.x,1.-localMask.y)).rgb*inMask.x*inMask.y;
-      float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.35);
-      // the camp arm thins out into the lawn: a smooth fade with a finely ragged edge (coarse noise here drew blotchy squares)
-      road*=1.-smoothstep(10.,18.,landUV.y+(tiny.g-.5)*1.1+(fine.b-.5)*.5)*step(landUV.x,-8.);
+      float road=smoothstep(.3,.6,masks.r+(tiny.r*.6+fine.g*.4-.5)*.5);
       // THE DRIVE'S OWN COORDINATES (roadUV, 16 cm texels): across it and along it. On the two-track the wheel tracks are drawn
       // from them, their measured width exactly with a slightly ragged edge (the ground mask, 30 cm texels, drew them broad and
       // soft), and the strip between them is grass.
       float across=0.,along=0.,onDrive=0.;
       {vec2 ruv=(landUV-roadUVMin)/roadUVSize;
-       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=smoothstep(.97,1.,rc.a)*smoothstep(2.5,7.5,landUV.x+(tiny.r-.5)*.8);}}   // (from where the apron's east arm narrows into the tracks)
-      float track=1.-smoothstep(trackAt.y*.5-.07,trackAt.y*.5+.07,abs(abs(across)-trackAt.x)+(tiny.r-.5)*.1+(fine.g-.5)*.06);
+       if(ruv.x>0.&&ruv.x<1.&&ruv.y>0.&&ruv.y<1.){vec4 rc=texture2D(roadUV,ruv);across=(rc.r-.5)*4.;along=atan(rc.g*2.-1.,rc.b*2.-1.)/6.2832+.5;onDrive=smoothstep(.97,1.,rc.a)*smoothstep(-5.5,-3.,landUV.x+(tiny.r-.5)*.6);}}   // (the two-track starts at the lawn wedge's tip, x -4, as the May frames show)
+      float tOff=mix(.43,trackAt.x,smoothstep(-5.,.5,landUV.x));   // the strip between the tracks starts as a thin wedge
+      float track=1.-smoothstep(trackAt.y*.5-.07,trackAt.y*.5+.07,abs(abs(across)-tOff)+(tiny.r-.5)*.1+(fine.g-.5)*.06);
       road=mix(road,track,onDrive);
       // Past where the drone frames resolve the drive, the wheel tracks are drawn.
-      float drawn=road*smoothstep(-1.,2.,landUV.x);
-      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-1.,2.,landUV.x)*(1.-onDrive),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);near*=1.-centre*tuftsHere*.25;drawn=max(drawn,centre*(1.-tuftsHere));
+      float drawn=road*smoothstep(-5.5,-3.,landUV.x);
+      float centre=smoothstep(.1,.2,masks.r)*(1.-road)*smoothstep(-5.5,-3.,landUV.x)*(1.-onDrive),tuftsHere=smoothstep(.38,.58,fine.g*.55+tiny.r*.45);near=mix(near,vec3(.5,.58,.3)*(.8+fine.g*.4),centre*tuftsHere*.92);near*=1.-centre*tuftsHere*.25;drawn=max(drawn,centre*(1.-tuftsHere));
       // (the gravel measured 143,141,141 in the July frames, a neutral mid grey; it was drawn 176,173,153)
       near=mix(near,vec3(.66,.65,.64)*(.88+fine.r*.24),drawn*.95);
       // TYRE MARKS AND THE CUT VERGE, from the drive's own coordinates (roadUV): in each track the tyres' long streaks, a darker packed
       // middle and loose paler gravel at its edges, as the July frames show; beside it a foot or two of short mown green.
       {if(onDrive>0.){float side=abs(across),fade=1.-smoothstep(25.,70.,distance(cameraPosition,detailWorld));
-         float inTrack=clamp(abs(side-trackAt.x)/(trackAt.y*.5),0.,1.);
+         float inTrack=clamp(abs(side-tOff)/(trackAt.y*.5),0.,1.);
          float st=tyreNoise(vec2(along*16.,across*22.),16.)*.6+tyreNoise(vec2(along*48.,across*57.+3.7),48.)*.4;
          near*=mix(1.,mix(.86,1.08,smoothstep(.3,.95,inTrack))*(.88+st*.24),drawn*fade);
-         float edge=trackAt.x+trackAt.y*.5,verge=smoothstep(edge-.05,edge+.08,side)*(1.-smoothstep(edge+trackAt.z-.1,edge+trackAt.z+.12,side))*(1.-road);
+         float edge=tOff+trackAt.y*.5,verge=smoothstep(edge-.05,edge+.08,side)*(1.-smoothstep(edge+trackAt.z-.1,edge+trackAt.z+.12,side))*(1.-road);
          near=mix(near,mix(vec3(.36,.56,.17),vec3(.46,.64,.2),smoothstep(.3,.7,fine.r))*(.86+tiny.g*.28),verge*.7*onDrive);
          // the strip between the tracks: grass, a little thinner where the wheels drift onto it
-         float median=(1.-smoothstep(trackAt.x-trackAt.y*.5-.06,trackAt.x-trackAt.y*.5+.04,side))*(1.-road);
+         float median=(1.-smoothstep(tOff-trackAt.y*.5-.06,tOff-trackAt.y*.5+.04,side))*(1.-road);
          near=mix(near,mix(vec3(.4,.53,.2),vec3(.5,.6,.26),fine.b)*(.8+tiny.r*.4),median*.8*onDrive*smoothstep(.3,.6,fine.g*.6+tiny.b*.4+.25));}}
       // The apron: its colour is drawn, so the shadows the drone caught on it stay out of the map. Pale scuffed middle, tyre arcs, gravel grain.
-      float apron=road*(1.-smoothstep(0.,6.5,landUV.x+(fine.r-.5)*.8));   // the apron's pale gravel greys into the tracks over 6 m
+      float apron=road*(1.-smoothstep(-6.,-2.,landUV.x+(fine.r-.5)*.8));   // the apron's pale gravel greys into the tracks
       if(apron>0.){vec2 apronUV=(landUV-apronMin)/apronSize;vec2 apronMark=texture2D(apronMap,vec2(apronUV.x,1.-apronUV.y)).rg;
        vec3 gravel=mix(vec3(.72,.65,.6),vec3(.84,.78,.72),apronMark.g)*(.9+fine.r*.12+tiny.b*.1);gravel*=1.-apronMark.r*.27*smoothstep(.32,.62,fine.b*.6+tiny.g*.4);near=mix(near,gravel,apron);apronLift=apron;}
       // Lush ground has no dirt showing: a green mat under the blades, wherever the frames' plant map says lush.
