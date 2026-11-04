@@ -108,6 +108,15 @@ function ropeSwing(limbY,reach,drop){const g=new THREE.Group(),tilt=.12,L=reach+
  seg(seat,seat+1.1,.012,0x1f1e1c);seg(seat+1.1,seat+1.45,.01,0x8a8a86);seg(seat+1.45,seat+1.62,.032,0xc9b25e);seg(seat+1.62,top,.016,0xc9b25e);
  const d=new THREE.Mesh(new THREE.CylinderGeometry(.17,.17,.045,14),mat(0x2b2622));d.position.set(x,seat,0);g.add(d);
  mergeGroup(g);return g;}
+// A fallen dead tree: a grey, barkless trunk lying from its foot (local origin) along +x, its far end drop metres lower, with
+// broken limb stubs on its upper side.
+function fallenLog(len,drop,seed){const g=new THREE.Group(),R=rng(seed),m=mat(0x3f3d40),y0=.24,y1=.07-drop,t=Math.atan2(y0-y1,len),L=Math.hypot(len,y0-y1);
+ const A=new THREE.Vector3(Math.cos(t),-Math.sin(t),0),U=new THREE.Vector3(Math.sin(t),Math.cos(t),0),Z=new THREE.Vector3(0,0,1),Y=new THREE.Vector3(0,1,0);
+ const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.09,.3,L,9),m);trunk.quaternion.setFromUnitVectors(Y,A);trunk.position.set(0,y0,0).addScaledVector(A,L/2);g.add(trunk);
+ for(let i=0;i<14;i++){const u=.25+R()*.7,a=(R()-.5)*3.2,l=.4+R()*1.2*(1-u*.4),r=.028+.03*(1-u);
+  const d=A.clone().multiplyScalar(.45).addScaledVector(U,Math.cos(a)).addScaledVector(Z,Math.sin(a)).normalize();
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(r*.45,r,l,5),m);b.quaternion.setFromUnitVectors(Y,d);b.position.set(0,y0,0).addScaledVector(A,u*L).addScaledVector(d,l/2);g.add(b);}
+ mergeGroup(g);return g;}
 function lumber(pieces,color=0x9c8a6c){const g=new THREE.Group(),R=rng(77),m=mat(color),dk=mat(0x8d7a5c);for(let i=0;i<pieces;i++)box(g,[3.2+R()*.5,.05,.2+R()*.14],[(R()-.5)*.3,.05+Math.floor(i/4)*.06,(i%4-1.5)*.32+(R()-.5)*.06],R()<.3?dk:m,[0,(R()-.5)*.06,0]);mergeGroup(g);return g;}
 function brushPile(){const g=new THREE.Group(),R=rng(303),m=mat(0x6b5a43),d=mat(0x4a3f30);for(let i=0;i<34;i++){const a=R()*6.283,l=1.4+R()*1.6,c=new THREE.Mesh(new THREE.CylinderGeometry(.018,.045,l,5),R()<.5?m:d);c.position.set(Math.cos(a)*R()*.9,.12+R()*.55,Math.sin(a)*R()*.9);c.rotation.set((R()-.5)*1.1,R()*6.28,Math.PI/2+(R()-.5)*.8);g.add(c);}mergeGroup(g);return g;}
 function pedestal(w,h,d,color){const g=new THREE.Group();box(g,[w,h,d],[0,h/2,0],mat(color));box(g,[w*1.1,.04,d*1.1],[0,h+.02,0],mat(color));mergeGroup(g);return g;}
@@ -249,10 +258,14 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  // the second stack, crosswise to the first: the tarped one. Picture 7 shows it running north-south at x -8.5, in front of the
  // juniper (his batch-4 marks 07-4, 07-5), and picture 8 shows only a glimpse of it behind the group.
  place(tarpedStack(2.4,.8,917),{x:-8.5,z:35.3},-.145+Math.PI/2,'prop:wood-2','Firewood stack under a tarp');
- // The swing tree is the census snag M4_swing at (-1.31, 81.39); the limb points down the 43% slope (north-north-west), the way
+ // The swing tree is the census snag M4_swing at (-14.3, 96.2); the limb points down the 40% slope (north-north-west), the way
  // the video shows the swing going out, toward the house clearing.
- {const T={x:-1.31,z:81.39},dir={x:-.33,z:-.94},reach=3,tip=reach*Math.cos(.12),drop=heightAt(T.x,T.z)-heightAt(T.x+dir.x*tip,T.z+dir.z*tip);
+ {const T={x:-14.3,z:96.2},dir={x:-.47,z:-.88},reach=3,tip=reach*Math.cos(.12),drop=heightAt(T.x,T.z)-heightAt(T.x+dir.x*tip,T.z+dir.z*tip);
   place(ropeSwing(9.5,reach,drop),T,Math.atan2(-dir.z,dir.x),'prop:rope-swing','Rope swing');}
+ // The tall dead tree of picture 7 (2022) has fallen: the May 2026 drone shows its trunk lying from its foot at (-1.31, 81.39)
+ // down the slope to about (-5.0, 69.1).
+ {const B={x:-1.31,z:81.39},dir={x:-.289,z:-.957},len=12.6,drop=heightAt(B.x,B.z)-heightAt(B.x+dir.x*len,B.z+dir.z*len);
+  place(fallenLog(len,drop,931),B,Math.atan2(-dir.z,dir.x),'prop:fallen-tree','Fallen dead tree');}
  // Ground clutter measured on the May mosaic and by rays from solved frames.
  [[lumber(16),-26,1,-.37,'lumber-garage','Lumber pile'],[board(2.6,.12),-22.5,.4,-.24,'board-garage','Loose board'],[brushPile(),-6.6,-7.2,.8,'brush-house','Brush heap'],
     [stoneRow(2.4,47),-5.28,6.9,-.25,'stones-boxes','Stone row'],[entryArch(),98.8,-101.7,-2.33,'entry-arch','Driveway entry arch'],[rockCage(.36,1,61),3.11,36.75,0,'rock-cage-1','Wire rock cage'],[rockCage(.34,.82,62),-25.4,15.7,0,'rock-cage-2','Wire rock cage'],[pedestal(.28,1.15,.22,0x8c97a0),-2.05,7.7,0,'pedestal-post','Utility post'],[pedestal(.75,.85,.65,0x5f7f62),-.6,8.4,.15,'pedestal-box','Utility box']
