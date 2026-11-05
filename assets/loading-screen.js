@@ -8,10 +8,40 @@
 'use strict';
 let seed=20261104;const R=()=>(seed=(seed*16807)%2147483647)/2147483647,rr=(a,b)=>a+(b-a)*R();
 const f=n=>Math.round(n*10)/10,U=n=>`calc(var(--u)*${f(n)})`;
-// Tree and treeline silhouettes from the math-games South Park scene (same author). The tree's snow patches, which lie on its
-// layers of branches, are drawn here as those branches in sunlight.
-const TREE='M53 0C48 9 48 23 48 29L44 37 48 43C42 46 40 49 38 54L38 57 36 60 34 69 38 66 40 71 38 74 40 74 38 83 36 86 34 91 29 97 27 97 27 103 25 106 27 106 25 109 29 111 17 129 19 131 17 134 21 134 17 140 17 143 21 143 13 151 15 154 11 157 4 169 4 180 0 189 4 191 8 191 6 197 11 197 13 194 15 197 13 200 23 197 27 200 29 197 34 200 36 194 38 197 44 197 46 200 48 200 50 197 50 194 55 194 55 197 59 200 61 197 65 197 67 197 69 200 71 191 76 191 76 197 80 191 82 194 86 191 88 197 92 191 97 191 97 186 99 183 97 177 97 171 90 157 92 154 95 157 95 153 95 150 90 146 86 137 86 134 82 130 86 130 86 127 84 121 80 120 76 111 74 106 76 104 76 101 78 100 76 97 74 97 76 91 74 93 69 89 65 86 65 80 63 73 63 70 65 74 67 70 69 71 67 66 65 60 63 57 63 53 57 47 57 40 59 40 59 37 61 37 57 30 59 29 57 24 57 21C53 14 50 9 53 0Z';
-const TREE_LAYERS='<path d="M 55 37 L 57 40 C 57 43 57 43 59 46 L 63 51 L 63 57 L 59 54 L 55 54 L 55 60 C 55 66 53 66 53 60 C 50 63 46 63 48 59 C 42 63 46 54 44 51 C 42 57 40 57 38 54 L 40 49 L 42 46 L 46 40 C 48 34 53 37 55 37"/><path d="M 48 89 C 50 97 42 100 40 91 C 40 100 36 100 29 97 L 34 90 L 36 84 L 38 81 L 40 74 L 42 73 L 44 77 L 46 73 L 46 79 L 48 76 L 50 81 L 53 77 L 55 80 L 57 74 L 59 77 L 59 74 L 63 74 L 65 79 L 65 86 L 71 91 C 69 94 67 97 63 90 C 61 111 59 100 57 93 L 55 94 L 53 91 L 50 91"/><path d="M 59 120 C 63 137 71 131 69 117 C 76 131 76 126 78 120 L 82 121 L 84 120 L 76 111 L 74 106 L 74 103 L 71 104 L 69 100 L 67 104 L 67 101 L 61 99 L 59 99 C 59 106 55 109 53 110 L 50 107 L 46 116 L 44 114 L 44 109 L 40 111 L 40 114 L 38 111 L 36 116 L 36 111 L 34 110 L 34 106 L 29 109 L 29 111 L 19 124 C 23 131 25 129 27 123 C 27 129 29 126 32 123 C 29 143 38 131 40 126 C 40 131 44 129 46 126 C 48 140 55 121 59 120"/><path d="M 38 151 C 36 166 42 163 44 143 C 46 149 48 151 48 144 C 50 149 50 149 53 146 C 55 151 55 151 59 147 C 61 157 65 154 69 149 C 69 154 71 151 71 149 C 74 151 74 151 76 149 C 76 151 80 154 78 147 C 80 149 82 154 82 144 C 86 151 90 149 92 144 L 86 137 L 82 139 L 76 130 L 69 126 L 67 131 L 74 136 L 74 140 L 69 141 L 67 136 L 67 139 L 65 136 L 65 139 L 63 136 L 61 133 L 59 136 L 57 130 L 57 129 L 53 133 L 55 124 L 42 123 L 46 133 L 42 133 L 42 140 L 40 137 L 40 140 L 38 137 L 36 141 L 36 140 L 34 143 L 32 137 L 34 131 L 32 127 L 25 133 L 25 136 L 23 133 L 21 134 L 17 139 L 21 143 L 15 149 L 15 153 L 19 149 C 19 160 23 154 27 149 C 23 169 29 157 34 150 C 34 160 36 151 38 151"/><path d="M 53 169 C 59 183 65 186 65 174 C 67 186 69 177 69 174 C 71 189 74 180 74 174 C 76 177 78 174 78 171 C 80 177 84 180 88 174 C 90 191 90 171 92 169 L 97 171 L 90 157 L 90 161 L 88 159 L 82 157 L 82 161 L 80 164 L 78 159 L 76 163 L 74 159 L 74 163 L 71 157 C 67 163 63 163 67 149 L 61 150 C 65 157 63 163 61 163 L 61 160 L 59 161 L 57 156 L 55 163 L 53 159 C 53 166 48 169 44 164 L 42 169 L 42 164 C 38 169 38 169 36 161 L 34 164 L 32 167 L 32 163 L 29 164 L 27 160 L 25 161 L 23 167 L 21 160 L 19 164 L 19 163 L 15 164 L 15 161 L 13 163 L 13 160 L 11 159 L 4 169 L 4 179 L 6 179 L 8 174 C 8 183 11 180 13 174 C 13 189 17 186 17 177 C 17 197 21 183 21 179 C 23 186 25 183 27 176 L 29 176 C 29 191 38 183 38 177 L 38 180 L 40 177 C 44 191 48 177 48 171 C 50 180 53 174 55 171"/>';
+// A cartoon conifer in a box 200 tall (trunk at x=50, ground at y=200; tiers reach out to about x=-14..114). Tiers are
+// drawn from the bottom up, each a drooping skirt with swept-out tips and a wavy lower edge: its body, the shadow the tier
+// above casts on it (a dark band following that tier's wavy edge) and long light strokes below the shadow, all kept inside
+// the tier. Colours come from CSS variables (--tm body, --td shade, --tl light), so one shape serves every tree;
+// `outline` is the bodies alone, for the sunset rim; `defs` holds each tier's clip.
+function stickerTree(seed=11){
+  let s=seed;const r=()=>(s=(s*16807)%2147483647)/2147483647,j=(a,b)=>a+(b-a)*r(),F=n=>Math.round(n*10)/10;
+  const n=8,tiers=[];
+  for(let i=0;i<n;i++){const t=(i+1)/n,yb=16+170*Math.pow(t,.92),hw=12+52*Math.pow(t,.85),yt=i?tiers[i-1].yb-(yb-tiers[i-1].yb)*.72:2;tiers.push({yt,yb,hw});}
+  const smooth=(P,corners=new Set())=>{let o=`M${F(P[0][0])} ${F(P[0][1])}`;for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i];o+=corners.has(i)||corners.has(i-1)?`L${F(b[0])} ${F(b[1])}`:`Q${F((a[0]+b[0])/2+(b[1]-a[1])*.1)} ${F((a[1]+b[1])/2-(b[0]-a[0])*.05)} ${F(b[0])} ${F(b[1])}`;}return o+'Z';};
+  for(const T of tiers){const {yt,yb,hw}=T,h=yb-yt;T.sides={};
+    for(const side of [-1,1]){const X=k=>50+side*k,top=[];
+      for(const [k,y] of [[.22,.14],[.44,.32],[.64,.5],[.82,.68]])top.push([X(hw*k*j(.96,1.04)),yt+h*y*j(.95,1.05)]);
+      const tip=[X(hw*j(1,1.06)),yb+h*j(.02,.1)],low=[];
+      for(const [k,dy] of [[.86,-.17],[.74,.04],[.6,-.15],[.46,.05],[.32,-.12],[.17,.04]])low.push([X(hw*k*j(.97,1.03)),yb+h*dy*j(.8,1.2)]);
+      T.sides[side]={top,tip,low};}
+    const L=T.sides[-1],R=T.sides[1];T.edge=[L.tip,...L.low,[50,yb-h*.04],...R.low.slice().reverse(),R.tip];
+    const ring=[[50,yt],...L.top,...T.edge,...R.top.slice().reverse()],tl=1+L.top.length,tr=tl+T.edge.length-1;T.body=smooth(ring,new Set([tl,tr]));}
+  let defs='',parts='',outline='';
+  for(let i=n-1;i>=0;i--){const T=tiers[i],{yt,yb,hw}=T,h=yb-yt;
+    defs+=`<clipPath id="ldPC${i}"><path d="${T.body}"/></clipPath>`;outline+=`<path d="${T.body}"/>`;
+    let g=`<path d="${T.body}" fill="var(--tm)"/>`;
+    // the shadow of the tier above: its wavy edge, carried down
+    if(i){const U=tiers[i-1],drop=h*.3;g+=`<path d="${smooth([[U.edge[0][0]-3,U.edge[0][1]-6],...U.edge.map(([x,y])=>[x,y+drop*j(.8,1.2)]),[U.edge.at(-1)[0]+3,U.edge.at(-1)[1]-6]])}" fill="var(--td)"/>`;}
+    // light strokes below it, swept down and out
+    for(const side of [-1,1]){const X=k=>50+side*k,m=i<2?1:i<4?2:3;
+      for(let q=0;q<m;q++){const a=j(.04,.5),x0=X(hw*a),y0=yt+h*j(.5,.66)+a*h*.18,len=hw*j(.38,.58),w=h*j(.12,.17),x1=x0+side*len,y1=y0+len*.42;
+        g+=`<path d="M${F(x0)} ${F(y0)}Q${F((x0+x1)/2-side*2)} ${F((y0+y1)/2-w*1.25)} ${F(x1)} ${F(y1)}Q${F((x0+x1)/2+side*3)} ${F((y0+y1)/2+w*.15)} ${F(x0+side*3)} ${F(y0+w)}Z" fill="var(--tl)"/>`;}}
+    parts+=`<g clip-path="url(#ldPC${i})">${g}</g>`;
+  }
+  return {defs,parts,outline,trunk:'<path d="M46 184L45 200H55L54 184Z"/>'};
+}
+const PINE=stickerTree();
+// The far treelines are the math-games South Park scene's jagged treeline (same author).
 const LINE='M92 200L11 200 19 40 21 190 25 120 26 190 29 140 31 180 34 50 37 170 40 90 43 150 48 80 50 150 54 30 59 160 65 70 69 160 72 90 75 150 81 0 83 150 87 70Z';
 const FLAME='M50 0C55 30 72 52 80 82C91 122 92 152 80 176C72 192 61 200 50 200C38 200 24 193 17 178C6 155 10 127 23 103C29 92 35 85 37 68C43 82 45 92 47 97C49 70 44 38 50 0Z';
 
@@ -80,18 +110,23 @@ function chalk(P,closed=false,w=2.8){const dense=[];const n=P.length;
 function open(P){if(P.length<3)return 'M'+P.map(p=>f(p[0])+' '+f(p[1])).join('L');let d=`M${f(P[0][0])} ${f(P[0][1])}`;
   for(let i=0;i<P.length-1;i++){const a=P[Math.max(0,i-1)],b=P[i],c=P[i+1],e=P[Math.min(P.length-1,i+2)];d+=`C${f(b[0]+(c[0]-a[0])/6)} ${f(b[1]+(c[1]-a[1])/6)} ${f(c[0]-(e[0]-b[0])/6)} ${f(c[1]-(e[1]-b[1])/6)} ${f(c[0])} ${f(c[1])}`;}return d;}
 const circleP=(cx,cy,rx,ry=rx,n=12)=>Array.from({length:n},(_,i)=>[cx+Math.cos(i/n*6.283)*rx*rr(.92,1.06),cy+Math.sin(i/n*6.283)*ry*rr(.92,1.06)]);
-// a child's pine: a zigzag of three tiers on a stubby trunk
-function kidPine(cx,by,h){const w=h/2;return chalk([[cx-w*.46,by-h*.12],[cx-w*.16,by-h*.38],[cx-w*.36,by-h*.4],[cx-w*.1,by-h*.66],[cx-w*.24,by-h*.68],[cx,by-h],[cx+w*.24,by-h*.68],[cx+w*.1,by-h*.66],[cx+w*.36,by-h*.4],[cx+w*.16,by-h*.38],[cx+w*.46,by-h*.12]],true)+chalk([[cx-w*.07,by-h*.12],[cx-w*.07,by],[cx+w*.07,by],[cx+w*.07,by-h*.12]]);}
+// a child's pine, the size of the tree it stands for: a zigzag of tiers (more for a taller tree) on a stubby trunk
+function kidPine(cx,by,h,wide=1){const w=h*.62*wide,n=h>380?6:h>240?5:4,base=by-h*.07,top=by-h,step=(base-top)/n,pts=[],hw=i=>w/2*(.22+.78*(i+1)/n);
+  for(let i=n-1;i>=0;i--){const y=top+step*(i+1);pts.push([cx-hw(i),y],[cx-hw(i)*.42,y-step*.42]);}
+  pts.push([cx,top]);for(let i=0;i<n;i++){const y=top+step*(i+1);pts.push([cx+hw(i)*.42,y-step*.42],[cx+hw(i),y]);}
+  return chalk(pts,true)+chalk([[cx-w*.05,base],[cx-w*.05,by],[cx+w*.05,by],[cx+w*.05,base]]);}
 // closed smooth curve through points (Catmull-Rom as cubic Beziers)
 function blob(P){let d=`M${f(P[0][0])} ${f(P[0][1])}`;const n=P.length;for(let i=0;i<n;i++){const a=P[(i-1+n)%n],b=P[i],c=P[(i+1)%n],e=P[(i+2)%n];
   d+=`C${f(b[0]+(c[0]-a[0])/6)} ${f(b[1]+(c[1]-a[1])/6)} ${f(c[0]-(e[0]-b[0])/6)} ${f(c[1]-(e[1]-b[1])/6)} ${f(c[0])} ${f(c[1])}`;}return d+'Z';}
 const poly=P=>'M'+P.map(p=>f(p[0])+' '+f(p[1])).join('L')+'Z';
-// a conifer: a warm rim of sunset light on its west edge, the dark tree, its branch layers lit, and their sunniest tops
-function tree(cx,by,h,lit,dark){const s=h/200,x=cx-50*s,y=by-h;return `<g transform="translate(${f(x)} ${f(y)}) scale(${(s).toFixed(4)})"><use href="#ldTree" fill="#f0a04a" transform="translate(-2.2 -1)"/><use href="#ldTree" fill="${dark}"/><use href="#ldTreeLayers" fill="${lit}"/><use href="#ldTreeLayers" fill="#c9b048" opacity=".55" transform="translate(-1.2 -1.2) scale(.985)"/></g>`;}
+// a soft oval of shadow on the ground, cast a little east (the sun is low in the west)
+const groundShadow=(cx,by,rx)=>`<ellipse cx="${f(cx+rx*.18)}" cy="${f(by-rx*.02)}" rx="${f(rx)}" ry="${f(rx*.2)}" fill="url(#ldShadow)"/>`;
+// a conifer: its shadow, a warm rim of sunset light on its west edge, then the tiers with their shadows and lit strokes (no outline)
+function tree(cx,by,h,[mid,shade,light],wide=1){const s=h/200,x=cx-50*s*wide,y=by-h;return groundShadow(cx,by,h*.36*wide)+`<g transform="translate(${f(x)} ${f(y)}) scale(${(s*wide).toFixed(4)} ${(s).toFixed(4)})" style="--tm:${mid};--td:${shade};--tl:${light}"><use href="#ldPineK" fill="#6b4422"/><use href="#ldPineO" fill="#f0a04a" transform="translate(-2.6 -1.2)"/><use href="#ldPine"/></g>`;}
 
 // ---- shared paints ----
 const DEFS=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-<path id="ldTree" d="${TREE}"/><g id="ldTreeLayers">${TREE_LAYERS}</g><path id="ldLine" d="${LINE}"/><symbol id="ldFlameS" viewBox="0 0 100 200" preserveAspectRatio="none"><path d="${FLAME}"/></symbol>
+${PINE.defs}<g id="ldPine">${PINE.parts}</g><g id="ldPineO">${PINE.outline}</g><g id="ldPineK">${PINE.trunk}</g><path id="ldLine" d="${LINE}"/><symbol id="ldFlameS" viewBox="0 0 100 200" preserveAspectRatio="none"><path d="${FLAME}"/></symbol>
 <linearGradient id="ldSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a3a9c"/><stop offset=".2" stop-color="#7d47a6"/><stop offset=".38" stop-color="#c44f86"/><stop offset=".5" stop-color="#ec6360"/><stop offset=".6" stop-color="#f88a45"/><stop offset=".7" stop-color="#ffb44e"/></linearGradient>
 <radialGradient id="ldSunGlow"><stop offset="0" stop-color="#ffe9a0" stop-opacity=".95"/><stop offset=".35" stop-color="#ffc062" stop-opacity=".55"/><stop offset="1" stop-color="#ff9a50" stop-opacity="0"/></radialGradient>
 <linearGradient id="ldLitFace" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9a5c"/><stop offset=".55" stop-color="#e2704f"/><stop offset="1" stop-color="#a5506a"/></linearGradient>
@@ -104,6 +139,7 @@ const DEFS=`<svg width="0" height="0" style="position:absolute" aria-hidden="tru
 <linearGradient id="ldLitTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb24c" stop-opacity=".9"/><stop offset=".5" stop-color="#ff9a3c" stop-opacity="0"/></linearGradient>
 <radialGradient id="ldEmber"><stop offset="0" stop-color="#fff0a0"/><stop offset=".35" stop-color="#ffab3a"/><stop offset=".75" stop-color="#d4421a"/><stop offset="1" stop-color="#7a1e0a" stop-opacity="0"/></radialGradient>
 <radialGradient id="ldGround"><stop offset="0" stop-color="#ffa04a" stop-opacity=".7"/><stop offset=".55" stop-color="#ff8a3a" stop-opacity=".25"/><stop offset="1" stop-color="#ff8a3a" stop-opacity="0"/></radialGradient>
+<radialGradient id="ldShadow"><stop offset="0" stop-color="#0c1a0c" stop-opacity=".5"/><stop offset=".55" stop-color="#0c1a0c" stop-opacity=".28"/><stop offset="1" stop-color="#0c1a0c" stop-opacity="0"/></radialGradient>
 <radialGradient id="ldWarm"><stop offset="0" stop-color="#ffd27f" stop-opacity=".85"/><stop offset="1" stop-color="#ffb04a" stop-opacity="0"/></radialGradient>
 <linearGradient id="ldWin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7a0"/><stop offset="1" stop-color="#ffaa3a"/></linearGradient>
 <linearGradient id="ldFlO" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a1a" stop-opacity="0"/><stop offset=".22" stop-color="#ff5a1f" stop-opacity=".75"/><stop offset=".6" stop-color="#ff7d1a"/><stop offset="1" stop-color="#ffa63a"/></linearGradient>
@@ -151,14 +187,15 @@ piece('far','rise',.09,[0,300,1600,140],`<path d="M0 360C120 330 230 345 340 335
 // ---- meadow, then the forest growing on it in waves ----
 piece('far','fade',.11,[0,500,1600,400],`<path d="M0 548C260 536 520 552 800 544C1080 536 1340 550 1600 540L1600 900 0 900Z" fill="url(#ldMeadow)"/><path d="M0 560C300 552 560 566 800 560C1060 554 1320 566 1600 558L1600 590C1300 600 1000 588 800 594C540 600 260 588 0 596Z" fill="#c7b048" opacity=".35"/>`,chalk([[0,548],[260,538],[520,550],[800,544],[1080,537],[1340,549],[1600,540]]));
 // back rows: jagged treelines, hazier the further away
-for(const [row,base,hMin,hMax,col,at0] of [[0,470,120,190,'#3e4a5e',.12],[1,515,150,230,'#2a4636',.16]]){
+for(const [row,base,hMin,hMax,col,at0] of [[0,470,120,190,'#2b3446',.12],[1,515,150,230,'#182c21',.16]]){
   for(let g=0;g<4;g++){let inner='';const x0=g*400-40,x1=x0+480;for(let x=x0;x<x1;x+=rr(40,70)){const h=rr(hMin,hMax),w=h*rr(.5,.7);inner+=`<use href="#ldLine" fill="${col}" transform="translate(${f(x)} ${f(base-h)}) scale(${(w/100).toFixed(3)} ${(h/200).toFixed(3)})"/>`;}
     piece('far','grow',at0+g*.012,[x0,base-hMax-10,x1-x0+80,hMax+14],inner);}
 }
-// the forest behind the cabin: single trees, lit gold on the sunset side
-const TPAL=[['#6f8a33','#1f3b27'],['#7a8f38','#22402a'],['#66832f','#1c3524'],['#80913a','#253f2b']];
+// the forest behind the cabin: single trees; sketched: every other one and the tall ones away from the cabin, and the two
+// tall ones at the porch's left end
+const TPAL=[['#1d4a1e','#10301a','#2b6229'],['#1f4e20','#11321b','#2e672b'],['#1b461c','#0e2c17','#296027'],['#21521f','#12351c','#316c2d']];
 const forest=[];for(let x=-20;x<1640;x+=rr(42,66))forest.push([x+rr(-8,8),rr(528,548),rr(190,300)]);
-forest.sort((a,b)=>a[1]-b[1]).forEach(([x,by,h],i)=>{const [l,d]=TPAL[i%4],w=h/2;piece('far','grow',.19+.17*(x+20)/1660,[x-w/2-4,by-h-4,w+8,h+8],tree(x,by,h,l,d),i%3===0&&(x<660||x>1390)?kidPine(x,by,h*.9):'');});
+forest.sort((a,b)=>a[1]-b[1]).forEach(([x,by,h],i)=>{const w=h*.66;piece('far','grow',.19+.17*(x+20)/1660,[x-w/2-4,by-h-4,w+8,h+8],tree(x,by,h,TPAL[i%4]),(x<670||x>1380)&&(i%2===0||h>255)||x>680&&x<760&&h>275?kidPine(x,by,h):'');});
 
 // ---- the cabin, after the reference painting: on stilts, the main roof's gable out over the porch on two braced posts (hollow
 // underneath, its boards running back), a little porch roof on the left slanting up to the cabin, window between the posts, door and lantern beside,
@@ -167,7 +204,7 @@ forest.sort((a,b)=>a[1]-b[1]).forEach(([x,by,h],i)=>{const [l,d]=TPAL[i%4],w=h/2
  const A=[966,196],L=[842,300],Rr=[1090,300],B=[1236,196],E=[1360,300];   // gable apex and eaves, the ridge's back end, the back eave
  // stilts and the shade under the deck
  const SX=[717,837,956,1081,1167];
- piece('far','grow',.3,[690,455,670,105],`<path d="M700 470H1350V548H700Z" fill="#2a2018" opacity=".55"/>${SX.map(x=>`<rect x="${x-6}" y="466" width="12" height="86" fill="${post}"/><rect x="${x-6}" y="466" width="4" height="86" fill="${woodLit}" opacity=".45"/>`).join('')}<path d="M760 548C800 538 840 548 860 552H700Z" fill="#6e6458"/>`,SX.map(x=>chalk([[x,468],[x,552]],false,2.4)).join(''));
+ piece('far','grow',.3,[690,455,670,105],`${groundShadow(1000,556,370)}<path d="M700 470H1350V548H700Z" fill="#2a2018" opacity=".55"/>${SX.map(x=>`<rect x="${x-6}" y="466" width="12" height="86" fill="${post}"/><rect x="${x-6}" y="466" width="4" height="86" fill="${woodLit}" opacity=".45"/>`).join('')}<path d="M760 548C800 538 840 548 860 552H700Z" fill="#6e6458"/>`,SX.map(x=>chalk([[x,468],[x,552]],false,2.4)).join(''));
  // the deck
  piece('far','grow',.33,[696,446,490,26],`<rect x="700" y="456" width="480" height="12" fill="${woodDk}"/><rect x="700" y="452" width="480" height="5" fill="${woodLit}"/>${[740,820,900,980,1060,1140].map(x=>`<circle cx="${x}" cy="462" r="2.2" fill="#5a3a20"/>`).join('')}`,chalk([[700,454],[1180,454],[1180,468],[700,468]],true,2.4));
  // walls: the front under the porch, the long side to the right; window, door, lantern
@@ -212,10 +249,10 @@ forest.sort((a,b)=>a[1]-b[1]).forEach(([x,by,h],i)=>{const [l,d]=TPAL[i%4],w=h/2
  st+=`<path d="M1300 576H1440L1452 592H1290Z" fill="#b9b0a2"/>`;
  {const z=[[1177,464]];for(let i=0;i<9;i++){const x=1177+i*21.2,y=464+i*12.3;z.push([x+21.2,y],[x+21.2,y+12.3]);}piece('far','grow',.44,[1160,396,300,202],st,chalk(z,false,2.4)+chalk([[1177,404],[1366,520]]));}
  // a small tree in front of the cabin
- piece('near','grow',.45,[916,380,110,186],tree(972,562,176,'#86a03c','#21412a'),kidPine(972,562,166));
+ piece('near','grow',.45,[910,380,124,186],tree(972,562,176,['#2a6127','#173d18','#3d8238']));   // (no sketch: it would sit on the cabin's)
 }
 // tall framing trees at the sides, nearer than the forest
-[[40,640,600],[150,600,470],[1480,630,540],[1585,650,640]].forEach(([x,by,h],i)=>{const w=h/2;piece('near','grow',.4+i*.018,[x-w/2-6,by-h-6,w+12,h+40],`<rect x="${x-h*.018}" y="${by-h*.1}" width="${h*.036}" height="${h*.12}" fill="#4a3020"/>`+tree(x,by,h,i%2?'#738c35':'#6a8632','#1d3624'),kidPine(x,by,h*.95));});
+[[150,600,470],[40,640,600],[1480,630,540],[1585,650,640]].forEach(([x,by,h],i)=>{const w=h*.66;piece('near','grow',.4+i*.018,[x-w/2-6,by-h-6,w+12,h+12],tree(x,by,h,i%2?['#2a6127','#173d18','#3d8238']:['#285d25','#163a17','#3a7d36'],.72),kidPine(x,by,h,.72));});
 
 // ---- the fire pit: dirt ring, stones, logs, embers; chairs round it ----
 const FX=800,FY=716,lit=[];   // fire centre (ring centre); lit: shapes the firelight falls on
@@ -228,7 +265,7 @@ const stone=s=>`<path d="${s.d}" fill="url(#ldStone)" stroke="#5a4636" stroke-wi
 // Adirondack chair, three-quarter view facing +x: parts as 3D points (x forward, y up, z away) drawn oblique.
 function chair(cx,by,s,flip,[main,light,dark,deep]){
   const P=(x,y,z)=>[f(cx+(flip?-1:1)*(x+.42*z-30)*s),f(by-(y+.3*z)*s)],Q=pts=>'M'+pts.map(p=>P(...p).join(' ')).join('L')+'Z';
-  let g='',l='';
+  let g=groundShadow(cx+(flip?-1:1)*12*s,by,62*s),l='';
   const ol=`stroke="${deep}" stroke-width="${f(.9*s)}" stroke-linejoin="round"`;
   const box=(x0,x1,y0,y1,z0,z1,top,front,side)=>{g+=`<path d="${Q([[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]])}" fill="${top}" ${ol}/><path d="${Q([[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]])}" fill="${front}" ${ol}/><path d="${Q([[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]])}" fill="${side}" ${ol}/>`;};
   box(46,54,0,62,56,62,dark,dark,deep);box(-6,64,60,64,48,68,light,dark,dark);                  // far front leg, far arm
@@ -244,7 +281,7 @@ function kidChair(cx,by,s,flip){const P=(x,y,z)=>[cx+(flip?-1:1)*(x+.42*z-30)*s,
   return chalk([P(2,30,6),P(-34,112,6),P(-37,120,30),P(-34,112,56),P(2,30,56)],true)+chalk([P(0,30,30),P(52,38,30)])+chalk([P(-8,62,0),P(66,62,0)])+chalk([P(50,0,0),P(50,62,0)])+chalk([P(-20,0,0),P(2,30,0)])+chalk([P(50,0,58),P(50,40,58)],false,2.2);}
 const PINK=['#ef5f74','#ff8b98','#b8405a','#8e2c44'],TEAL=['#3cb6c6','#78d8e2','#23889a','#18667a'];
 // (behind the ring first, then the ring's back stones, the fire, the logs, the front stones, the near chairs)
-piece('near','pop',.6,[560,500,200,210],chair(620,700,1.5,false,TEAL),kidChair(620,700,1.5,false));
+piece('near','pop',.6,[490,500,200,210],chair(550,700,1.5,false,TEAL),kidChair(550,700,1.5,false));
 piece('near','pop',.63,[930,505,210,210],chair(1050,705,1.5,true,PINK),kidChair(1050,705,1.5,true));
 const kidStone=s=>chalk(circleP(s.sx,s.sy-s.h*.42,s.w*.46,s.h*.46,9),true,2.4);
 stones.filter(s=>!s.front).forEach((s,i)=>{piece('near','pop',.5+i*.006,[s.sx-s.w/2-6,s.sy-s.h-6,s.w+12,s.h+12],stone(s),kidStone(s));lit.push(`<path d="${s.d}" fill="url(#ldLitLow)"/>`);});
@@ -271,7 +308,7 @@ let fire='';{const fl=(cls,x,w,h,t,d)=>`<div class="ld-fl ${cls}" style="left:${
 layers.near+=`<div class="ld-grows" data-fire="light"><div class="ld-glow"><svg viewBox="0 0 1600 900" style="position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:screen" aria-hidden="true"><ellipse cx="${FX}" cy="${FY+20}" rx="330" ry="110" fill="url(#ldGround)"/>${lit.join('')}</svg></div></div>`;
 
 // ---- foreground: a boulder and summer wildflowers, last of all ----
-piece('fore','rise',.72,[0,760,300,150],`<path d="${blob([[10,900],[20,830],[70,790],[150,778],[220,800],[270,850],[280,900]])}" fill="#8e8898"/><path d="${blob([[40,840],[80,800],[150,790],[200,806],[160,820],[90,836]])}" fill="#c9a49e" opacity=".8"/>`,chalk([[14,898],[24,830],[72,792],[150,780],[218,802],[268,852],[278,898]]));
+piece('fore','rise',.72,[0,760,300,150],`${groundShadow(150,902,150)}<path d="${blob([[10,900],[20,830],[70,790],[150,778],[220,800],[270,850],[280,900]])}" fill="#8e8898"/><path d="${blob([[40,840],[80,800],[150,790],[200,806],[160,820],[90,836]])}" fill="#c9a49e" opacity=".8"/>`,chalk([[14,898],[24,830],[72,792],[150,780],[218,802],[268,852],[278,898]]));
 const flower={lupine(x,by,h,c1,c2){let g=`<path d="M${x} ${by}V${by-h}" stroke="#4a6a28" stroke-width="3"/>`;for(let i=0;i<14;i++){const t=i/13,y=by-h*.35-h*.65*t,r=7*(1-t*.6);g+=`<ellipse cx="${f(x-r*.6)}" cy="${f(y)}" rx="${f(r)}" ry="${f(r*.7)}" fill="${i%2?c1:c2}"/><ellipse cx="${f(x+r*.6)}" cy="${f(y-2)}" rx="${f(r)}" ry="${f(r*.7)}" fill="${i%2?c2:c1}"/>`;}
    for(let i=0;i<5;i++){const a=-2.4+i*.45;g+=`<ellipse cx="${f(x+Math.cos(a)*14)}" cy="${f(by-10+Math.sin(a)*8)}" rx="11" ry="3.5" fill="#557a2a" transform="rotate(${f(a*57)} ${f(x+Math.cos(a)*14)} ${f(by-10+Math.sin(a)*8)})"/>`;}return g;},
   brush(x,by,h){let g=`<path d="M${x} ${by}Q${x+4} ${by-h/2} ${x} ${by-h}" stroke="#4a6a28" stroke-width="3" fill="none"/>`;for(let i=0;i<8;i++){const y=by-h+i*7;g+=`<ellipse cx="${f(x+(i%2?5:-5))}" cy="${f(y)}" rx="7" ry="5" fill="${i<3?'#ff6a3a':'#e2402a'}"/>`;}return g;},
