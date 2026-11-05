@@ -6,7 +6,6 @@ export function createToolDock({landscape,sceneTransform,paint,canvas,camera,con
  rail.id='toolRail';rail.setAttribute('aria-label','Scene tools');dock.id='toolDock';dock.hidden=true;
  document.body.append(rail,dock);document.body.classList.add('tools-docked');
  const style=document.createElement('style');style.textContent=`
- .tools-docked #panel,.tools-docked #fab,.tools-docked #landscapeEditor,.tools-docked #photoBarToggle{display:none!important}
  #toolRail{position:fixed;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:3px;z-index:60}
  #toolRail button,#toolRail a{box-sizing:border-box;width:49px;height:45px;display:grid;place-content:center;text-decoration:none;font:11px system-ui;padding:2px}
  #toolRail button,#toolRail a,#toolDock button{color:#ecf2f7;background:#203144eb;border:1px solid #657b91;border-radius:4px;cursor:pointer}
@@ -31,11 +30,11 @@ export function createToolDock({landscape,sceneTransform,paint,canvas,camera,con
  for(const id of ['leUndo','leRedo'])move(terrain,id);const heightCopy=document.createElement('button');heightCopy.textContent='Copy edits';heightCopy.onclick=async()=>{await $('stExport').onclick();$('leStatus').textContent=$('stStatus').textContent;};terrain.append(heightCopy);move(terrain,'leStatus');
  const surface=panel('paint','Paint');surface.innerHTML=`<label>Paint <select id="tpKind"><option value="green">Lush green</option><option value="dry">Dry grass</option><option value="grass">Grass surface</option><option value="gravel">Gravel</option><option value="erase">Erase paint</option></select></label><label>Radius (m) <input id="tpRadius" type="number" min="1" max="50" step="1" value="10"></label><label>Strength <input id="tpStrength" type="range" min="0.05" max="1" step="0.05" value="0.4"></label><button id="tpUndo">Undo</button><button id="tpRedo">Redo</button><button id="tpCopy">Copy edits</button><span id="tpStatus" role="status">Drag to paint with soft edges. Right-drag to navigate.</span>`;
  $('tpUndo').onclick=()=>paint.undo();$('tpRedo').onclick=()=>paint.redo();$('tpCopy').onclick=async()=>{await $('stExport').onclick();$('tpStatus').textContent=$('stStatus').textContent;};
- const photo=panel('photo','Photo');move(photo,'photoBar');$('photoBar').classList.remove('collapsed');
+ const photo=panel('photo','Photo');move(photo,'photoBar');
  const car=panel('car','Car');for(const id of ['drive','dU','dD','dL','dR'])move(car,id);const help=document.createElement('span');help.textContent='Drive / exit · WASD or arrow keys';car.append(help);
  const route=panel('route','Route');for(const id of ['routeGuides','radd','rclear','rdrive','rintro','rcopy'])move(route,id,id==='routeGuides');move(route,'rdump');
  const settings=panel('settings','Settings');for(const id of ['qualityMode','shadowQuality','targetFPS','groundDetail','groundGreen'])move(settings,id,true);move(settings,'qualityStatus');
- const advanced=document.createElement('details');advanced.innerHTML='<summary>Inspect & backups</summary>';settings.append(advanced);for(const id of ['coordinateMode','vex'])move(advanced,id,true);for(const id of ['mode','stand','dropcam','pondView','campView','leExport','leImport','leFile','leReset'])move(advanced,id);
+ const advanced=document.createElement('details');advanced.innerHTML='<summary>Inspect & backups</summary>';settings.append(advanced);for(const id of ['coordinateMode','propertyLine','vex'])move(advanced,id,true);for(const id of ['mode','stand','dropcam','pondView','campView','topview','leExport','leImport','leFile','leReset'])move(advanced,id);
  const labs=document.createElement('a');labs.href='./labs/';labs.textContent='Labs ↗';labs.title='Open experiments';rail.append(labs);
  // Height tools have their own history; object history includes placement/deletion.
  function open(id){

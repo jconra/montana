@@ -36,19 +36,7 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
   }
  }catch(e){console.warn('Photo refinement draft update unavailable:',e);}
  const panel=document.createElement('section');panel.id='landscapeEditor';panel.hidden=true;panel.setAttribute('aria-label','Landscape editor');
- panel.innerHTML=`<div class="le-title"><h2>Landscape editor</h2><button id="leClose" title="Close editor">Done</button></div>
- <label><input id="leLockGeometry" type="checkbox"> lock geometry while adjusting the camera</label>
- <div class="le-row"><button id="leObjects" aria-pressed="true">Objects</button><button id="leTerrain" aria-pressed="false">Terrain</button></div>
- <div class="le-row"><button id="leHouse">House view</button><button id="leTop">Top view</button></div>
- <div id="leObjectTools"><label>Select type<select id="leFilter"><option value="">All objects</option><option value="tree/">Trees</option><option value="rock/">Rocks</option><option value="bush/">Bushes</option><option value="prop/">Property props</option></select></label>
- <p class="le-help">Click an object to select it. Drag the selected object to move it along the ground. Right-drag to pan; drag empty space to orbit.</p>
- <div id="leSelection">Nothing selected</div>
- <fieldset id="leTransform" disabled style="border:0;padding:0;margin:0"><div class="le-row"><label>East X (m)<input id="leX" type="number" step="0.1" min="-749" max="749"></label><label>North (m)<input id="leNorth" type="number" step="0.1" min="-749" max="749"></label></div>
- <label>Above ground (m)<input id="leOffset" type="number" step="0.1" min="-1000" max="1000"></label>
- <div class="le-row"><label>Heading (°)<input id="leHeading" type="number" step="5" min="-360" max="360"></label><label>Size multiplier<input id="leSize" type="number" step="0.05" min="0.05" max="10"></label></div>
- <div class="le-row"><button id="leDuplicate">Duplicate</button><button id="leDelete" class="le-danger">Remove</button></div></fieldset>
- <h3>Add an object</h3><label>Model<select id="leAsset"></select></label><div class="le-row"><button id="leAdd">Place on ground…</button><button id="leCancelAdd" hidden>Cancel</button></div></div>
- <div id="leTerrainTools" hidden><p class="le-help">Click a vertex for an exact Y value, or drag a brush on the ground. Heights use normal (1×) vertical scale. Objects follow the edited ground.</p>
+ panel.innerHTML=`<div id="leTerrainTools" hidden><p class="le-help">Click a vertex for an exact Y value, or drag a brush on the ground. Heights use normal (1×) vertical scale. Objects follow the edited ground.</p>
  <label>Tool<select id="leTerrainTool"><option value="vertex">Select vertex</option><option value="raise">Raise brush</option><option value="lower">Lower brush</option><option value="flatten">Flatten brush</option><option value="smooth">Smooth brush</option></select></label>
  <div class="le-row"><label>Brush radius (m)<input id="leRadius" type="number" min="1" max="20" step="0.5" value="3"></label><label>Step (m)<input id="leStep" type="number" min="0.01" max="3" step="0.05" value="0.25"></label></div>
  <label>Flatten to Y (m)<input id="leFlatten" type="number" min="-1000" max="3000" step="0.1" value="0"></label>
@@ -59,14 +47,9 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  <details open><summary>Save &amp; share</summary><p class="le-help">A draft is saved in this browser. Export the JSON and send it to me to make these changes the published defaults.</p><div class="le-row"><button id="leExport">Export JSON</button><button id="leImport">Import JSON</button></div><input id="leFile" type="file" accept=".json,application/json" hidden><button id="leReset">Reset to published defaults</button></details>
  <p id="leStatus" role="status" aria-live="polite"></p>`;
  document.body.append(panel);const $=id=>document.getElementById(id);
- const mainLock=document.getElementById('lockGeometry');
- $('leLockGeometry').checked=!!mainLock?.checked;
- $('leLockGeometry').onchange=()=>{if(mainLock)mainLock.checked=$('leLockGeometry').checked;};
- mainLock?.addEventListener('change',()=>{$('leLockGeometry').checked=mainLock.checked;});
- for(const [key,asset] of catalog){const option=document.createElement('option');option.value=key;option.textContent=asset.label;$('leAsset').append(option);}
  const deactivateListeners=new Set(),addListeners=new Set();
  let gizmoMode=false;
- let active=false,mode='objects',selected=null,vertex=null,adding=false,gesture=null,preview=null,lastGrid=null,dirtyTerrain=false;
+ let active=false,mode='objects',selected=null,vertex=null,adding=false,addAsset=null,gesture=null,preview=null,lastGrid=null,dirtyTerrain=false;
  $('leFlatten').value=(bridge.heightAt(8,-8)/getVex()).toFixed(3);
  const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),object=new THREE.Object3D(),box=new THREE.Box3(),localRay=new THREE.Ray(),inverse=new THREE.Matrix4(),hitPoint=new THREE.Vector3();
  const outline=new THREE.Box3Helper(new THREE.Box3(),0x8cffe1);outline.material.depthTest=false;outline.renderOrder=30;outline.visible=false;scene.add(outline);
@@ -78,8 +61,6 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  for(const asset of catalog.values()){asset.bounds=new THREE.Box3();for(const part of asset.parts){part.geometry.computeBoundingBox();asset.bounds.union(part.geometry.boundingBox);}}
  let previousHeights=new Map();
  function status(text){$('leStatus').textContent=text;}
- function geometryLocked(){return Boolean(mainLock?.checked||$('leLockGeometry')?.checked);}
- function requireGeometryUnlocked(){if(!geometryLocked())return true;status('Geometry is locked. Uncheck the lock control before editing.');return false;}
  function save(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(documentOut()));saveWarning='';}catch(e){saveWarning='Browser draft could not be saved. Export JSON to keep your work.';}const count=state.overrides.size+state.added.size+state.removed.size;status(saveWarning||`Draft saved · ${count} object edits · ${state.heights.size} terrain vertices`);}
  function syncHistory(){$('leUndo').disabled=!history.undoStack.length;$('leRedo').disabled=!history.redoStack.length;}
  function applyHeights(){
@@ -88,8 +69,8 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  }
  function finishTerrain(){if(!dirtyTerrain)return;fine.pos.needsUpdate=true;fine.mesh.geometry.computeVertexNormals();fine.mesh.geometry.computeBoundingBox();fine.mesh.geometry.computeBoundingSphere();bridge.terrainChanged();dirtyTerrain=false;if(lastGrid)showGrid(lastGrid.x,lastGrid.z);showVertex();}
  function applyObjects(){bridge.apply(state.all(),new Set([...state.overrides.keys(),...state.added.keys()]));}
- function applyDocument(){clearPreview();applyHeights();finishTerrain();applyObjects();if(selected&&!state.get(selected))selected=null;showSelection();if(active&&mode==='objects')showPreview();syncHistory();}
- function commit(before){if(history.push(before,state.export())){previousHeights=new Map(state.heights);finishTerrain();applyObjects();save();}showSelection();if(active&&mode==='objects')showPreview();syncHistory();}
+ function applyDocument(){clearPreview();applyHeights();finishTerrain();applyObjects();if(selected&&!state.get(selected))selected=null;if(active&&mode==='objects')showPreview();syncHistory();}
+ function commit(before){if(history.push(before,state.export())){previousHeights=new Map(state.heights);finishTerrain();applyObjects();save();}if(active&&mode==='objects')showPreview();syncHistory();}
  function restore(data){state.load(data);applyDocument();save();}
  function worldMatrix(rec){object.position.set(rec.x,bridge.heightAt(rec.x,rec.z)+rec.offset,rec.z);object.rotation.set(...rec.rotation);object.scale.set(...rec.scale);object.updateMatrix();return object.matrix;}
  function clearPreview(){if(preview){scene.remove(preview);preview.traverse(o=>{if(o.isMesh)o.material.dispose();});preview=null;}outline.visible=false;bridge.hide(null);}
@@ -100,17 +81,12 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
   }
   preview.position.set(rec.x,bridge.heightAt(rec.x,rec.z)+rec.offset,rec.z);preview.rotation.set(...rec.rotation);preview.scale.set(...rec.scale);preview.updateMatrixWorld(true);outline.box.setFromObject(preview,true);outline.visible=true;bridge.hide(rec.id);
  }
- function showSelection(){const rec=state.get(selected);$('leTransform').disabled=!rec;if(!rec){$('leSelection').textContent='Nothing selected';return;}const original=state.base.get(rec.id)||catalog.get(rec.asset).defaults;
-  $('leSelection').textContent=catalog.get(rec.asset).label+' · '+rec.id;
-  $('leX').value=rec.x.toFixed(2);$('leNorth').value=(-rec.z).toFixed(2);$('leOffset').value=rec.offset.toFixed(2);$('leHeading').value=THREE.MathUtils.radToDeg(rec.rotation[1]).toFixed(1);$('leSize').value=(rec.scale[1]/original.scale[1]).toFixed(3);
- }
- function select(id){selected=id;showSelection();showPreview();}
- function pickObject(){let best=null,nearest=Infinity;const filter=$('leFilter').value,visible=bridge.visibleIds();
+ function select(id){selected=id;showPreview();}
+ function pickObject(){let best=null,nearest=Infinity;const visible=bridge.visibleIds();
   // Test bounds in object space; this also selects shader-facing impostors,
   // whose CPU plane geometry does not follow their billboard shader.
   for(const rec of state.all()){
    if(rec.id!==selected&&!visible.has(rec.id))continue;
-   if(filter&&!rec.asset.startsWith(filter))continue;
    const asset=catalog.get(rec.asset),matrix=worldMatrix(rec);box.copy(asset.bounds).applyMatrix4(matrix);if(!ray.ray.intersectsBox(box))continue;
    inverse.copy(matrix).invert();localRay.copy(ray.ray).applyMatrix4(inverse);if(!localRay.intersectBox(asset.bounds,hitPoint))continue;
    hitPoint.applyMatrix4(matrix);const distance=ray.ray.origin.distanceTo(hitPoint);if(distance<nearest){nearest=distance;best=rec.id;}
@@ -128,13 +104,12 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
   for(const [i,y] of changes)writeHeight(i,y);showGrid(point.x,point.z);showVertex();
  }
  function brushAt(point){const positions=brush.geometry.attributes.position.array,radius=Math.max(1,Math.min(20,+$('leRadius').value||3));for(let i=0;i<64;i++){const a=i/64*Math.PI*2,x=point.x+Math.cos(a)*radius,z=point.z+Math.sin(a)*radius;positions.set([x,bridge.heightAt(x,z)+.1,z],i*3);}brush.geometry.attributes.position.needsUpdate=true;brush.geometry.computeBoundingSphere();brush.visible=$('leTerrainTool').value!=='vertex';}
- function addAt(point,source=null){const asset=source?.asset||$('leAsset').value,rec=clone(source||catalog.get(asset).defaults);rec.id='added:'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));rec.asset=asset;rec.x=point.x;rec.z=point.z;const before=state.export();state.set(rec);selected=rec.id;setAdding(false);commit(before);for(const fn of addListeners)fn(clone(rec));}
- function setAdding(on){adding=on;$('leAdd').textContent=on?'Click the ground…':'Place on ground…';$('leCancelAdd').hidden=!on;canvas.style.cursor=on?'crosshair':'';}
+ function addAt(point,source=null){const asset=source?.asset||addAsset,rec=clone(source||catalog.get(asset).defaults);rec.id='added:'+(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));rec.asset=asset;rec.x=point.x;rec.z=point.z;const before=state.export();state.set(rec);selected=rec.id;setAdding(false);commit(before);for(const fn of addListeners)fn(clone(rec));}
+ function setAdding(on){adding=on;canvas.style.cursor=on?'crosshair':'';}
  function cancelGesture(){if(!gesture)return;const before=gesture.before;gesture=null;controls.enabled=true;restore(before);}
  function finishGesture(ev){if(!gesture)return;const g=gesture;gesture=null;controls.enabled=true;if(canvas.hasPointerCapture(ev.pointerId))canvas.releasePointerCapture(ev.pointerId);commit(g.before);}
  canvas.addEventListener('pointerdown',ev=>{
   if(!active||gizmoMode||ev.button!==0)return;
-  if(!requireGeometryUnlocked())return;
   // Captured pointer gestures prevent the browser's normal focus change.
   // Commit the old field before selecting a different object or vertex.
   if(panel.contains(document.activeElement))document.activeElement.blur();
@@ -159,36 +134,24 @@ export async function createLandscapeEditor({scene,camera,controls,canvas,fine,c
  canvas.addEventListener('pointerup',ev=>{if(!gesture)return;ev.preventDefault();ev.stopImmediatePropagation();finishGesture(ev);},true);
  canvas.addEventListener('pointercancel',cancelGesture,true);
  canvas.addEventListener('lostpointercapture',()=>{if(gesture)cancelGesture();});
- function changeObject(id){if(!requireGeometryUnlocked())return;const rec=clone(state.get(selected));if(!rec)return;const before=state.export(),original=state.base.get(rec.id)||catalog.get(rec.asset).defaults,value=+$(id).value;
-  if(id==='leX')rec.x=value;else if(id==='leNorth')rec.z=-value;else if(id==='leOffset')rec.offset=value;else if(id==='leHeading')rec.rotation[1]=THREE.MathUtils.degToRad(value);else if(id==='leSize')rec.scale=original.scale.map(n=>n*value);
-  const candidate=clone(before),list=state.base.has(rec.id)?candidate.objects.overrides:candidate.objects.added;const index=list.findIndex(o=>o.id===rec.id);if(index<0)list.push(rec);else list[index]=rec;
-  try{state.load(candidate);commit(before);}catch(e){status(e.message);showSelection();}
- }
- for(const id of ['leX','leNorth','leOffset','leHeading','leSize']){let dirty=false;$(id).addEventListener('input',()=>{dirty=true;});$(id).addEventListener('change',()=>{if(dirty){dirty=false;changeObject(id);}});}
- function remove(){if(!requireGeometryUnlocked()||!selected)return;const before=state.export();state.remove(selected);selected=null;clearPreview();commit(before);}
- $('leDelete').onclick=remove;$('leDuplicate').onclick=()=>{if(!requireGeometryUnlocked())return;const rec=state.get(selected);if(rec)addAt({x:Math.min(748,rec.x+2),z:rec.z},rec);};
- $('leAdd').onclick=()=>{if(requireGeometryUnlocked())setAdding(!adding);};$('leCancelAdd').onclick=()=>setAdding(false);
- function setMode(value){mode=value;setAdding(false);clearPreview();$('leObjectTools').hidden=mode!=='objects';$('leTerrainTools').hidden=mode!=='terrain';$('leObjects').setAttribute('aria-pressed',mode==='objects');$('leTerrain').setAttribute('aria-pressed',mode==='terrain');points.visible=mode==='terrain'&&$('leGrid').checked;brush.visible=false;showVertex();if(mode==='objects')showPreview();else{const p=controls.target;showGrid(p.x,p.z);}}
- $('leObjects').onclick=()=>setMode('objects');$('leTerrain').onclick=()=>setMode('terrain');
+ function remove(){if(!selected)return;const before=state.export();state.remove(selected);selected=null;clearPreview();commit(before);}
+ function setMode(value){mode=value;setAdding(false);clearPreview();points.visible=mode==='terrain'&&$('leGrid').checked;brush.visible=false;showVertex();if(mode==='objects')showPreview();else{const p=controls.target;showGrid(p.x,p.z);}}
  $('leGrid').onchange=()=>{points.visible=active&&mode==='terrain'&&$('leGrid').checked;};$('leHideBuildings').onchange=()=>bridge.hideBuildings($('leHideBuildings').checked);
- function vertexChange(y){if(!requireGeometryUnlocked()||vertex==null)return;const before=state.export();try{writeHeight(vertex,y);commit(before);}catch(e){status(e.message);showVertex();}}
+ function vertexChange(y){if(vertex==null)return;const before=state.export();try{writeHeight(vertex,y);commit(before);}catch(e){status(e.message);showVertex();}}
  let vertexDirty=false;$('leVertexY').oninput=()=>{vertexDirty=true;};$('leVertexY').onchange=()=>{if(vertexDirty){vertexDirty=false;vertexChange(+$('leVertexY').value);}};$('leDown').onclick=()=>vertexChange(fine.baseY[vertex]-(+$('leStep').value||.25));$('leUp').onclick=()=>vertexChange(fine.baseY[vertex]+(+$('leStep').value||.25));$('leSample').onclick=()=>{$('leFlatten').value=fine.baseY[vertex].toFixed(3);};
- function undo(){if(!requireGeometryUnlocked())return;const data=history.undo();if(data)restore(data);}function redo(){if(!requireGeometryUnlocked())return;const data=history.redo();if(data)restore(data);}
+ function undo(){const data=history.undo();if(data)restore(data);}function redo(){const data=history.redo();if(data)restore(data);}
  $('leUndo').onclick=undo;$('leRedo').onclick=redo;
- $('leHouse').onclick=()=>{const y=bridge.heightAt(8,-8);camera.position.set(40,y+34,38);controls.target.set(8,y,-8);controls.update();if(mode==='terrain')showGrid(8,-8);};
- $('leTop').onclick=()=>{const p=controls.target,y=bridge.heightAt(p.x,p.z);camera.position.set(p.x,y+70,p.z+.01);controls.target.set(p.x,y,p.z);controls.update();};
  $('leExport').onclick=()=>{const blob=new Blob([JSON.stringify(documentOut(),null,2)+'\n'],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='montana-landscape-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);status('Export downloaded. Send that JSON file to publish this layout.');};
  $('leImport').onclick=()=>$('leFile').click();$('leFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>12e6)throw Error('Import is limited to 12 MB.');const before=state.export(),data=JSON.parse(await file.text());state.load(data);history.push(before,state.export());selected=null;applyDocument();save();status('Imported landscape. '+(saveWarning||'Draft saved in this browser.'));}catch(error){status('Import failed: '+error.message);}e.target.value='';};
- $('leReset').onclick=()=>{if(!requireGeometryUnlocked())return;const before=state.export();state.load(published);history.push(before,state.export());selected=null;applyDocument();save();};
- function setActive(value){if(gesture)cancelGesture();active=value;if(!value)for(const listener of deactivateListeners)listener();panel.hidden=!value;setAdding(false);if(value){enter();showSelection();if(mode==='objects')showPreview();else{showGrid(controls.target.x,controls.target.z);showVertex();}bridge.hideBuildings($('leHideBuildings').checked);}else{clearPreview();points.visible=brush.visible=vertexMarker.visible=false;bridge.hideBuildings(false);controls.enabled=true;leave();}}
- $('leClose').onclick=()=>setActive(false);
+ $('leReset').onclick=()=>{const before=state.export();state.load(published);history.push(before,state.export());selected=null;applyDocument();save();};
+ function setActive(value){if(gesture)cancelGesture();active=value;if(!value)for(const listener of deactivateListeners)listener();panel.hidden=!value;setAdding(false);if(value){enter();if(mode==='objects')showPreview();else{showGrid(controls.target.x,controls.target.z);showVertex();}bridge.hideBuildings($('leHideBuildings').checked);}else{clearPreview();points.visible=brush.visible=vertexMarker.visible=false;bridge.hideBuildings(false);controls.enabled=true;leave();}}
  addEventListener('keydown',e=>{if(!active||gizmoMode||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;if(mode==='objects'){if(e.key==='Escape')setAdding(false);return;}if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();e.key.toLowerCase()==='y'||e.shiftKey?redo():undo();}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();e.stopImmediatePropagation();if(mode==='objects')remove();}else if(e.key==='Escape'){e.preventDefault();if(gesture)cancelGesture();else if(adding)setAdding(false);else{selected=null;showSelection();clearPreview();}}},true);
  applyDocument();status(saveWarning||(restored?'Restored your saved browser draft.':'Ready. Changes are saved as a browser draft until you export them.'));
  return {state,published:clone(published),setActive,setMode,
-  startAdding(asset){if(!catalog.has(asset))return;gizmoMode=false;if(!active)setActive(true);setMode('objects');panel.hidden=true;$('leAsset').value=asset;setAdding(true);},
+  startAdding(asset){if(!catalog.has(asset))return;gizmoMode=false;if(!active)setActive(true);setMode('objects');panel.hidden=true;addAsset=asset;setAdding(true);},
   onAdd(fn){addListeners.add(fn);},catalog,
   removeSelected:remove,onDeactivate(listener){deactivateListeners.add(listener);return ()=>deactivateListeners.delete(listener);},
-  restoreGizmoObject(id,record){if(!requireGeometryUnlocked())return;const before=state.export();clearPreview();selected=null;if(record)state.set(record);else state.remove(id);commit(before);},
+  restoreGizmoObject(id,record){const before=state.export();clearPreview();selected=null;if(record)state.set(record);else state.remove(id);commit(before);},
   setGizmoMode(on){gizmoMode=on;if(on){if(!active)setActive(true);setMode('objects');panel.hidden=true;}else if(active)setActive(false);},
   pick(ev){eventRay(ev);const id=pickObject();if(!id)return null;const rec=state.get(id);const bounds=catalog.get(rec.asset).bounds.clone().applyMatrix4(worldMatrix(rec));const p=ray.ray.intersectBox(bounds,new THREE.Vector3());return {id,distance:p?ray.ray.origin.distanceTo(p):Infinity};},
   selectForGizmo(id){select(id);return preview;},

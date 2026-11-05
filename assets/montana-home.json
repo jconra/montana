@@ -585,6 +585,7 @@
       "flipRidge": false,
       "raiseWalls": false,
       "gableMat": 3,
+      "overhang": 4,
       "rake": 1.5,
       "fasciaMat": 11,
       "soffitMat": 11

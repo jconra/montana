@@ -31,7 +31,7 @@ export function createPhotoMatch({camera,controls,renderer,stopDrive,onLens}){
     else setOverlayOpacity();
   }
   function setPhotoMode(active){
-    photoMode=Boolean(active);if(photoMode){bar.classList.remove('collapsed');$('photoBarToggle').setAttribute('aria-expanded','true');$('photoBarToggle').textContent='photo controls';}
+    photoMode=Boolean(active);
     if(photoMode){controls.rotateSpeed=rotateSpeed;}else{controls.rotateSpeed=baseRotateSpeed;stopAutoFade();}
   }
   function setView(v){
@@ -66,7 +66,6 @@ export function createPhotoMatch({camera,controls,renderer,stopDrive,onLens}){
   $('ovop').oninput=e=>{$('ovopv').textContent=Math.round(+e.target.value*100)+'%';if(autoFade)overlay.style.setProperty('--photo-fade-peak',Math.max(0,+e.target.value));else setOverlayOpacity();};
   $('photoAutoFade').onchange=e=>setAutoFade(e.target.checked);
   $('photoRotateSpeed').oninput=e=>{rotateSpeed=+e.target.value;$('photoRotateValue').textContent=rotateSpeed.toFixed(2)+'×';if(photoMode)controls.rotateSpeed=rotateSpeed;};
-  $('photoBarToggle').onclick=()=>{const collapsed=bar.classList.toggle('collapsed');$('photoBarToggle').setAttribute('aria-expanded',String(!collapsed));$('photoBarToggle').textContent=collapsed?'photo controls ▸':'photo controls';};
   $('ovtog').onclick=()=>{const on=overlay.style.display!=='none';overlay.style.display=on?'none':'block';$('ovtog').textContent=on?'show photo':'hide photo';if(on){stopAutoFade();}else if(autoFade)setAutoFade(true);};
   $('photoAspect').onchange=resize;
   $('photoRoll').oninput=e=>{roll=+e.target.value;$('photoRollValue').textContent=roll.toFixed(1)+'°';};

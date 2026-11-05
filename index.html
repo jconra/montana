@@ -4,34 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Terrain — Paradise Valley</title>
-<link rel="stylesheet" href="./assets/landscape-editor.css">
 <style>
   html,body{margin:0;height:100%;background:#0d1117;overflow:hidden;font-family:system-ui,sans-serif;color:#e6edf3}
   #c{display:block;width:100%;height:100%}
   .card{position:fixed;z-index:10;background:rgba(13,17,23,.75);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5}
   #hud{top:10px;left:10px}
   #hud b{color:#7ee787}
-  #panel{bottom:10px;left:10px;max-height:78vh;overflow:auto}
-  #fab{position:fixed;bottom:10px;left:10px;z-index:12;width:42px;height:42px;border-radius:50%;font-size:22px;line-height:1;display:none;cursor:pointer;color:#7ee787}
-  #min{padding:0 9px;font-size:15px;line-height:1.2}
   #stats{bottom:10px;right:10px;font:11px/1.5 monospace;color:#7ee787}
-  #panel .sec{margin-top:7px;padding-top:6px;border-top:1px solid #2a3038;color:#9aa4af;font-size:10px;text-transform:uppercase;letter-spacing:.5px}
-  #panel label{display:flex;align-items:center;gap:8px;margin-top:4px}
   input[type=range]{width:120px}
   select,button{cursor:pointer;background:#21262d;color:#e6edf3;border:1px solid #444;border-radius:6px;padding:4px 8px}
-  #photoBar{position:fixed;z-index:11;left:54px;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:4px 6px;background:rgba(13,17,23,.9);border:1px solid #39414b;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35);font-size:11px;white-space:nowrap}
-  #photoBar[hidden]{display:none}
+  /* the dock's controls wait here, unseen, until the tool dock moves them in */
+  #dockParts{display:none}
   #photoBar label{display:flex;align-items:center;gap:4px;color:#c9d1d9}
   #photoBar input[type=range]{width:92px}
   #photoBar .photoValue{display:inline-block;min-width:34px;color:#7ee787;font-variant-numeric:tabular-nums}
   #photoBarTools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
   #photoReference{max-width:230px}
   #photoStatus{font-size:10px;color:#9aa4af;white-space:normal}
-  #photoBar.collapsed{right:auto}
   :root{--photo-bar-height:32px}
-  #photoBar.collapsed #photoBarTools{display:none}
-  #photoBarToggle{color:#7ee787}
-  @media(max-width:760px){#photoBar{left:0;right:0;bottom:0;white-space:normal;flex-wrap:wrap;justify-content:center}#photoBarTools{flex-wrap:wrap;justify-content:center}}
+  /* the landscape editor's own panel only holds its controls until the tool dock moves them */
+  #landscapeEditor{display:none!important}
+  #leStatus{font-size:12px;color:#92dcae;overflow-wrap:anywhere}
   #info{top:10px;right:10px;max-width:210px;color:#ffd479}
   #compass{position:fixed;z-index:10;top:120px;right:10px;width:52px;height:52px;background:rgba(13,17,23,.75);border-radius:50%;font-size:11px}
   #compass span{position:absolute;left:50%;transform:translateX(-50%);top:4px;color:#ff7b72;font-weight:bold}
@@ -42,69 +35,33 @@
 </style>
 </head>
 <body>
+<script src="./assets/loading-screen.js"></script>
 <canvas id="c"></canvas>
 <img id="ov">
-<div id="hud" class="card">loading…</div>
+<div id="hud" class="card"></div>
 <div id="info" class="card">open tools to inspect or edit</div>
 <div id="compass"><span>N</span></div>
-<div id="panel" class="card">
-  <a href="./labs/" style="color:#7ee787">Open labs →</a>
-  <label style="justify-content:space-between;margin:0 0 2px"><b style="color:#7ee787">Tools</b> <button id="min">–</button></label>
-  <label><button id="editLandscape" disabled>Loading landscape editor…</button></label>
+<div id="dockParts">
   <label>inspect coordinates <input id="coordinateMode" type="checkbox"></label>
+  <label>show property line <input id="propertyLine" type="checkbox"></label>
   <label>vertical scale <input id="vex" type="range" min="0.5" max="3" step="0.1" value="1"><span id="vexv">1.0×</span></label>
-  <label><button id="mode">show elevation colors</button></label>
+  <button id="mode">show elevation colors</button>
   <label>ground detail <input id="groundDetail" type="checkbox" checked></label>
   <label>ground greenery <input id="groundGreen" type="range" min="0" max="1" step="0.05" value="0.85"></label>
-
-  <label><button id="pondView">view pond</button><button id="campView">view camp</button></label>
-
-  <div class="sec">performance</div>
+  <button id="pondView">view pond</button><button id="campView">view camp</button><button id="topview">top view</button>
+  <button id="stand">stand at marker</button><button id="dropcam">drop camera</button>
   <label>quality <select id="qualityMode"><option value="auto">Auto</option><option value="0">Minimal</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option><option value="4">Ultra</option></select></label>
   <label>shadows <select id="shadowQuality"><option value="auto">Match quality</option><option value="off">Off</option><option value="2">Medium</option><option value="3">High</option><option value="4">Ultra</option></select></label>
   <label>target <select id="targetFPS"><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
   <div id="qualityStatus" style="font-size:11px;color:#9aa4af" aria-live="polite"></div>
-
-  <div class="sec">structures</div>
-  <label><select id="type"><option value="garage">Garage + Apartment</option><option value="house">Main House</option><option value="cabin">Cabin</option><option value="shed">Shed</option></select> <button id="place">＋ add</button> <button id="undo">undo</button></label>
-  <label>edit existing <select id="structureSelect"><option value="">select a building…</option></select></label>
-  <label><input id="lockGeometry" type="checkbox"> lock geometry (camera only)</label>
-
-  <div class="sec">selected — tap a building, drag to move</div>
-  <label>heading <input id="head" type="range" min="0" max="360" step="0.1" value="0"><span id="headv">0.0°</span></label>
-  <label>size <input id="size" type="range" min="0.25" max="3" step="0.005" value="1"><span id="sizev">1.000×</span></label>
-  <label>nudge 1m <button id="nw">W</button><button id="ne">E</button><button id="nn">N</button><button id="ns">S</button></label>
-  <div id="selinfo" style="font-size:11px;color:#9aa4af;margin-top:3px">none selected</div>
-
-  <div class="sec">layout data</div>
-  <label><button id="copy">copy layout</button> <button id="topview">top view</button></label>
-  <textarea id="dump" rows="5" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333;margin-top:3px" readonly></textarea>
-
-  <div class="sec">trees (from LiDAR)</div>
-  <label>style <select id="treeStyle"><option value="spiky">spiky (textured)</option><option value="lowpoly">low-poly</option><option value="cross2">billboards ×2</option><option value="cross3">billboards ×3</option></select></label>
-  <label>show <input id="treeN" type="range" min="0" max="45000" step="500" value="18000"><span id="treeNv">18000</span></label>
-  <label>billboard size <input id="bbSize" type="range" min="0.5" max="1.8" step="0.02" value="1"><span id="bbSizev">1.00</span></label>
-  <label>billboard y <input id="bbY" type="range" min="-0.4" max="0.3" step="0.01" value="0"><span id="bbYv">0.00</span></label>
-  <label><button id="reseed">rebuild</button></label>
-  <div style="font-size:11px;color:#9aa4af">Use Edit landscape to move, resize, add or remove vegetation.</div>
-
-  <div class="sec">vehicle</div>
-  <label><button id="drive">drive the RAV4</button></label>
-  <label>drive <button id="dU">▲</button><button id="dD">▼</button><button id="dL">◀</button><button id="dR">▶</button></label>
-  <div style="font-size:10px;color:#9aa4af">arrows / WASD, or hold buttons · chase-cam lines up behind it</div>
-
-  <div class="sec">route / sim</div>
+  <button id="drive">drive the RAV4</button>
+  <button id="dU">▲</button><button id="dD">▼</button><button id="dL">◀</button><button id="dR">▶</button>
   <label>show route guides <input id="routeGuides" type="checkbox"></label>
-  <label>show property line <input id="propertyLine" type="checkbox"></label>
-  <label><button id="radd">add waypoints</button> <button id="rclear">clear</button></label>
-  <label><button id="rdrive">drive route</button> <button id="rintro">▶ play intro</button></label>
-  <label><button id="rcopy">copy route</button></label>
+  <button id="radd">add waypoints</button><button id="rclear">clear</button>
+  <button id="rdrive">drive route</button><button id="rintro">▶ play intro</button>
+  <button id="rcopy">copy route</button>
   <textarea id="rdump" rows="2" style="width:182px;font:11px monospace;background:#0d1117;color:#7ee787;border:1px solid #333" readonly></textarea>
-
-  <label><button id="stand">stand at marker</button> <button id="dropcam">drop camera</button></label>
-</div>
-<div id="photoBar" class="collapsed" aria-label="Photo match controls">
-  <button id="photoBarToggle" type="button" aria-expanded="false">photo controls ▸</button>
+<div id="photoBar" aria-label="Photo match controls">
   <div id="photoBarTools">
     <label>reference <select id="photoReference"><option value="">Choose property photo…</option></select></label>
     <button id="photoSave">Save alignment</button>
@@ -119,20 +76,24 @@
     <span id="photoStatus" role="status" aria-live="polite">Choose a reference, then save and export your alignment.</span>
   </div>
 </div>
-<button id="fab" class="card">＋</button>
+</div>
 <div id="stats" class="card">–</div>
 <div id="err"></div>
-<script>window.onerror=(m,s,l)=>{const e=document.getElementById('err');e.style.display='block';e.textContent+=m+' @'+l+'\n';};</script>
+<script>window.onerror=(m,s,l)=>{const e=document.getElementById('err');e.style.display='block';e.textContent+=m+' @'+l+'\n';window.montanaLoading?.fail('Something went wrong: '+m);};
+addEventListener('unhandledrejection',e=>window.montanaLoading?.fail('Something went wrong: '+(e.reason?.message||e.reason)));</script>
 <script>
 // Editor work saved in this browser loads over the published layout. Work saved before the published layout last changed
 // (building positions, ground shaping, object ids, house designs) moves buildings, raises mounds and hides
 // props, so set it aside once per LAYOUT: kept under montanaSetAside:<key>, not deleted. Bump LAYOUT when published edits
 // supersede what browsers may hold. Quality settings stay.
-{const LAYOUT='2026-11-04b',KEYS=['montanaLandscapeDraft:v1','montanaBuildingTransforms:v1','montanaTerrainPaint:v1','montanaHouse','montanaGarage','montanaShed'];
+{const LAYOUT='2026-11-04d',KEYS=['montanaLandscapeDraft:v1','montanaBuildingTransforms:v1','montanaTerrainPaint:v1','montanaHouse','montanaGarage','montanaShed'];
  try{if(localStorage.getItem('montanaLayout')!==LAYOUT){
   for(const k of KEYS){const v=localStorage.getItem(k);if(v===null)continue;localStorage.removeItem(k);try{localStorage.setItem('montanaSetAside:'+k,v);}catch(e){}}
   for(const k of ['montanaPlantCensus:v1','montanaReferenceEdits:v1'])localStorage.removeItem(k);
   localStorage.setItem('montanaLayout',LAYOUT);}}catch(e){}}
+// The straight-down photo's published camera was replaced by a solved one; a browser still holding the old copy would keep showing it.
+{try{const k='montanaPhotoAlignments:v1',a=JSON.parse(localStorage.getItem(k)||'{}'),o=a&&a.overhead;
+ if(o&&o.position&&Math.abs(o.position[0]+12.1681)<.01&&Math.abs(o.position[2]-14.1959)<.01){delete a.overhead;localStorage.setItem(k,JSON.stringify(a));}}catch(e){}}
 </script>
 <script type="importmap">
 { "imports": {
@@ -186,6 +147,14 @@ import { createLandscapeObjects } from './assets/landscape-objects.js';
 import { RouteDriver,dampFactor } from './assets/route-driving.mjs';
 import {propaneTank} from './assets/property-props.js';
 import {createPhotoMatch,PHOTO_VIEWS} from './assets/photo-match.js';
+// ---- loading: the loading screen (assets/loading-screen.js) covers the canvas until every part is in place, so nothing is drawn
+// half-built (plants the census later removes, a placeholder car, trees swapping in). Progress: the first half is this script's own
+// steps, the second half the trees' baking, the landscape records and a few warm-up frames under the screen.
+const LOAD=window.montanaLoading||{at(){},done(){return Promise.resolve();},fail(){}},tick=()=>new Promise(r=>setTimeout(r,0));
+const loadParts={trees:0,shrubs:0,land:0,warm:0};let loadLabel='Planting trees';
+function loadAt(label){if(label)loadLabel=label;LOAD.at(.5+.12*loadParts.trees+.04*loadParts.shrubs+.26*loadParts.land+.08*loadParts.warm,loadLabel);}
+let loading=true,warming=false,holdCar=false,landscapeFailed=false;
+LOAD.at(.04,'Reading the map');
 
 const M = await (await fetch('./assets/manifest.json')).json();
 let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
@@ -194,6 +163,7 @@ let shedSchema=null;try{shedSchema=await (await fetch('./assets/montana-shed.jso
 const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
 const loadBin = async u => new Float32Array(await (await fetch(u)).arrayBuffer());
 const [cData, fData] = await Promise.all([loadBin('./assets/'+M.coarse.bin), loadBin('./assets/'+M.fine.bin)]);
+LOAD.at(.12,'Shaping the hills');await tick();
 // The drive graded smooth before anything samples the ground (drive-grade.mjs: the survey's humps read as a lumpy road).
 // THE TERRAIN'S REGISTRATION. The height grids sit 1.35 m west and 1.63 m north of the world the solved drone cameras live in: fitted
 // against the LiDAR ground the cameras were solved on, that shift takes the two from 28 cm apart (sd) to 2.7 cm, the same in every
@@ -291,6 +261,7 @@ const fine  =buildTile(fData,M.fine.W,  M.fine.H,  M.fine.px,[uv0,uv0,uv1,uv1],f
 {const old=coarse.mesh.geometry.index.array,indices=[];for(let i=0;i<old.length;i+=3){let inside=true;for(let j=0;j<3;j++){const n=old[i+j];inside&&=Math.abs(coarse.pos.getX(n)-TERRAIN_SHIFT.x)<fHalf&&Math.abs(coarse.pos.getZ(n)-TERRAIN_SHIFT.z)<fHalf;}if(!inside)indices.push(old[i],old[i+1],old[i+2]);}coarse.mesh.geometry.setIndex(indices);}
 for(const material of mats){groundDetail.attach(material);gradeLand(material);prepareShadowMaterial(material);}
 fine.mesh.receiveShadow=coarse.mesh.receiveShadow=true;
+LOAD.at(.2,'Raising the buildings');await tick();
 
 // ---- height sampling ----------------------------------------------------
 let VEX=1;
@@ -312,76 +283,11 @@ const pondLevel=preparePond(tiles,heightAt);
 let propertyNature=null,meadowVex=1;
 let sceneTransform=null,toolDock=null;
 let landscapeCatalog=new Map(),landscape=null,landscapeRecords=null,landscapeLayer=null,landscapeHidden=null,landscapeAuthored=new Set();
-// Read-only handle for the test rigs: the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 
 // ---- building models ----------------------------------------------------
 const placed=[];
 const MAT=(c,r=.9,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m,flatShading:true});
-const COL={side:0x352a20, trim:0xece9e0, roof:0x2e3033, glass:0x28323b,
-           wood:0xba8a4e, stone:0x6b6560, garage:0xbcac91, tank:0xd6d2c6};
 function box(p,w,h,d,x,y,z,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);p.add(m);return m;}
-// gable roof, ridge along Z, gable ends face +Z / -Z. baseY = eave height.
-function gableRoof(p,w,d,rh,baseY,eave,mat){
-  const s=new THREE.Shape();s.moveTo(-w/2-eave,0);s.lineTo(w/2+eave,0);s.lineTo(0,rh);s.lineTo(-w/2-eave,0);
-  const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:d+2*eave,bevelEnabled:false}),mat);
-  r.position.set(0,baseY,-(d/2+eave));p.add(r);return r;
-}
-// gable roof with ridge along X (E–W); slopes face ±Z, gable ends (siding) face ±X
-function gableRoofX(g,w,d,rh,baseY,eave,roofMat,gableMat){
-  const D=d/2+eave, ang=Math.atan2(rh,D), sl=Math.hypot(D,rh), W=w+2*eave;
-  box(g,W,0.12,sl,0,baseY+rh/2, D/2,roofMat).rotation.x= ang;
-  box(g,W,0.12,sl,0,baseY+rh/2,-D/2,roofMat).rotation.x=-ang;
-  for(const sx of [-1,1]){const s=new THREE.Shape();s.moveTo(-d/2,0);s.lineTo(d/2,0);s.lineTo(0,rh);s.lineTo(-d/2,0);
-    const t=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:0.12,bevelEnabled:false}),gableMat);
-    t.rotation.y=Math.PI/2; t.position.set(sx*w/2,baseY,0); g.add(t);}
-}
-// small gabled dormer sitting on the front (+Z) slope, window facing +Z
-function dormer(g,cx,zc,yc,side,roof,glass,trim){
-  const dw=1.9,dh=1.6,dd=1.6,drh=0.9;
-  box(g,dw,dh,dd,cx,yc+dh/2,zc,side);
-  const s=new THREE.Shape();s.moveTo(-dw/2-0.15,0);s.lineTo(dw/2+0.15,0);s.lineTo(0,drh);s.lineTo(-dw/2-0.15,0);
-  const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:dd+0.3,bevelEnabled:false}),roof);
-  r.position.set(cx,yc+dh,zc-(dd/2+0.15)); g.add(r);
-  box(g,1.1,1.0,0.1,cx,yc+dh*0.52,zc+dd/2+0.05,glass);
-  box(g,1.35,1.25,0.05,cx,yc+dh*0.52,zc+dd/2+0.02,trim);
-}
-
-// build a Three.js group from the box-part schema (auto-material: walls / roof / deck)
-function buildFromParts(schema){
-  const g=new THREE.Group(), S=0.5;                          // scale designer units → ~metres
-  const sideMat=MAT(0x3a2f24), roofMat=MAT(0x33363a,.5,.35), deckMat=MAT(0x795c3a), trimMat=MAT(0xd8d4c8);
-  const wdim=p=>[p.params.w*(p.scale?p.scale[0]||1:1), p.params.d*(p.scale?p.scale[2]||1:1)];
-  for(const p of schema.parts){
-    if(p.kind!=='box') continue;
-    const P=p.params, y=p.pos[1]||0, tilted=p.rot&&((p.rot[2]||0)!==0);
-    let mat=sideMat;
-    if(tilted || (P.h<=0.4 && y>2)) mat=roofMat;             // tilted board / high thin slab = roof
-    else if(P.h<=0.4) mat=deckMat;                           // low thin slab = deck/floor
-    else if(Math.min(P.w,P.d)<=0.25 && P.h<=6) mat=trimMat;  // short thin panel = window/rail trim
-    const m=new THREE.Mesh(new THREE.BoxGeometry(P.w*S,P.h*S,P.d*S),mat);
-    m.position.set((p.pos[0]||0)*S, y*S, (p.pos[2]||0)*S);
-    if(p.rot)   m.rotation.set(p.rot[0]||0,p.rot[1]||0,p.rot[2]||0);
-    if(p.scale) m.scale.set(p.scale[0]||1,p.scale[1]||1,p.scale[2]||1);
-    g.add(m);
-  }
-  // ---- auto roof over the open-topped shell ----
-  let minX=1e9,maxX=-1e9,minZ=1e9,maxZ=-1e9,eastTop=0,westTop=0;
-  for(const p of schema.parts){if(p.params.h<3)continue; const[w,d]=wdim(p),x=p.pos[0]||0,z=p.pos[2]||0;
-    minX=Math.min(minX,x-w/2);maxX=Math.max(maxX,x+w/2);minZ=Math.min(minZ,z-d/2);maxZ=Math.max(maxZ,z+d/2);}
-  for(const p of schema.parts){if(p.params.h<3)continue; const x=p.pos[0]||0,t=(p.pos[1]||0)+p.params.h/2;
-    if(x>maxX-4)eastTop=Math.max(eastTop,t); if(x<minX+4)westTop=Math.max(westTop,t);}
-  const midX=(minX+maxX)/2, ov=3, zc=(minZ+maxZ)/2, zd=(maxZ-minZ+ov*2);
-  const slab=(x1,y1,x2,y2)=>{const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)+ov,ang=Math.atan2(dy,dx);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(len*S,0.5*S,zd*S),roofMat);
-    m.position.set((x1+x2)/2*S,(y1+y2)/2*S,zc*S); m.rotation.z=ang; g.add(m);};
-  const ridge=eastTop+4, eMid=(midX+maxX)/2;
-  slab(midX,eastTop, eMid,ridge); slab(eMid,ridge, maxX+1,eastTop-1);   // gable over the tall east block
-  slab(minX-1,westTop+1.5, midX,westTop+2.5);                          // low shed over the west wing
-  if(eastTop-westTop>2){const sw=new THREE.Mesh(new THREE.BoxGeometry(0.4*S,(eastTop-westTop+4)*S,(maxZ-minZ)*S),sideMat);
-    sw.position.set(midX*S,(westTop+eastTop)/2*S,zc*S); g.add(sw);}   // step wall between wing and block
-  return g;
-}
 // the Home Designer works in FEET; montana's world is metres (USGS LiDAR). Bake the conversion
 // into the geometry (flattened) so optimizeGroup can still merge it and the placement scale slider works.
 const FT=0.3048;
@@ -408,86 +314,14 @@ function makeHouse(){
   const saved=localStorage.getItem('montanaHouse');                  // live design from the Home Designer (same-origin)
   if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return bakedFt(h); }catch(e){} }
   if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length) return withSkirt(bakedFt(h),houseSchema); }catch(e){} }   // committed montana-home.json
-  const g=new THREE.Group(), w=15,d=9,wh=6.2,rh=4.6,eave=0.7,fh=0.6;
-  const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
-        stone=MAT(COL.stone),tank=MAT(COL.tank,.5,.2),wood=MAT(COL.wood),pipe=MAT(0x242424,.5,.4);
-  box(g,w+0.6,fh,d+0.6,0,fh/2,0,stone);
-  box(g,w,wh,d,0,fh+wh/2,0,side);
-  gableRoofX(g,w,d,rh,fh+wh,eave,roof,side);
-  const wt=fh+wh, sang=Math.atan2(rh,d/2+eave);
-  dormer(g,-4.2,2.3,wt+1.3,side,roof,glass,trim);                  // left gabled dormer
-  dormer(g, 4.2,2.3,wt+1.3,side,roof,glass,trim);                  // right gabled dormer
-  for(const x of [-1.5,1.5]) box(g,1.5,0.12,1.4,x,wt+rh*0.6,1.1,glass).rotation.x=sang;   // two skylights
-  {const p=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,2.6,10),pipe);p.position.set(-5.6,wt+rh*0.55+1.0,-0.6);g.add(p);}  // stovepipe
-  const zf=d/2+0.05;
-  for(const x of [-5.0,-2.6,3.4,5.6]){box(g,1.5,1.7,0.14,x,fh+2.1,zf,glass);box(g,1.8,2.0,0.07,x,fh+2.1,zf-0.03,trim);}  // ground windows
-  box(g,3.0,2.0,1.2,0,fh+1.6,d/2+0.6,side);                        // center bay projection
-  box(g,2.6,1.4,0.14,0,fh+1.7,d/2+1.25,glass);                     // bay window
-  {const s=new THREE.Shape();s.moveTo(-1.8,0);s.lineTo(1.8,0);s.lineTo(0,0.9);s.lineTo(-1.8,0);
-   const r=new THREE.Mesh(new THREE.ExtrudeGeometry(s,{depth:1.7,bevelEnabled:false}),roof);
-   r.position.set(0,fh+2.6,d/2-0.7); g.add(r);}                    // bay gablet
-  box(g,1.4,2.6,0.14,2.0,fh+1.3,zf,MAT(COL.trim));                 // front door
-  box(g,4.6,0.2,3.2,-4.6,fh+3.1,d/2+1.4,roof);                     // left forward porch roof
-  for(const x of [-6.6,-2.6]) box(g,0.24,3.1,0.24,x,fh+1.55,d/2+2.7,wood);
-  box(g,3.2,0.2,2.6,6.2,fh+3.1,d/2+1.0,roof);                      // right covered porch roof
-  for(const x of [4.9,7.5]) box(g,0.22,3.1,0.22,x,fh+1.55,d/2+2.0,MAT(0x241e18));
-  {const t=new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3.4,12),tank);t.rotation.z=Math.PI/2;t.position.set(w/2+3.2,fh+0.9,-1);g.add(t);}  // propane
-  return g;
+  console.warn('House design could not load');return new THREE.Group();
 }
 
 function makeGarageApt(){                    // tall garage w/ apartment above, steep gable
   for(const source of [localStorage.getItem('montanaGarage'),garageSchema])if(source){try{const h=buildHouse(THREE,typeof source==='string'?JSON.parse(source):source);if(h.children.length)return bakedFt(h);}catch(e){console.warn('Garage design could not load:',e);}}
-  const g=new THREE.Group(), w=8,d=9,wh=6.2,rh=5.4,eave=0.6,fh=0.5;
-  const side=MAT(COL.side),trim=MAT(COL.trim),roof=MAT(COL.roof,.45,.35),glass=MAT(COL.glass,.3),
-        stone=MAT(COL.stone),wood=MAT(COL.wood),gdoor=MAT(COL.garage,.7);
-  box(g,w+0.5,fh,d+0.5,0,fh/2,0,stone);
-  box(g,w,wh,d,0,fh+wh/2,0,side);
-  gableRoof(g,w,d,rh,fh+wh,eave,roof);
-  const ang=Math.atan2(rh,w/2+eave);
-  {const s=box(g,1.3,0.14,1.6,w/4,fh+wh+rh*0.5,0,glass);s.rotation.z=-ang;}     // skylight
-  const zf=d/2+0.05;
-  box(g,w*0.60,3.0,0.14,-0.7,fh+1.5,zf,gdoor);                    // garage door
-  box(g,1.3,2.6,0.14,w/2-1.2,fh+1.3,zf,MAT(COL.trim));           // man door
-  for(const x of [-2,2]){box(g,1.3,1.7,0.14,x,fh+4.7,zf,glass);box(g,1.6,2.0,0.07,x,fh+4.7,zf-0.03,trim);}  // apt windows
-  box(g,1.1,1.1,0.14,0,fh+wh+rh*0.42,zf,glass);                  // gable peak window
-  for(const z of [-2.6,2.6]) box(g,0.14,1.6,1.2,w/2+0.05,fh+4.5,z,glass);
-  // natural-wood pergola over the entry (front, +Z)
-  const pz=d/2+2.3;
-  for(const c of [[-w/2+0.5,d/2+0.3],[-w/2+0.5,pz],[w/2-0.5,d/2+0.3],[w/2-0.5,pz]]) box(g,0.22,3.4,0.22,c[0],fh+1.7,c[1],wood);
-  box(g,w+0.2,0.2,0.22,0,fh+3.3,d/2+0.3,wood); box(g,w+0.2,0.2,0.22,0,fh+3.3,pz,wood);
-  for(let i=-3;i<=3;i++) box(g,0.14,0.14,pz-(d/2+0.3),i*1.15,fh+3.4,(d/2+0.3+pz)/2,wood);
-  // 2nd-floor balcony + railing above the entry
-  box(g,w+0.2,0.22,2.0,0,fh+3.5,d/2+1.0,side);
-  box(g,w+0.2,0.1,0.1,0,fh+4.6,d/2+2.0,trim);
-  for(let i=-3;i<=3;i++) box(g,0.07,1.1,0.07,i*1.15,fh+4.05,d/2+2.0,trim);
-  return g;
+  console.warn('Garage design could not load');return new THREE.Group();
 }
 
-// railing segment with full balusters between two deck points
-function railSeg(g,mat,x1,z1,x2,z2,y,h){
-  const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz); if(len<0.05)return;
-  const ux=dx/len,uz=dz/len,ang=Math.atan2(-uz,ux);
-  box(g,len,0.07,0.07,(x1+x2)/2,y+h,(z1+z2)/2,mat).rotation.y=ang;      // top rail
-  box(g,len,0.05,0.05,(x1+x2)/2,y+0.12,(z1+z2)/2,mat).rotation.y=ang;   // bottom rail
-  const n=Math.max(2,Math.round(len/0.16));
-  for(let i=0;i<=n;i++){const t=i/n; box(g,0.04,h,0.04,x1+dx*t,y+h/2,z1+dz*t,mat);}  // balusters
-  box(g,0.09,h+0.1,0.09,x1,y+(h+0.1)/2,z1,mat); box(g,0.09,h+0.1,0.09,x2,y+(h+0.1)/2,z2,mat); // corner posts
-}
-// Exterior stair flight along local X; a rotated group can run it along a wall.
-// Concrete is optional: only the garage-facing flight has a concrete pad.
-function stairFlight(g,treadM,railM,concM,x0,z0,topY,width,run,steps,dir=1){
-  steps=Math.max(2,Math.round(steps));
-  const rise=topY/steps, sign=dir<0?-1:1;
-  for(let i=0;i<steps;i++){const cx=x0+sign*run*(i+0.5),cy=topY-rise*(i+0.5);
-    box(g,run*1.02,0.06,width,cx,cy,z0,treadM); box(g,0.05,rise,width,cx+sign*run/2,cy-rise/2,z0,treadM);}
-  const endX=x0+sign*run*steps,endY=topY-rise*steps;
-  for(const side of [-1,1]){const cz=z0+side*width/2;
-    for(let i=0;i<=steps;i++){box(g,0.05,0.85,0.05,x0+sign*run*i,topY-rise*i+0.42,cz,railM);}
-    const rl=Math.hypot(run*steps,rise*steps);
-    box(g,rl,0.06,0.06,(x0+endX)/2,(topY+endY)/2+0.85,cz,railM).rotation.z=Math.atan2(endY-topY,endX-x0);
-  }
-  if(concM)box(g,1.6,0.12,1.8,endX+sign*0.9,endY-0.06,z0,concM);
-}
 const cabinTextures={};
 function cabinTexture(kind){ // fine board, deck and rib maps for the code-built cabin (feet-based UVs)
   if(cabinTextures[kind])return cabinTextures[kind];
@@ -628,118 +462,27 @@ function optimizeGroup(g){
     else {geos.forEach(ge=>g.add(new THREE.Mesh(ge,mat)));for(const geo of prepared)if(!geos.includes(geo))geo.dispose();}
   }
 }
-let sel=null;   // last-placed structure, driven live by heading/size sliders
 function placeStructure(type,x,z,heading,scale){
   const g=BUILD[type](); optimizeGroup(g); weatherBuilding(THREE,g,type); g.position.set(x,heightAt(x,z),z);
-  const rot=heading!==undefined?heading:+document.getElementById('head').value;
-  const sc =scale  !==undefined?scale  :+document.getElementById('size').value;
-  g.rotation.y=THREE.MathUtils.degToRad(rot); g.scale.setScalar(sc);
+  g.rotation.y=THREE.MathUtils.degToRad(heading); g.scale.setScalar(scale);
   g.traverse(o=>{if(o.isMesh){o.castShadow=!o.material.userData?.noShadow;o.receiveShadow=true;for(const m of (Array.isArray(o.material)?o.material:[o.material]))prepareShadowMaterial(m);}});
-  scene.add(g); const rec={group:g,x,z,type}; placed.push(rec); sel=rec; syncStructureSelect(); selectRec(rec); return rec;
+  scene.add(g); const rec={group:g,x,z,type}; placed.push(rec); return rec;
 }
 // real placements from your layout (E,N,heading,scale); z = -N
 placeStructure('house',   8,   -8, 7, 1);
 placeStructure('garage',-29.1,-9.8,65, 1);
 placeStructure('cabin', -41,   31,94, 1);
+LOAD.at(.27,'Scattering rocks');await tick();
 
-// ---- trees (instanced conifers) ----------------------------------------
-const paint=(geo,c)=>{const n=geo.attributes.position.count,arr=new Float32Array(n*3),col=new THREE.Color(c);
-  for(let i=0;i<n;i++){arr[i*3]=col.r;arr[i*3+1]=col.g;arr[i*3+2]=col.b;} geo.setAttribute('color',new THREE.BufferAttribute(arr,3));return geo;};
-const treeGeo=(()=>{
-  const t=paint(new THREE.CylinderGeometry(0.22,0.34,1.8,5),0x5b4632).translate(0,0.9,0);
-  const c1=paint(new THREE.ConeGeometry(2.4,3.4,7),0x2f5233).translate(0,2.6,0);
-  const c2=paint(new THREE.ConeGeometry(1.8,2.9,7),0x356139).translate(0,4.1,0);
-  const c3=paint(new THREE.ConeGeometry(1.1,2.3,7),0x3a6b3d).translate(0,5.5,0);
-  return mergeGeometries([t,c1,c2,c3]);
-})();
-const treeMat=new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1});
-// ---- tree render styles: low-poly geometry vs crossed textured billboards ----
-function makeTreeTexture(){
-  const c=document.createElement('canvas');c.width=128;c.height=256;const g=c.getContext('2d');
-  g.fillStyle='#4a3826';g.fillRect(59,205,10,48);                          // trunk
-  const cols=['#26482a','#2c5230','#335c37'];
-  for(let i=0;i<6;i++){const f=i/5, cy=210-f*180, hw=58*(1-f*0.72);        // stacked conifer tiers
-    g.beginPath();g.moveTo(64,cy-46);g.lineTo(64-hw,cy);g.lineTo(64+hw,cy);g.closePath();g.fillStyle=cols[i%3];g.fill();}
-  const id=g.getImageData(0,0,128,256), px=id.data;                        // speckle for needle texture
-  for(let k=0;k<2400;k++){const i=(Math.random()*128|0)+(Math.random()*256|0)*128;
-    if(px[i*4+3]>20){const dark=Math.random()<0.5; px[i*4]+=dark?-18:26; px[i*4+1]+=dark?-14:22; px[i*4+2]+=dark?-12:14;}}
-  g.putImageData(id,0,0);
-  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
-}
-const treeTex=makeTreeTexture();
-const billMat=new THREE.MeshStandardMaterial({map:treeTex,alphaTest:0.5,roughness:1,metalness:0,side:THREE.DoubleSide});
-function crossGeo(n){const ps=[];for(let k=0;k<n;k++){const p=new THREE.PlaneGeometry(6.4,7.0);p.translate(0,3.5,0);p.rotateY(k*Math.PI/n);ps.push(p);}return mergeGeometries(ps);}
-// spiky low-poly conifer: cones with base rings jittered into drooping spikes + needle texture
-function needleTex(){
-  const c=document.createElement('canvas');c.width=64;c.height=64;const g=c.getContext('2d');
-  g.fillStyle='#3a6330';g.fillRect(0,0,64,64);
-  const cols=['#264a1e','#2f5626','#5c8a44','#20401a'];
-  for(let k=0;k<1100;k++){const x=Math.random()*64,y=Math.random()*64,l=2+Math.random()*4;
-    g.strokeStyle=cols[k&3];g.lineWidth=1;g.beginPath();g.moveTo(x,y);g.lineTo(x+(Math.random()-0.5)*2,y+l);g.stroke();}
-  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);t.colorSpace=THREE.SRGBColorSpace;return t;
-}
-function spikeCone(r,h,y,segs){
-  const g=new THREE.ConeGeometry(r,h,segs,1,true);          // open-ended: lower poly, spikes hang free
-  const pos=g.attributes.position;
-  for(let i=0;i<pos.count;i++){const vy=pos.getY(i);
-    if(vy<-h/2+0.01){const vx=pos.getX(i),vz=pos.getZ(i),rad=Math.hypot(vx,vz);
-      if(rad>0.001){const f=1.2+Math.random()*0.55; pos.setX(i,vx*f); pos.setZ(i,vz*f); pos.setY(i,vy-(0.25+Math.random()*0.7)*h);}}}
-  g.computeVertexNormals(); g.translate(0,y,0); return g;
-}
-const treeGeoSpiky=mergeGeometries([
-  new THREE.CylinderGeometry(0.16,0.28,1.6,6).translate(0,0.8,0),
-  spikeCone(1.9,3.2,2.3,8), spikeCone(1.5,2.9,3.7,8), spikeCone(1.05,2.5,5.0,7), spikeCone(0.62,2.1,6.2,7)
-]);
-const treeMatSpiky=new THREE.MeshStandardMaterial({map:needleTex(),flatShading:true,roughness:1,metalness:0});
-const STYLES={spiky:{geo:treeGeoSpiky,mat:treeMatSpiky},lowpoly:{geo:treeGeo,mat:treeMat},cross2:{geo:crossGeo(2),mat:billMat},cross3:{geo:crossGeo(3),mat:billMat}};
-let treeStyle='spiky';
-function setTreeStyle(s){treeStyle=s;buildTreeMesh();}
-let trees=[], treeMeshes=[];
-const removedTrees=new Set(); let selTree=null;   // tree editing: click to get id, remove ones inside the house
+let trees=[];
 const _o=new THREE.Object3D(), _c=new THREE.Color();
-// ---- high-detail pine (used near buildings): drooping branch-card billboards ----
-function branchTex(){
-  const c=document.createElement('canvas');c.width=160;c.height=96;const g=c.getContext('2d');
-  const greens=['#22451d','#294f22','#33612a','#1a3815']; const bx=8,tx=152,my=48;
-  for(let i=0;i<80;i++){const t=i/79, x=bx+(tx-bx)*t, spread=(1-t)*40+3;
-    for(const side of [-1,1]) for(let j=0;j<2;j++){ g.strokeStyle=greens[(i+j)&3]; g.lineWidth=2;
-      g.beginPath(); g.moveTo(x,my); g.lineTo(x+(1-t)*8+2, my+side*spread*(0.6+0.4*Math.random())); g.stroke(); }
-    g.strokeStyle=greens[(i+1)&3]; g.lineWidth=3; g.beginPath(); g.moveTo(x,my-spread*0.35); g.lineTo(x,my+spread*0.35); g.stroke();
-  }
-  const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace; return tex;
-}
-const pineTrunkGeo=new THREE.CylinderGeometry(0.12,0.34,7.4,6).translate(0,3.7,0);
-const pineTrunkMat=new THREE.MeshStandardMaterial({color:0x5a4632,flatShading:true,roughness:1});
-// one branch = a ribbon that curves outward (+X) then droops down, width tapering to the tip
-function curvedBranch(L,W,segs,droop0,curve){
-  const cx=[],cy=[]; let x=0,y=0,ang=droop0;
-  for(let i=0;i<=segs;i++){cx.push(x);cy.push(y); const sl=L/segs; x+=Math.cos(ang)*sl; y-=Math.sin(ang)*sl; ang+=curve;}
-  const pos=[],uv=[],idx=[];
-  for(let i=0;i<=segs;i++){const w=W*(1-i/segs*0.8)*0.5, u=i/segs; pos.push(cx[i],cy[i],w, cx[i],cy[i],-w); uv.push(u,1, u,0);}
-  for(let i=0;i<segs;i++){const a=i*2; idx.push(a,a+2,a+1, a+1,a+2,a+3);}
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-  g.setIndex(idx); g.computeVertexNormals(); return g;
-}
-const pineFoliageGeo=(()=>{
-  const cards=[]; // [y, count, L, W, droop0, curvePerSeg]
-  const tiers=[[1.5,11,3.4,2.2,0.32,0.30],[2.4,11,3.1,2.0,0.35,0.30],[3.2,10,2.7,1.8,0.38,0.32],[4.0,9,2.3,1.6,0.40,0.32],
-               [4.7,8,2.0,1.4,0.42,0.34],[5.4,7,1.7,1.15,0.44,0.34],[6.0,6,1.4,0.95,0.46,0.34],[6.6,5,1.1,0.8,0.46,0.34],[7.1,4,0.9,0.65,0.46,0.34]];
-  for(const [ty,n,L,W,dr,cv] of tiers) for(let i=0;i<n;i++){
-    const b=curvedBranch(L*(0.8+Math.random()*0.55),W,3,dr,cv);      // vary length so some reach further
-    b.rotateY((i/n)*Math.PI*2 + ty*2.1 + Math.random()*0.35); b.translate(0,ty,0);
-    cards.push(b);
-  }
-  return mergeGeometries(cards);
-})();
-const pineFoliageMat=new THREE.MeshStandardMaterial({map:branchTex(),alphaTest:0.42,side:THREE.DoubleSide,roughness:1,metalness:0});
-function isNearBuild(x,z){ for(const o of placed){ if((x-o.x)**2+(z-o.z)**2 < 65*65) return true; } return false; }
 // ---- the forest: tree kinds drawn near as meshes and far as octahedral imposters (assets/forest) ----
 let treeAssetsSettled=false,lidarSettled=false;
 let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
+// Read-only handle for the test rigs (set here, after everything it reads is declared): the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
+window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){const k=treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});return k==='juniper'&&!authored?juniperVariety(id,h):k;}
 function treeTint(kind,id,tint,tone){
@@ -762,8 +505,7 @@ const treeAssetsReady=(async()=>{
       sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
     if(treeBudget)forest.setBudget(treeBudget);
     await forest.loaded;
-    if(trees.length)buildTreeMesh();
-  }catch(e){console.warn('Forest could not load, using the basic trees',e);forest=null;treeAssetsSettled=true;}
+  }catch(e){console.warn('Forest could not load',e);forest=null;treeAssetsSettled=true;}
 })();
 // aspen groves (small, north-leaning, green) at the two spots he marked — scene coords x=E, z=-N
 // The second spot has no real aspens: its records (grove:9-15) are removed by the census. It stays listed so base ids never renumber.
@@ -780,23 +522,22 @@ function inBuilding(x,z){                                          // LiDAR read
     if((x-o.x)**2+(z-o.z)**2 < r*r) return true; }
   return false;
 }
-function buildTreesFrom(n){
-  if(landscapeRecords){
-    const all=landscapeRecords.filter(o=>o.asset.startsWith('tree/')),lidar=all.filter(o=>o.id.startsWith('lidar:'));
-    const count=Math.min(lidar.length,Math.round(lidar.length*n/Math.max(1,realXZ.length/3))),chosen=new Set();
-    for(let i=0;i<count;i++)chosen.add(lidar[Math.floor(i*lidar.length/count)].id);
-    trees=all.filter(o=>!o.id.startsWith('lidar:')||chosen.has(o.id)||landscapeAuthored.has(o.id)).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,offset:o.offset,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],lean:o.rotation[0],tint:o.tint,tone:o.tone,wide:(o.scale[0]+o.scale[2])/2/o.scale[1],editorRotation:o.rotation,editorScale:o.scale}));
-    buildTreeMesh();return;
-  }
-  const total=realXZ.length/3; n=Math.min(n,total);
-  const stride=n>0?total/n:1, R=rng(12345); trees=[];
-  for(let k=0;k<n;k++){const idx=Math.floor(k*stride);
-    if(removedTrees.has(idx)) continue;                             // skip trees you've deleted
+// The trees as drawn: every tree record, with the census and saved edits already applied.
+function drawTrees(){
+  trees=landscapeRecords.filter(o=>o.asset.startsWith('tree/')).map(o=>({id:o.id,asset:o.asset.slice(5),x:o.x,z:o.z,offset:o.offset,gy:heightAt(o.x,o.z)+o.offset,h:o.scale[1],s:o.scale[1]/6.4,r:o.rotation[1],lean:o.rotation[0],tint:o.tint,tone:o.tone,wide:(o.scale[0]+o.scale[2])/2/o.scale[1],editorRotation:o.rotation,editorScale:o.scale}));
+  buildTreeMesh(trees);
+}
+// The survey's trees and the planted groves, as the base records know them (lidar:<n>, grove/fill/knee/under ids). Never drawn
+// as they stand: the census removes and moves many of them, so they are drawn only from the records (drawTrees), unless the
+// landscape could not load at all.
+function surveyTrees(){
+  const total=realXZ.length/3, R=rng(12345); trees=[];
+  for(let idx=0;idx<total;idx++){
     const rx=realXZ[idx*3], rz=realXZ[idx*3+1]-TREE_SHIFT_N;
     if(inBuilding(rx,rz)||polygonDistance(rx,rz,LEGACY_POND_OUTLINE)>-.5) continue;                                 // strip trees sitting on the buildings
     const h=realXZ[idx*3+2], s=Math.max(0.45,Math.min(3.2,h/6.4));   // scale to real LiDAR height
     const id='lidar:'+idx,asset=treeKindOf(id,rx,rz,h),r=R()*Math.PI*2,tint=0.8+R()*0.35,jitter=R();trees.push({id:idx,key:id,asset,x:rx,z:rz,h,gy:heightAt(rx,rz),s:s*(0.9+jitter*0.2),r,tint,wide:treeWide(asset,id,h)});}
-  buildTreeMesh();
+  groveList=buildGroves();
 }
 // Shrubs are a forest of their own: their own short mesh circle and budget, so they never take a tree's place near the camera.
 function buildShrubs(){
@@ -806,14 +547,6 @@ function buildShrubs(){
     const a=treeHash(o.id,9),b=treeHash(o.id,10),t=o.tint??1;
     fixed.push({id:o.id,x:o.x,z:o.z,offset:o.offset,sp:shrub(o),scale:o.scale[1],wide:(o.scale[0]+o.scale[2])/2/o.scale[1],yaw:o.rotation[1],lean:o.rotation[0],tint:new THREE.Color(t*.86*(.96+.08*a),t*.83*(.97+.05*b),t*.86*(.96+.1*(1-a)))});}
   shrubForest.setFixed(fixed);
-}
-function addInst(geo,mat,list){
-  if(!list.length) return;
-  const im=new THREE.InstancedMesh(geo,mat,list.length);
-  for(let i=0;i<list.length;i++){const t=list[i];
-    _o.position.set(t.x,heightAt(t.x,t.z),t.z);_o.rotation.set(0,t.r,0);_o.scale.setScalar(t.s);_o.updateMatrix();
-    im.setMatrixAt(i,_o.matrix); im.setColorAt(i,_c.setRGB(t.tint,t.tint,t.tint));}
-  scene.add(im); treeMeshes.push({im,list});
 }
 function buildGroves(){      // aspen groves and stands: planted spots, since bare thin aspens barely show in the LiDAR
   if(landscapeRecords)return []; // edited groves use the same records as every other tree
@@ -836,18 +569,10 @@ function buildGroves(){      // aspen groves and stands: planted spots, since ba
   return list;
 }
 let groveList=[];
-function buildTreeMesh(){
-  for(const {im} of treeMeshes){scene.remove(im); im.dispose();} treeMeshes=[];
-  const S=STYLES[treeStyle];
-  if(!forest||!treeSpecies){                   // fallback: old near/far split with the hand-made pine
-    const near=[], far=[];
-    for(const t of trees) (isNearBuild(t.x,t.z)?near:far).push(t);
-    addInst(S.geo,S.mat,far); addInst(treeGeoSpiky,treeMatSpiky,near); addInst(pineFoliageGeo,pineFoliageMat,near);
-    return;
-  }
-  groveList=buildGroves();
+function buildTreeMesh(list){
+  if(!forest||!treeSpecies)return;
   const fixed=[];
-  for(const t of trees.concat(groveList)){
+  for(const t of list){
     if(polygonDistance(t.x,t.z)>.3)continue;   // nothing stands in the water
     const kind=t.asset||'aspen',sp=TREE_KINDS.indexOf(kind);
     // (form: its width reshaped by height, the census's measured one or one by rule; see plantForm)
@@ -864,16 +589,14 @@ function buildTreeMesh(){
     for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)for(const o of grid.get((cx+i)+':'+(cz+j))||[]){if(o===f)continue;const dx=o.x-f.x,dz=o.z-f.z,d=Math.hypot(dx,dz);if(d>9||d<.5)continue;
      const taller=(o.scale-f.scale*.7)/Math.max(4,f.scale);if(taller<=0)continue;const toSun=(dx*sx+dz*sz)/(d*sl)*-1;shade+=taller*(1-d/9)*(.45+.55*Math.max(0,toSun));}
     const k=(1-Math.min(.5,shade*.5))*(.86+.28*treeHash(f.id??f.x,77));f.tint=f.tint.clone().multiplyScalar(k);}}
-  groundDetail.setTrees(trees.concat(groveList));
+  groundDetail.setTrees(list);
   forest.setFixed(fixed);
 }
 const lidarReady=(async()=>{
   try{fillTrees=await (await fetch('./assets/trees-fill.json')).json();}catch(e){console.warn('Fill trees unavailable',e);}
   try{ realXZ=new Float32Array(await (await fetch('./assets/trees.bin?v=lidar')).arrayBuffer()); }catch(e){}
   {const pts=[];for(let i=0;i<realXZ.length;i+=3)pts.push([realXZ[i],realXZ[i+1]-TREE_SHIFT_N]);neighboursAt=neighbourCounter(pts);}
-  const total=realXZ.length/3, sl=document.getElementById('treeN');
-  sl.max=total; sl.value=total; document.getElementById('treeNv').textContent=sl.value;
-  buildTreesFrom(+sl.value);lidarSettled=true;
+  lidarSettled=true;
 })();
 
 // ---- distant low-poly mountains (60 km regional DEM, hole for the detailed scene) ----
@@ -957,14 +680,11 @@ function applyVex(v){
   propertyNature?.setVerticalScale(v);if(typeof meadow!=='undefined'&&v!==meadowVex){meadowVex=v;meadow.reanchor();plantFill.reanchor();}
   for(const t of tiles){for(let i=0;i<t.pos.count;i++)t.pos.setY(i,t.baseY[i]*v);t.pos.needsUpdate=true;t.mesh.geometry.computeVertexNormals();t.mesh.geometry.computeBoundingBox();t.mesh.geometry.computeBoundingSphere();}
   for(const o of placed) o.group.position.y=o.foundationY!=null?o.foundationY*v:heightAt(o.x,o.z);
-  for(const {im,list} of treeMeshes){for(let i=0;i<list.length;i++){const t=list[i];
-    _o.position.set(t.x,heightAt(t.x,t.z),t.z);_o.rotation.set(0,t.r,0);_o.scale.setScalar(t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
-    im.instanceMatrix.needsUpdate=true;}
   for(const {im,list} of groundMeshes){for(let i=0;i<list.length;i++){const t=list[i];
     _o.position.set(t.x,heightAt(t.x,t.z)+(t.dy||0),t.z);_o.rotation.set(t.rx||0,t.r,0);_o.scale.set(t.s,t.s*(t.sy||1),t.s);_o.updateMatrix();im.setMatrixAt(i,_o.matrix);}
     im.instanceMatrix.needsUpdate=true;}
   if(marker) marker.position.y=heightAt(marker.position.x,marker.position.z)+2;
-  if(landscapeLayer){landscapeLayer.refreshHeights();buildTreesFrom(+$('treeN').value);buildShrubs();landscape?.refresh();}else if(trees.length)buildTreeMesh();
+  if(landscapeLayer){landscapeLayer.refreshHeights();drawTrees();buildShrubs();landscape?.refresh();}else if(landscapeFailed)buildTreeMesh(trees.concat(groveList));
 }
 
 // ---- tap to inspect + move marker --------------------------------------
@@ -972,34 +692,15 @@ const marker=new THREE.Mesh(new THREE.ConeGeometry(3,10,8),new THREE.MeshStandar
 marker.rotation.x=Math.PI; marker.visible=false; scene.add(marker); marker.position.set(0,heightAt(0,0)+2,0);
 const info=document.getElementById('info');
 const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
-let dragging=null;
 function evNdc(ev){const r=renderer.domElement.getBoundingClientRect();
   const cx=(ev.touches?ev.touches[0].clientX:ev.clientX), cy=(ev.touches?ev.touches[0].clientY:ev.clientY);
   ndc.x=((cx-r.left)/r.width)*2-1; ndc.y=-((cy-r.top)/r.height)*2+1; ray.setFromCamera(ndc,cam);}
-function structureLabel(rec){return rec.type==='garage'?'Garage + apartment':rec.type[0].toUpperCase()+rec.type.slice(1);}
-function syncStructureSelect(){
-  const menu=document.getElementById('structureSelect');if(!menu)return;
-  const current=sel?placed.indexOf(sel):-1;menu.replaceChildren(new Option('select a building…',''));
-  placed.forEach((rec,i)=>{if(!rec.deleted)menu.add(new Option(structureLabel(rec),String(i)));});
-  menu.value=current>=0?String(current):'';
-}
-function updateSelInfo(){ if(!sel)return; const g=sel.group, deg=((THREE.MathUtils.radToDeg(g.rotation.y))%360+360)%360;
-  document.getElementById('selinfo').innerHTML=`<b>${structureLabel(sel)}</b> · E ${sel.x.toFixed(1)} N ${(-sel.z).toFixed(1)} · ${deg.toFixed(1)}° · ${g.scale.x.toFixed(3)}×`; }
-function selectRec(rec){
-  sel=rec;syncStructureSelect();if(!rec){document.getElementById('selinfo').textContent='none selected';return;}
-  const g=rec.group, deg=((THREE.MathUtils.radToDeg(g.rotation.y))%360+360)%360;
-  document.getElementById('head').value=deg; document.getElementById('headv').textContent=deg.toFixed(1)+'°';
-  document.getElementById('size').value=g.scale.x; document.getElementById('sizev').textContent=g.scale.x.toFixed(3)+'×';
-  updateSelInfo(); }
-function nudge(de,dn){ if($('lockGeometry')?.checked||!sel)return; sel.x+=de; sel.z-=dn; sel.group.position.set(sel.x,heightAt(sel.x,sel.z),sel.z);sel.foundationY=sel.group.position.y/VEX; updateSelInfo(); }
-function dumpLayout(){ return placed.map(o=>({type:o.type, E:+o.x.toFixed(1), N:+(-o.z).toFixed(1),
-  heading:+(((THREE.MathUtils.radToDeg(o.group.rotation.y))%360+360)%360).toFixed(1), scale:+o.group.scale.x.toFixed(3)})); }
 
 renderer.domElement.addEventListener('pointerdown',ev=>{
   if(landscape?.active||sceneTransform?.active)return;
   evNdc(ev);
   if(routeAdd){const h=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(h) addWaypoint(h.point.x,h.point.z); return;}
-  if(driveMode) return;                                            // no building editing while driving
+  if(driveMode) return;
   if(!document.getElementById('coordinateMode').checked)return;
   const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
   const p=hit.point; marker.position.set(p.x,p.y+2,p.z);
@@ -1007,15 +708,6 @@ renderer.domElement.addEventListener('pointerdown',ev=>{
   const lat=M.center.lat+north/111132, lon=M.center.lon+east/(111320*Math.cos(M.center.lat*Math.PI/180));
   info.innerHTML=`marker<br>E ${east.toFixed(1)} m · N ${north.toFixed(1)} m<br>elev ${elev.toFixed(0)} m (${(elev*3.28084).toFixed(0)} ft)<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`;
 });
-renderer.domElement.addEventListener('pointermove',ev=>{
-  if(landscape?.active||sceneTransform?.active)return;
-  if(!dragging) return;
-  evNdc(ev);
-  const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
-  dragging.x=hit.point.x; dragging.z=hit.point.z;
-  dragging.group.position.set(dragging.x,heightAt(dragging.x,dragging.z),dragging.z);dragging.foundationY=dragging.group.position.y/VEX; updateSelInfo();
-});
-addEventListener('pointerup',()=>{ if(dragging){dragging=null; controls.enabled=true;} });
 
 // ---- driveable Toyota RAV4 (third-person camera orbits it) --------------
 const wheels=[];
@@ -1045,11 +737,12 @@ function makeRav4(){
 const car={x:-31,z:22.3,heading:1.84,speed:0,group:makeRav4()};
 let rav4Rig=null,carSteering=0;
 // Load locally, without an expiring S3 URL; keep the placeholder on failure.
-loadRav4().then(rig=>{
+const rav4Loaded=loadRav4().then(rig=>{
   const previous=car.group;car.group=rig.model;car.group.position.copy(previous.position);car.group.rotation.copy(previous.rotation);
   scene.add(car.group);scene.remove(previous);previous.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});wheels.length=0;rav4Rig=rig;
   window.__rav4Ready=true;
 }).catch(e=>{console.warn('RAV4 model failed; retaining placeholder.',e);info.textContent='RAV4 model could not load; using the basic car.';});
+function placeCar(){car.group.position.set(car.x,heightAt(car.x,car.z),car.z);car.group.rotation.y=car.heading;}
 scene.add(car.group);
 car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading;
 
@@ -1175,16 +868,6 @@ $('groundDetail').onchange=()=>groundDetail.uniforms.detailEnabled.value=$('grou
 let aerial=true;
 $('mode').onclick=()=>{aerial=!aerial;for(const m of mats){m.map=aerial?tex:null;m.vertexColors=!aerial;m.color.set(0xffffff);m.needsUpdate=true;}
   $('mode').textContent=aerial?'show elevation colors':'show aerial photo';};
-$('structureSelect').onchange=e=>{const i=Number(e.target.value);if(Number.isInteger(i)&&placed[i])selectRec(placed[i]);};
-$('head').oninput=e=>{$('headv').textContent=(+e.target.value).toFixed(1)+'°'; if(sel&&!$('lockGeometry').checked){sel.group.rotation.y=THREE.MathUtils.degToRad(+e.target.value); updateSelInfo();}};
-$('size').oninput=e=>{$('sizev').textContent=(+e.target.value).toFixed(3)+'×'; if(sel&&!$('lockGeometry').checked){sel.group.scale.setScalar(+e.target.value); updateSelInfo();}};
-$('place').onclick=()=>{if(!$('lockGeometry').checked)placeStructure($('type').value,marker.position.x,marker.position.z);};
-$('undo').onclick=()=>{if($('lockGeometry').checked)return;const o=placed.pop();if(o)scene.remove(o.group); sel=placed[placed.length-1]||null;syncStructureSelect();selectRec(sel);};
-$('treeN').oninput=e=>{$('treeNv').textContent=e.target.value;buildTreesFrom(+e.target.value);};
-$('bbSize').oninput=e=>{const v=+e.target.value; $('bbSizev').textContent=v.toFixed(2); if(impHU)impHU.value=v;};
-$('bbY').oninput=e=>{const v=+e.target.value; $('bbYv').textContent=v.toFixed(2); if(impYU)impYU.value=v;};
-$('treeStyle').onchange=e=>setTreeStyle(e.target.value);
-$('reseed').onclick=()=>buildTreesFrom(+$('treeN').value);
 $('drive').onclick=()=> driveMode?endDrive():beginDrive('manual');
 $('routeGuides').onchange=()=>{routeObj.visible=$('routeGuides').checked||routeAdd;};
 {let line=null;$('propertyLine').onchange=async()=>{const on=$('propertyLine').checked;if(on&&!line)line=await createPropertyLine({scene,heightAt});if(line)line.visible=$('propertyLine').checked;};}
@@ -1193,9 +876,6 @@ $('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='ad
 $('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
 $('rintro').onclick=playIntro;
 $('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value).catch(()=>{});}catch(e){}};
-function setPanel(open){if(toolDock)return;$('panel').style.display=open?'block':'none'; $('fab').style.display=open?'none':'block';}
-$('min').onclick=()=>setPanel(false); $('fab').onclick=()=>setPanel(true);
-setPanel(false);   // start collapsed — just the ＋ button
 const bindHold=(id,key)=>{const b=$(id); b.addEventListener('pointerdown',e=>{e.preventDefault();KEY[key]=true;});
   ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>KEY[key]=false));};
 bindHold('dU','arrowup'); bindHold('dD','arrowdown'); bindHold('dL','arrowleft'); bindHold('dR','arrowright');
@@ -1208,36 +888,26 @@ $('stand').onclick=()=>{                    // put the eye at the marker (photog
   controls.update();
 };
 $('dropcam').onclick=dropCamera;
-$('nw').onclick=()=>nudge(-1,0); $('ne').onclick=()=>nudge(1,0); $('nn').onclick=()=>nudge(0,1); $('ns').onclick=()=>nudge(0,-1);
-$('copy').onclick=()=>{const txt=JSON.stringify(dumpLayout(),null,1); $('dump').value=txt; try{navigator.clipboard.writeText(txt);}catch(e){} $('dump').select();};
 $('topview').onclick=()=>{controls.target.set(0,heightAt(0,0),0); cam.position.set(0,gmin+relief+380,0.1); controls.update();};
 
 $('hud').innerHTML=`<b>Paradise Valley, MT</b><br>wide ${(2*cHalf).toFixed(0)} m · center ${(2*fHalf).toFixed(0)} m @1m<br>`+
   `elev ${M.globalMin.toFixed(0)}–${M.globalMax.toFixed(0)} m · relief ${relief.toFixed(0)} m<br>drag to orbit · open tools to edit`;
 
-// ---- flatten a building pad into the slope: carve terrain in a rect down to `padY`, ramping out over `blend` metres ----
-function flattenPad(cx,cz,halfW,halfD,padY,blend){ blend=blend||3;
-  for(const t of tiles){ for(let i=0;i<t.pos.count;i++){ const x=t.pos.getX(i), z=t.pos.getZ(i);
-    const m=Math.max(Math.abs(x-cx)-halfW, Math.abs(z-cz)-halfD);   // 0 inside the pad, grows outside
-    const w = m<=0?1:(m>=blend?0:1-m/blend);
-    if(w>0) t.baseY[i]=t.baseY[i]*(1-w)+padY*w; } }   // applyVex re-applies baseY->pos.y + re-places the house at heightAt
-}
-{ // set the house into the hill: pad at the average grade across the footprint (~driveway level; back cuts into the slope, front near grade)
-  const hx=8, hz=-8, hw=13, hd=8;
-  let sum=0, n=0;
-  for(let a=-hw;a<=hw;a+=hw/3) for(let b=-hd;b<=hd;b+=hd/3){ sum+=heightAt(hx+a,hz+b); n++; }
-  const padY = sum/n - 0.3;        // average grade, just recessed
-  flattenPad(hx,hz,hw,hd,padY,5);
-}
+LOAD.at(.32,'Filling the pond');await tick();
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
 const plantFillMap=await loadPlantFillMap();
+LOAD.at(.38,'Growing the meadow');await tick();
 const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial,fill:plantFillMap});
+LOAD.at(.44,'Growing the meadow');await tick();
 const plantFill=await createPlantFill({scene,heightAt,fill:plantFillMap});
+LOAD.at(.47,'Setting stones on the hills');await tick();
 createHillStones({scene,heightAt,free:(x,z)=>!inBuilding(x,z)&&polygonDistance(x,z)<-1&&roadCoverage(x,z)<.1&&campSurface(x,z).lawn<.25&&plantFillMap.at('lush',x,z)<.3&&driveLineDistance(x,z)>2.6&&distDriveway(x,z)>2});
+LOAD.at(.49,'Setting stones on the hills');await tick();
 {const d=plantFillMap.data,px=new Uint8Array(d.w*d.h*4);for(let i=0;i<d.h;i++)for(let j=0;j<d.w;j++){px[(i*d.w+j)*4]=plantFillMap.at('lush',d.x0+j+.5,d.z0+i+.5)*255;px[(i*d.w+j)*4+3]=255;}
  const lush=new THREE.DataTexture(px,d.w,d.h,THREE.RGBAFormat);lush.minFilter=lush.magFilter=THREE.LinearFilter;lush.needsUpdate=true;
  groundDetail.uniforms.lushMap.value=lush;groundDetail.uniforms.lushMin.value.set(d.x0,d.z0);groundDetail.uniforms.lushSize.value.set(d.w,d.h);}
 applyVex(1);
+LOAD.at(.5,'Planting trees');
 // Photo match owns resize so image and renderer use the same letterboxed frame.
 renderer.setSize(innerWidth,innerHeight);
 const cmp=document.querySelector('#compass span');
@@ -1326,8 +996,9 @@ function updateQuality(seconds,dt){
 }
 const landscapeReady=(async()=>{
   await Promise.all([treeAssetsReady,lidarReady]);
+  loadParts.land=.1;loadAt('Planting trees');
   if(!treeSpecies||!realXZ.length)throw Error('Tree models or placement data could not load.');
-  buildTreesFrom(realXZ.length/3); // stable full baseline, even if the density slider changed during loading
+  surveyTrees();
   const catalog=new Map(),base=[];
   function asset(key,label,parts,scale){catalog.set(key,{label,parts,defaults:{asset:key,x:0,z:0,offset:0,rotation:[0,0,0],scale,tint:1}});}
   for(const v of treeSpecies)asset('tree/'+v.name,v.label,v.parts,[v.defaultHeight,v.defaultHeight,v.defaultHeight]);
@@ -1335,7 +1006,7 @@ const landscapeReady=(async()=>{
   let shrubSpecies=null;
   try{shrubSpecies=buildShrubSpecies();
     shrubForest=new Forest(renderer,scene,{species:shrubSpecies,fixed:[],heightAt,grid:8,cell:128,imposterAt:36,band:5,ahead:.5,spread:.5,nearCap:240,nearBudget:160,shadows:true,wind:true,sunDir:SUN_DIR.clone(),shadowEdge:{at:shadowUniforms.shadowFocus,range:shadowUniforms.shadowExtent}});
-    if(shrubBudget)shrubForest.setBudget(shrubBudget);await shrubForest.loaded;
+    if(shrubBudget)shrubForest.setBudget(shrubBudget);await shrubForest.loaded;loadParts.land=.25;loadAt('Placing the sage');
   }catch(e){console.warn('Shrubs could not load, using the plain sage',e);shrubForest=null;shrubSpecies=null;}
   try{const near=await loadCentralRocks();for(const [name,part] of near){const entry=catalog.get('rock/'+name);if(entry)entry.nearParts=[part];}}catch(error){console.warn('Central rock set unavailable:',error);}
   shrubModels.forEach((parts,i)=>asset('bush/'+(i?'evergreen':'broadleaf'),i?'Evergreen bush':'Broadleaf bush',parts,[.8,.8,.8]));
@@ -1349,6 +1020,7 @@ const landscapeReady=(async()=>{
     let parts;try{parts=await loadBoulder(file);}catch(error){console.warn(label+' unavailable:',error);parts=[{geometry:rockGeos[fallback],material:rockMat}];}
     asset(key,label,parts,[1,1,1]);
   }
+  loadParts.land=.45;loadAt('Placing rocks and props');await tick();
   asset('prop/propane','Propane tank',propaneTank(),[1,1,1]);
   const row=(id,asset,t,scale,rotation=[0,t.r||0,0],offset=0)=>({id,asset,x:t.x,z:t.z,offset,rotation,scale,tint:t.tint??1});
   for(const t of trees)base.push(row('lidar:'+t.id,'tree/'+t.asset,t,[t.h*t.wide,t.h,t.h*t.wide]));
@@ -1388,7 +1060,7 @@ const landscapeReady=(async()=>{
   const bridge={heightAt,
     apply(records,authored){
       if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();propertyNature.detachProps();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
-      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);buildTreesFrom(+$('treeN').value);buildShrubs();
+      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);drawTrees();buildShrubs();
     },
     hide(id){
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
@@ -1399,12 +1071,13 @@ const landscapeReady=(async()=>{
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[]),...(shrubForest?landscapeRecords.filter(o=>landscapeCatalog.get(o.asset)?.shrub).map(o=>o.id):[])]);},
   };
+  loadParts.land=.6;loadAt('Placing every bush and tree');await tick();
   const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,autoRemoved:trackSage,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
-    enter(){endDrive({preserveView:true});dragging=null;for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();setPanel(false);},
-    leave(){quality.reset(3);setPanel(true);},
+    enter(){endDrive({preserveView:true});for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();},
+    leave(){quality.reset(3);},
   });
   configureShadows();
-  landscape=result;$('editLandscape').disabled=false;$('editLandscape').textContent='Edit landscape';$('editLandscape').onclick=()=>landscape.setActive(true);
+  landscape=result;
   // Add this building after capturing the existing scatter baseline: old
   // landscape exports must keep exactly the same deterministic object IDs.
   const shedSite=photoToWorld(757,157),shed=placeStructure('shed',shedSite.x,shedSite.z,94,1);shed.foundationY=shed.group.position.y/VEX;
@@ -1418,26 +1091,47 @@ const landscapeReady=(async()=>{
     rec.group.rotation.set(...saved.rotation);rec.group.scale.fromArray(saved.scale);
     if(saved.deleted){rec.deleted=true;rec.group.visible=false;scene.remove(rec.group);}
   }
-  // Keep the cabin selected after the late shed insertion so its transform
-  // controls are immediately useful for the bird's-eye alignment pass.
-  selectRec(placed.find(o=>o.type==='cabin'));
-  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,onBuilding:selectRec,stopDrive:()=>endDrive({preserveView:true}),paint:groundDetail.paint});
+  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,stopDrive:()=>endDrive({preserveView:true}),paint:groundDetail.paint});
+  loadParts.land=.9;loadAt('Painting the ground');
   await groundDetail.paint.ready;
   toolDock=createToolDock({landscape,sceneTransform,paint:groundDetail.paint,canvas:renderer.domElement,camera:cam,controls,scene,heightAt,groundHit:bridge.groundHit,stopDrive:()=>endDrive({preserveView:true}),stopRoute(){routeAdd=false;$('radd').textContent='add waypoints';}});
   if(new URLSearchParams(location.search).has('edit')){toolDock.open('objects');}
   if(new URLSearchParams(location.search).get('view')==='big-bush'){endDrive({preserveView:true});const y=heightAt(-15,27);cam.position.set(-9,y+3.4,34);controls.target.set(-15,y+1.4,27);controls.update();toolDock.open('objects');$('stAsset').value='bush/big-bush';}
+  loadParts.land=1;loadAt();
   return result;
-})().catch(error=>{console.error('Landscape editor:',error);$('editLandscape').textContent='Editor unavailable';info.textContent='Landscape editor could not load: '+error.message;});
-const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key)); if(AUTO_INTRO) playIntro();
+})().catch(error=>{console.error('Landscape editor:',error);landscapeFailed=true;if(trees.length)buildTreeMesh(trees.concat(groveList));info.textContent='Landscape editor could not load: '+error.message;});
+const AUTO_INTRO=!['edit','view','photo'].some(key=>new URLSearchParams(location.search).has(key));
 const requestedView=new URLSearchParams(location.search).get('view');if(PHOTO_VIEWS[requestedView])landscapeReady.then(()=>{photoMatch.setView(PHOTO_VIEWS[requestedView]);});
 const requestedPhoto=new URLSearchParams(location.search).get('photo');if(requestedPhoto)Promise.all([landscapeReady,photoMatch.ready]).then(()=>{photoMatch.choosePhoto(requestedPhoto);toolDock?.open('photo');});
 const _treeLook=new THREE.Vector3();
 let lastT=performance.now(), frames=0, fpsT=lastT; const statsEl=document.getElementById('stats');
 let houseCutKey='';
+// While loading nothing is drawn: the frames go to baking the tree pictures, as much of each frame as it can take.
+function bakeWhileLoading(dt){
+  if(!forest)return;const look=cam.getWorldDirection(_treeLook).add(cam.position),t0=performance.now();
+  do{forest.update(cam,look,cam.position,dt);shrubForest?.update(cam,look,cam.position,dt);}while((forest.baking||shrubForest?.baking)&&performance.now()-t0<30);
+  loadParts.trees=forest.ready?1:forest.progress;loadParts.shrubs=shrubForest?(shrubForest.ready?1:shrubForest.progress):0;loadAt();
+}
+// The reveal: once every part is in, the first view is set up and drawn a few times under the loading screen (every shader
+// built, the near trees swapped in, shadows drawn), then the screen lifts and the intro drive starts as it fades.
+const settled=()=>new Promise(r=>{let good=0,last=performance.now();const t0=last;(function f(){const n=performance.now();good=n-last<45?good+1:0;last=n;if(good>=8||n-t0>3500)r();else requestAnimationFrame(f);})();});
+(async function reveal(){
+  const t0=performance.now(),until=(ok,ms)=>new Promise(r=>{(function f(){if(ok()||performance.now()-t0>ms)r();else setTimeout(f,50);})();});
+  await landscapeReady;await rav4Loaded;
+  await until(()=>(!forest||forest.ready)&&(!shrubForest||shrubForest.ready),120000);
+  if(AUTO_INTRO){playIntro();placeCar();cam.lookAt(controls.target);holdCar=true;}
+  loading=false;warming=true;loadParts.warm=.15;loadAt('Lighting the fire');
+  try{await Promise.race([renderer.compileAsync(scene,cam),new Promise(r=>setTimeout(r,4000))]);}catch(e){console.warn('Shader warm-up skipped',e);}
+  loadParts.warm=.5;loadAt();
+  await settled();
+  loadParts.warm=1;loadAt();warming=false;quality.reset();
+  await LOAD.done();holdCar=false;quality.reset();
+})();
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
-  updateQuality(elapsed,dt);
-  updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
+  if(loading){bakeWhileLoading(dt);return;}
+  if(!warming)updateQuality(elapsed,dt);
+  if(!holdCar)updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
   photoMatch.applyRoll();
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);
   landscapeLayer?.update(cam);
