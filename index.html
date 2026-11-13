@@ -25,8 +25,10 @@
   /* the landscape editor's own panel only holds its controls until the tool dock moves them */
   #landscapeEditor{display:none!important}
   #leStatus{font-size:12px;color:#92dcae;overflow-wrap:anywhere}
-  #info{top:10px;right:10px;max-width:210px;color:#ffd479}
-  #compass{position:fixed;z-index:10;top:120px;right:10px;width:52px;height:52px;background:rgba(13,17,23,.75);border-radius:50%;font-size:11px}
+  #info{top:10px;right:64px;max-width:210px;color:#ffd479}
+  /* readouts are hidden unless Settings › show stats is on; messages also show while building */
+  body:not(.show-stats) #hud,body:not(.show-stats) #stats,body:not(.show-stats):not(.building) #info{display:none}
+  #compass{position:fixed;z-index:10;top:64px;right:6px;width:52px;height:52px;background:rgba(13,17,23,.75);border-radius:50%;font-size:11px}
   #compass span{position:absolute;left:50%;transform:translateX(-50%);top:4px;color:#ff7b72;font-weight:bold}
   #ov{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;opacity:.5;pointer-events:none;display:none;z-index:5}
   @keyframes photoOverlayFade{0%,100%{opacity:.05}50%{opacity:var(--photo-fade-peak,.5)}}
@@ -39,23 +41,20 @@
 <canvas id="c"></canvas>
 <img id="ov">
 <div id="hud" class="card"></div>
-<div id="info" class="card">open tools to inspect or edit</div>
+<div id="info" class="card">pick a build tool on the right</div>
 <div id="compass"><span>N</span></div>
 <div id="dockParts">
   <label>inspect coordinates <input id="coordinateMode" type="checkbox"></label>
   <label>show property line <input id="propertyLine" type="checkbox"></label>
   <label>vertical scale <input id="vex" type="range" min="0.5" max="3" step="0.1" value="1"><span id="vexv">1.0×</span></label>
-  <button id="mode">show elevation colors</button>
   <label>ground detail <input id="groundDetail" type="checkbox" checked></label>
-  <label>ground greenery <input id="groundGreen" type="range" min="0" max="1" step="0.05" value="0.85"></label>
+  <label>show stats <input id="showStats" type="checkbox"></label>
   <button id="pondView">view pond</button><button id="campView">view camp</button><button id="topview">top view</button>
-  <button id="stand">stand at marker</button><button id="dropcam">drop camera</button>
+  <button id="stand">stand at marker</button>
   <label>quality <select id="qualityMode"><option value="auto">Auto</option><option value="0">Minimal</option><option value="1">Low</option><option value="2">Medium</option><option value="3">High</option><option value="4">Ultra</option></select></label>
   <label>shadows <select id="shadowQuality"><option value="auto">Match quality</option><option value="off">Off</option><option value="2">Medium</option><option value="3">High</option><option value="4">Ultra</option></select></label>
   <label>target <select id="targetFPS"><option value="30">30 FPS</option><option value="60">60 FPS</option></select></label>
   <div id="qualityStatus" style="font-size:11px;color:#9aa4af" aria-live="polite"></div>
-  <button id="drive">drive the RAV4</button>
-  <button id="dU">▲</button><button id="dD">▼</button><button id="dL">◀</button><button id="dR">▶</button>
   <label>show route guides <input id="routeGuides" type="checkbox"></label>
   <button id="radd">add waypoints</button><button id="rclear">clear</button>
   <button id="rdrive">drive route</button><button id="rintro">▶ play intro</button>
@@ -117,7 +116,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
 import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
-import { polygonDistance,LEGACY_POND_OUTLINE,CLEARING,photoToWorld } from './assets/property-layout.mjs';
+import { polygonDistance,LEGACY_POND_OUTLINE,CLEARING,CAMP_PROPS,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
 import { buildHouse } from './assets/house-model.js?v=43';
 import {loadBigBush} from './assets/sagebrush.js?v=big-bush-3';
@@ -141,6 +140,7 @@ import {buildShrubSpecies,SAGE_FORMS,sageFormOf} from './assets/forest/shrubs.js
 import {makeCloudSky} from './assets/sky/cloudSky.js';
 import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
+import {createVisitorUI} from './assets/visitor-ui.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
@@ -482,7 +482,7 @@ let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 // Read-only handle for the test rigs (set here, after everything it reads is declared): the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
+window.montanaDebug={cam,controls,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){const k=treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});return k==='juniper'&&!authored?juniperVariety(id,h):k;}
 function treeTint(kind,id,tint,tone){
@@ -700,7 +700,7 @@ renderer.domElement.addEventListener('pointerdown',ev=>{
   if(landscape?.active||sceneTransform?.active)return;
   evNdc(ev);
   if(routeAdd){const h=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(h) addWaypoint(h.point.x,h.point.z); return;}
-  if(driveMode) return;
+  if(followCar) return;
   if(!document.getElementById('coordinateMode').checked)return;
   const hit=ray.intersectObjects([coarse.mesh,fine.mesh])[0]; if(!hit) return;
   const p=hit.point; marker.position.set(p.x,p.y+2,p.z);
@@ -747,7 +747,7 @@ scene.add(car.group);
 car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading;
 
 let driveMode=false, carMode='idle';        // carMode: idle | manual | route
-const KEY={},DRIVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
+const KEY={};
 addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.ctrlKey||e.metaKey||e.altKey||e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
   // Toolbar buttons keep focus after a click. WASD still navigates, while
@@ -755,8 +755,7 @@ addEventListener('keydown',e=>{
   if(/^(BUTTON|A)$/.test(e.target.tagName)&&(e.code==='Space'||e.key==='Enter'))return;
   const k=e.key.toLowerCase(); KEY[k]=true;
   if(e.code==='Space')KEY.space=true;
-  if(!driveMode&&e.code==='Space')e.preventDefault();
-  if(driveMode&&k.startsWith('arrow'))e.preventDefault();
+  if(e.code==='Space')e.preventDefault();
 });
 addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;if(e.code==='Space')KEY.space=false;});
 const clearCameraKeys=()=>{for(const key of Object.keys(KEY))KEY[key]=false;};
@@ -791,7 +790,12 @@ function chaseCam(blend,lookBlend=blend){
   _look.set(car.x+_fwd.x*3, y+1.3, car.z+_fwd.z*3);
   cam.position.lerp(_des,blend);controls.target.lerp(_look,lookBlend);cam.lookAt(controls.target);
 }
-renderer.domElement.addEventListener('wheel',e=>{ if(driveMode){e.preventDefault(); chaseDist=Math.max(5,Math.min(45,chaseDist+e.deltaY*0.02));}},{passive:false});
+// Once someone swipes or zooms, the camera keeps the angle and distance they chose and just travels along with the car.
+let followCar=false,userOrbit=false,glide=null;
+controls.addEventListener('start',()=>{if(followCar)userOrbit=true;glide=null;});
+function carryCam(){const y=heightAt(car.x,car.z);_look.set(car.x,y+1.3,car.z);_des.subVectors(_look,controls.target);controls.target.add(_des);cam.position.add(_des);}
+// The camera lets go of the car; the car carries on with its drive.
+function releaseCamera(){followCar=false;userOrbit=false;controls.enabled=true;}
 
 // ---- drive + intro cinematic ----
 let introT=0, introActive=false; const introDur=4.5;
@@ -801,15 +805,14 @@ function beginDrive(mode,points=routePts){
   if(landscape?.active)landscape.setActive(false);
   document.getElementById('coordinateMode').checked=false;marker.visible=false;routeAdd=false;
   document.getElementById('radd').textContent='add waypoints';routeObj.visible=document.getElementById('routeGuides').checked;
-  driveMode=true; carMode=mode; controls.enabled=false; introActive=false;
-  document.getElementById('drive').textContent='exit drive';
-  if(mode==='route'){for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=0;}
-  chaseCam(1);return true;
+  driveMode=true; carMode=mode; introActive=false; followCar=true; userOrbit=false; glide=null; controls.enabled=true;
+  for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=0;
+  chaseCam(1);onCameraMode();return true;
 }
-function endDrive({preserveView=false}={}){ driveMode=false; carMode='idle'; introActive=false; controls.enabled=true;
+function endDrive({preserveView=false}={}){ driveMode=false; carMode='idle'; introActive=false; releaseCamera();
   // Editor tools must not disturb a carefully aligned photo camera.
   if(!preserveView){controls.target.set(0,heightAt(0,0),0); controls.update();}
-  document.getElementById('drive').textContent='drive the RAV4'; }
+  onCameraMode(); }
 // The intro opens 15 m outside the entry arch (measured in the July 2022 frames; prop:entry-arch), so the car drives in under it.
 // A hand-made route that never passes within 4 m of the arch plays from its own start.
 const ENTRY_ARCH={x:128.15,z:-55.9};
@@ -824,51 +827,40 @@ function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypo
 function updateCar(dt){
   if(!driveMode) return;
   let travel=0;
-  // Any drive key takes the wheel from the route (intro included), keeping the car's speed.
-  if(carMode==='route'&&DRIVE_KEYS.some(k=>KEY[k])){carMode='manual';routeDriver=null;}
-  if(carMode==='manual'){
-    const f=(KEY['arrowup']||KEY['w']?1:0)-(KEY['arrowdown']||KEY['s']?1:0);
-    car.speed+=f*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
-    const s=(KEY['arrowleft']||KEY['a']?1:0)-(KEY['arrowright']||KEY['d']?1:0);
-    carSteering+=(s*.48-carSteering)*dampFactor(5,dt);
-    car.heading+=carSteering/.48*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
-    travel=car.speed*dt;car.x+=Math.sin(car.heading)*travel;car.z+=Math.cos(car.heading)*travel;
-  } else if(carMode==='route'){
+  if(carMode==='route'){                                     // at the end of the route the car parks
     travel=routeDriver.update(dt);for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=routeDriver.steering;
-    if(routeDriver.done){carMode='manual';introActive=false;}
+    if(routeDriver.done){carMode='parked';car.speed=0;introActive=false;}
+    const y=heightAt(car.x,car.z);
+    car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
+    if(rav4Rig)rav4Rig.update(carSteering,travel);
+    else {const spin=travel/0.36;for(const w of wheels)w.rotation.x+=spin;}
   }
-  const y=heightAt(car.x,car.z);
-  car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
-  if(rav4Rig)rav4Rig.update(carSteering,travel);
-  else {const spin=travel/0.36;for(const w of wheels)w.rotation.x+=spin;}
+  if(!followCar)return;
+  if(userOrbit){carryCam();controls.update();return;}
   if(introActive){introT+=dt;chaseCam(dampFactor(1.2+3.8*Math.min(1,introT/introDur),dt),dampFactor(7,dt));if(introT>=introDur)introActive=false;}
   else chaseCam(dampFactor(5,dt),dampFactor(7,dt));
 }
-
-// ---- photo-match camera -------------------------------------------------
-let camGizmo=null;
-function dropCamera(){
-  if(camGizmo) scene.remove(camGizmo);
-  camGizmo=new THREE.Group();
-  box(camGizmo,3,2,4,0,0,0,MAT(0x1a1a1a,.4,.4));
-  const lens=new THREE.Mesh(new THREE.ConeGeometry(1.1,2.4,12),MAT(0x0a0a0a,.3,.5));lens.rotation.x=-Math.PI/2;lens.position.z=3;camGizmo.add(lens);
-  camGizmo.position.copy(cam.position); camGizmo.lookAt(controls.target); scene.add(camGizmo);
-  const east=cam.position.x,north=-cam.position.z,elev=gmin+cam.position.y/VEX;
-  info.innerHTML=`📷 camera dropped<br>E ${east.toFixed(0)} · N ${north.toFixed(0)} m<br>eye ${elev.toFixed(0)} m (${(elev*3.28084).toFixed(0)} ft)`;
+// Free camera: a short glide to the fire pit, looking across at the house. From there swipes orbit and pinches zoom.
+function freeCamera(){
+  releaseCamera();const fire=CAMP_PROPS.fire,house=placed.find(r=>r.type==='house'&&!r.deleted)||{x:8.8,z:-4.9};
+  const dx=fire.x-house.x,dz=fire.z-house.z,d=Math.hypot(dx,dz)||1,ex=fire.x+dx/d*9-dz/d*1.5,ez=fire.z+dz/d*9+dx/d*1.5;
+  glide={t:0,dur:2.6,p0:cam.position.clone(),t0:controls.target.clone(),p1:new THREE.Vector3(ex,heightAt(ex,ez)+4.2,ez),t1:new THREE.Vector3(house.x,heightAt(house.x,house.z)+2.5,house.z)};
+  onCameraMode();
 }
+function updateGlide(dt){if(!glide)return;glide.t=Math.min(1,glide.t+dt/glide.dur);const e=glide.t*glide.t*(3-2*glide.t);
+  cam.position.lerpVectors(glide.p0,glide.p1,e);controls.target.lerpVectors(glide.t0,glide.t1,e);
+  const lift=Math.sin(Math.PI*e)*Math.min(40,glide.p0.distanceTo(glide.p1)*.25);cam.position.y+=lift;   // an arc, not a slide through the trees
+  if(glide.t>=1)glide=null;}
+// The visitor bar shows whether the camera rides with the car.
+let onCameraModeHook=null;function onCameraMode(){onCameraModeHook?.(followCar);}
 
 // ---- UI wiring ----------------------------------------------------------
 const $=id=>document.getElementById(id);
-$('coordinateMode').onchange=()=>{const enabled=$('coordinateMode').checked;marker.visible=enabled;if(enabled){endDrive();routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;info.textContent='tap the terrain to read coordinates';}else info.textContent='open tools to inspect or edit';};
+$('coordinateMode').onchange=()=>{const enabled=$('coordinateMode').checked;marker.visible=enabled;if(enabled){releaseCamera();onCameraMode();routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;info.textContent='tap the terrain to read coordinates';}else info.textContent='pick a build tool on the right';};
 $('vex').oninput=e=>{$('vexv').textContent=(+e.target.value).toFixed(1)+'×';applyVex(+e.target.value);};
-$('pondView').onclick=()=>{endDrive();cam.position.set(-3,heightAt(12,62)+23,39);controls.target.set(12,heightAt(12,62),62);controls.update();};
-$('campView').onclick=()=>{endDrive();const p=CLEARING.fire;cam.position.set(p.x+10,heightAt(p.x,p.z)+6,p.z+15);controls.target.set(p.x,heightAt(p.x,p.z)+.5,p.z);controls.update();};
-$('groundGreen').oninput=()=>groundDetail.uniforms.greenness.value=+$('groundGreen').value;
+$('pondView').onclick=()=>{releaseCamera();onCameraMode();cam.position.set(-3,heightAt(12,62)+23,39);controls.target.set(12,heightAt(12,62),62);controls.update();};
+$('campView').onclick=()=>{releaseCamera();onCameraMode();const p=CLEARING.fire;cam.position.set(p.x+10,heightAt(p.x,p.z)+6,p.z+15);controls.target.set(p.x,heightAt(p.x,p.z)+.5,p.z);controls.update();};
 $('groundDetail').onchange=()=>groundDetail.uniforms.detailEnabled.value=$('groundDetail').checked?1:0;
-let aerial=true;
-$('mode').onclick=()=>{aerial=!aerial;for(const m of mats){m.map=aerial?tex:null;m.vertexColors=!aerial;m.color.set(0xffffff);m.needsUpdate=true;}
-  $('mode').textContent=aerial?'show elevation colors':'show aerial photo';};
-$('drive').onclick=()=> driveMode?endDrive():beginDrive('manual');
 $('routeGuides').onchange=()=>{routeObj.visible=$('routeGuides').checked||routeAdd;};
 {let line=null;$('propertyLine').onchange=async()=>{const on=$('propertyLine').checked;if(on&&!line)line=await createPropertyLine({scene,heightAt});if(line)line.visible=$('propertyLine').checked;};}
 $('radd').onclick=()=>{routeAdd=!routeAdd;if(routeAdd){endDrive();$('coordinateMode').checked=false;marker.visible=false;}routeObj.visible=$('routeGuides').checked||routeAdd; $('radd').textContent=routeAdd?'tap terrain… (done)':'add waypoints';};
@@ -876,10 +868,14 @@ $('rclear').onclick=()=>{clearRoute(); routeAdd=false; $('radd').textContent='ad
 $('rdrive').onclick=()=>{ if(routePts.length<2){info.innerHTML='need 2+ waypoints';return;} beginDrive('route'); };
 $('rintro').onclick=playIntro;
 $('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value).catch(()=>{});}catch(e){}};
-const bindHold=(id,key)=>{const b=$(id); b.addEventListener('pointerdown',e=>{e.preventDefault();KEY[key]=true;});
-  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>KEY[key]=false));};
-bindHold('dU','arrowup'); bindHold('dD','arrowdown'); bindHold('dL','arrowleft'); bindHold('dR','arrowright');
-const photoMatch=createPhotoMatch({camera:cam,controls,renderer,stopDrive(){if(landscape?.active)landscape.setActive(false);endDrive();},onLens(fov){$('fov').value=fov;$('fovv').textContent=fov.toFixed(1)+'°';}});
+const photoMatch=createPhotoMatch({camera:cam,controls,renderer,stopDrive(){if(landscape?.active)landscape.setActive(false);releaseCamera();onCameraMode();},onLens(fov){$('fov').value=fov;$('fovv').textContent=fov.toFixed(1)+'°';}});
+// Back behind the car, wherever it is (driving or parked).
+function rideAlong(){if(!driveMode){driveMode=true;carMode='parked';}followCar=true;userOrbit=false;glide=null;introActive=false;controls.enabled=true;onCameraMode();}
+const visitorUI=createVisitorUI({controls,photoMatch,getToolDock:()=>toolDock,freeCamera,followCar:rideAlong});
+onCameraModeHook=on=>visitorUI.setFollowing(on);
+// The readouts (place, frame rate, messages) are off unless asked for; the choice stays in this browser.
+{const k='montanaShowStats',apply=on=>document.body.classList.toggle('show-stats',on);try{$('showStats').checked=localStorage.getItem(k)==='1';}catch(e){}
+ apply($('showStats').checked);$('showStats').onchange=()=>{apply($('showStats').checked);try{localStorage.setItem(k,$('showStats').checked?'1':'0');}catch(e){}};}
 $('fov').oninput=e=>{$('fovv').textContent=e.target.value+'°';cam.fov=+e.target.value;cam.updateProjectionMatrix();};
 $('stand').onclick=()=>{                    // put the eye at the marker (photographer spot), look at the buildings
   let tx=0,tz=0; if(placed.length){for(const o of placed){tx+=o.x;tz+=o.z;}tx/=placed.length;tz/=placed.length;}
@@ -887,11 +883,10 @@ $('stand').onclick=()=>{                    // put the eye at the marker (photog
   cam.position.set(marker.position.x,heightAt(marker.position.x,marker.position.z)+1.6,marker.position.z);
   controls.update();
 };
-$('dropcam').onclick=dropCamera;
 $('topview').onclick=()=>{controls.target.set(0,heightAt(0,0),0); cam.position.set(0,gmin+relief+380,0.1); controls.update();};
 
 $('hud').innerHTML=`<b>Paradise Valley, MT</b><br>wide ${(2*cHalf).toFixed(0)} m · center ${(2*fHalf).toFixed(0)} m @1m<br>`+
-  `elev ${M.globalMin.toFixed(0)}–${M.globalMax.toFixed(0)} m · relief ${relief.toFixed(0)} m<br>drag to orbit · open tools to edit`;
+  `elev ${M.globalMin.toFixed(0)}–${M.globalMax.toFixed(0)} m · relief ${relief.toFixed(0)} m`;
 
 LOAD.at(.32,'Filling the pond');await tick();
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
@@ -1066,14 +1061,14 @@ const landscapeReady=(async()=>{
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
       forest?.setHidden(id);shrubForest?.setHidden(id);
     },
-    terrainChanged(){propertyNature.reanchor();meadow.reanchor();plantFill.reanchor();if(!driveMode)car.group.position.y=heightAt(car.x,car.z);drawRoute();},
+    terrainChanged(){propertyNature.reanchor();meadow.reanchor();plantFill.reanchor();if(carMode!=='route')car.group.position.y=heightAt(car.x,car.z);drawRoute();},
     groundHit(ray){const hits=ray.intersectObjects([fine.mesh,coarse.mesh]);return hits[0]?.point||null;},
     hideBuildings(hide){for(const o of placed)o.group.visible=!hide&&!o.deleted;},
     visibleIds(){return new Set([...trees.map(t=>t.id),...(landscapeLayer?.visibleIds()||[]),...(shrubForest?landscapeRecords.filter(o=>landscapeCatalog.get(o.asset)?.shrub).map(o=>o.id):[])]);},
   };
   loadParts.land=.6;loadAt('Placing every bush and tree');await tick();
   const result=await createLandscapeEditor({scene,camera:cam,controls,canvas:renderer.domElement,fine,catalog,base,reference,bridge,getVex:()=>VEX,autoRemoved:trackSage,migrate:record=>migrateTreeAsset(record,o=>treeKindOf(o.id,o.x,o.z,o.scale[1],true)),
-    enter(){endDrive({preserveView:true});for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();},
+    enter(){releaseCamera();onCameraMode();for(const key of Object.keys(KEY))KEY[key]=false;routeAdd=false;$('radd').textContent='add waypoints';routeObj.visible=$('routeGuides').checked;$('coordinateMode').checked=false;marker.visible=false;qualityTransition=null;quality.reset();},
     leave(){quality.reset(3);},
   });
   configureShadows();
@@ -1091,12 +1086,12 @@ const landscapeReady=(async()=>{
     rec.group.rotation.set(...saved.rotation);rec.group.scale.fromArray(saved.scale);
     if(saved.deleted){rec.deleted=true;rec.group.visible=false;scene.remove(rec.group);}
   }
-  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,stopDrive:()=>endDrive({preserveView:true}),paint:groundDetail.paint});
+  sceneTransform=createSceneTransform({scene,camera:cam,controls,canvas:renderer.domElement,landscape,placed,heightAt,getVex:()=>VEX,stopDrive:()=>{releaseCamera();onCameraMode();},paint:groundDetail.paint});
   loadParts.land=.9;loadAt('Painting the ground');
   await groundDetail.paint.ready;
-  toolDock=createToolDock({landscape,sceneTransform,paint:groundDetail.paint,canvas:renderer.domElement,camera:cam,controls,scene,heightAt,groundHit:bridge.groundHit,stopDrive:()=>endDrive({preserveView:true}),stopRoute(){routeAdd=false;$('radd').textContent='add waypoints';}});
-  if(new URLSearchParams(location.search).has('edit')){toolDock.open('objects');}
-  if(new URLSearchParams(location.search).get('view')==='big-bush'){endDrive({preserveView:true});const y=heightAt(-15,27);cam.position.set(-9,y+3.4,34);controls.target.set(-15,y+1.4,27);controls.update();toolDock.open('objects');$('stAsset').value='bush/big-bush';}
+  toolDock=createToolDock({landscape,sceneTransform,paint:groundDetail.paint,canvas:renderer.domElement,camera:cam,controls,scene,heightAt,groundHit:bridge.groundHit,stopDrive:()=>{releaseCamera();onCameraMode();},stopRoute(){routeAdd=false;$('radd').textContent='add waypoints';},onChange:id=>visitorUI.dockChanged(id),onDone:()=>visitorUI.setBuild(false)});
+  if(new URLSearchParams(location.search).has('edit')){visitorUI.setBuild(true);toolDock.open('objects');}
+  if(new URLSearchParams(location.search).get('view')==='big-bush'){releaseCamera();onCameraMode();const y=heightAt(-15,27);cam.position.set(-9,y+3.4,34);controls.target.set(-15,y+1.4,27);controls.update();toolDock.open('objects');$('stAsset').value='bush/big-bush';}
   loadParts.land=1;loadAt();
   return result;
 })().catch(error=>{console.error('Landscape editor:',error);landscapeFailed=true;if(trees.length)buildTreeMesh(trees.concat(groveList));info.textContent='Landscape editor could not load: '+error.message;});
@@ -1131,7 +1126,7 @@ const settled=()=>new Promise(r=>{let good=0,last=performance.now();const t0=las
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
   if(loading){bakeWhileLoading(dt);return;}
   if(!warming)updateQuality(elapsed,dt);
-  if(!holdCar)updateCar(Math.min(.1,elapsed)); if(!driveMode){ panCam(dt); controls.update(); }
+  if(!holdCar)updateCar(Math.min(.1,elapsed)); if(!followCar){ updateGlide(dt); if(!glide&&controls.enabled)panCam(dt); controls.update(); }
   photoMatch.applyRoll();
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);
   landscapeLayer?.update(cam);

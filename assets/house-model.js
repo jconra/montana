@@ -371,7 +371,10 @@ export function buildHouse(THREE, spec, opts){
     if(style!=='hip')panel([[-len/2-rake,-.275],[len/2+rake,-.275],[len/2+rake,.275],[-len/2-rake,.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
     if(rs.fasciaMat!=null&&style==='gable'){                    // eave boards and rake boards, set just under the steel
       const fm=swatchMat(rs.fasciaMat,defTrim),fh=rs.fasciaH??.55,fz=span/2+eave,L=len+2*rake,slopeLen=Math.hypot(fz,rise),tilt=Math.atan2(rise,fz);
-      for(const s of [-1,1]){const e=new THREE.Mesh(new THREE.BoxGeometry(L,fh,.12),fm);e.position.set(0,h-.18-fh/2+.2,s*fz);sub.add(e);}
+      for(const s of [-1,1]){                                   // the eave board stops at each dormer that breaks through this eave
+        const gaps=dormerCuts.filter(c=>c.roofIndex===pi).map(c=>c.poly.map(toLocal)).filter(q=>q.some(p=>s*p[1]>=fz-.01)).map(q=>[Math.min(...q.map(p=>p[0])),Math.max(...q.map(p=>p[0]))]).sort((u,v)=>u[0]-v[0]);
+        let x0=-L/2;const piece=(a,b)=>{if(b-a<.05)return;const e=new THREE.Mesh(new THREE.BoxGeometry(b-a,fh,.12),fm);e.position.set((a+b)/2,h-.18-fh/2+.2,s*fz);sub.add(e);};
+        for(const [ga,gb] of gaps){piece(x0,Math.min(ga,L/2));x0=Math.max(x0,gb);}piece(x0,L/2);}
       for(const sx of [-1,1])for(const s of [-1,1]){const r=new THREE.Mesh(new THREE.BoxGeometry(.12,fh,slopeLen),fm);r.position.set(sx*(len/2+rake),h+rise/2-fh/2+.02,s*fz/2);r.rotation.x=s*tilt;sub.add(r);}
     }
     if(style==='hip'){

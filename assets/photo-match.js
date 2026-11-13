@@ -53,6 +53,11 @@ export function createPhotoMatch({camera,controls,renderer,stopDrive,onLens}){
     if(restore&&view)setView({...view,aspect});
     loadPhoto(ref.file);status(saved[id]?'Restored your saved alignment.':view?'Starting viewpoint loaded. Adjust and save the alignment.':'Photo loaded. Position the camera, then save the alignment.');
   }
+  // Back to the plain full-screen view, the camera left where the photo put it.
+  function clear(){photo=null;aspect=null;roll=0;$('photoRoll').value=0;$('photoRollValue').textContent='0.0°';$('photoReference').value='';
+    overlay.style.display='none';overlay.style.clipPath='';$('ovtog').textContent='show photo';setPhotoMode(false);camera.up.set(0,1,0);resize();}
+  // Photos with a solved camera, in the published list's order.
+  const solved=()=>references.filter(r=>saved[r.id]||defaults[r.id]);
   const ready=(async()=>{
     try{
       const response=await fetch('./assets/photo-references.json');if(!response.ok)throw Error('Photo list could not load.');references=await response.json();
@@ -73,5 +78,5 @@ export function createPhotoMatch({camera,controls,renderer,stopDrive,onLens}){
   $('photoExportAll').onclick=()=>{if(photo){saved[photo]=snapshot();persist();}if(!Object.keys(saved).length){status('Save a photo alignment first.');return;}download({format:'montana-photo-alignments',version:1,alignments:Object.values(saved)},'montana-photo-alignments.json');};
   new ResizeObserver(()=>document.documentElement.style.setProperty('--photo-bar-height',bar.getBoundingClientRect().height+'px')).observe(bar);
   addEventListener('resize',resize);resize();
-  return {setView,resize,applyRoll,ready,choosePhoto};
+  return {setView,resize,applyRoll,ready,choosePhoto,clear,solved,get photo(){return photo;}};
 }

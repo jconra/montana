@@ -514,6 +514,25 @@
       "fov": 40.5,
       "aspect": 1.777777777777778,
       "roll": 0
+    },
+    {
+      "format": "montana-photo-camera",
+      "version": 1,
+      "photo": "firepit-northeast",
+      "filename": "montanaAtFirepitFacingNorthEastTowardsEmigrantPeak.jpg",
+      "position": [
+        -23.2548,
+        126.1956,
+        40.7151
+      ],
+      "target": [
+        -5.5003,
+        123.0669,
+        32.0556
+      ],
+      "fov": 55,
+      "aspect": 1.3333333333333333,
+      "roll": 0
     }
   ]
 }
