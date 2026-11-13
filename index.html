@@ -115,7 +115,7 @@ const Renderer=new URLSearchParams(location.search).get('webgl')==='1' ? THREE.W
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createGroundDetail, rockGeometry, rockMaterial, loadShrub } from './assets/ground-detail.js';
-import { AdaptiveQuality, QUALITY_LEVELS } from './assets/adaptive-quality.mjs';
+import { AdaptiveQuality, QUALITY_LEVELS, startingLevel } from './assets/adaptive-quality.mjs';
 import { preparePond,createPropertyNature } from './assets/property-nature.js';
 import { polygonDistance,LEGACY_POND_OUTLINE,CLEARING,CAMP_PROPS,photoToWorld } from './assets/property-layout.mjs';
 import { loadRav4 } from './assets/rav4-model.js';
@@ -484,7 +484,7 @@ let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 // Read-only handle for the test rigs (set here, after everything it reads is declared): the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,controls,renderer,heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
+window.montanaDebug={cam,controls,renderer,get car(){return car.group;},heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){const k=treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});return k==='juniper'&&!authored?juniperVariety(id,h):k;}
 function treeTint(kind,id,tint,tone){
@@ -741,12 +741,30 @@ let rav4Rig=null,carSteering=0;
 // Load locally, without an expiring S3 URL; keep the placeholder on failure.
 const rav4Loaded=loadRav4().then(rig=>{
   const previous=car.group;car.group=rig.model;car.group.position.copy(previous.position);car.group.rotation.copy(previous.rotation);
+  {const r=car.group.rotation.y;car.group.rotation.y=0;car.group.updateMatrixWorld(true);const s=new THREE.Box3().setFromObject(car.group).getSize(new THREE.Vector3());car.group.rotation.y=r;
+   carContact.scale.set(s.x*1.75,1,s.z*1.5);}   // the box drawn fills about 60% of the patch: so it reaches a little past the car
   scene.add(car.group);scene.remove(previous);previous.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose();}});wheels.length=0;rav4Rig=rig;
   window.__rav4Ready=true;
 }).catch(e=>{console.warn('RAV4 model failed; retaining placeholder.',e);info.textContent='RAV4 model could not load; using the basic car.';});
-function placeCar(){car.group.position.set(car.x,heightAt(car.x,car.z),car.z);car.group.rotation.y=car.heading;}
+// The car's shadow: a soft dark patch under it. (A sun shadow was faint at this scale and, to follow a moving car, needed the
+// shadow map redrawn three times as often.)
+const carContact=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');
+  // a blurred rounded box: dark under the body, fading out over the last stretch past its sides and ends
+  g.filter='blur(9px)';g.fillStyle='rgba(0,0,0,.82)';g.beginPath();g.roundRect(26,22,76,84,18);g.fill();
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(1,1).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+  m.name='car-contact-shadow';m.renderOrder=1;m.scale.set(2.6,1,5.4);scene.add(m);return m;})();
+// Laid on the ground's slope (heights sampled ahead, behind and to each side) and lifted 15 cm, so a hillside doesn't cut into it.
+const _cN=new THREE.Vector3(),_cUp=new THREE.Vector3(0,1,0),_cQ=new THREE.Quaternion(),_cH=new THREE.Quaternion();
+function placeCarContact(){
+  const fx=Math.sin(car.heading),fz=Math.cos(car.heading),L=2.2,W=1.1;
+  const ahead=heightAt(car.x+fx*L,car.z+fz*L),behind=heightAt(car.x-fx*L,car.z-fz*L),left=heightAt(car.x+fz*W,car.z-fx*W),right=heightAt(car.x-fz*W,car.z+fx*W);
+  // the ground normal from the two slopes, in world axes
+  const sx=(ahead-behind)/(2*L),sw=(left-right)/(2*W);_cN.set(-(sx*fx+sw*fz),1,-(sx*fz-sw*fx)).normalize();
+  _cQ.setFromUnitVectors(_cUp,_cN);_cH.setFromAxisAngle(_cUp,car.heading);carContact.quaternion.copy(_cQ).multiply(_cH);
+  carContact.position.set(car.x,(ahead+behind+left+right)/4+.15,car.z);}
+function placeCar(){car.group.position.set(car.x,heightAt(car.x,car.z),car.z);car.group.rotation.y=car.heading;placeCarContact();}
 scene.add(car.group);
-car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading;
+car.group.position.set(car.x,heightAt(car.x,car.z),car.z); car.group.rotation.y=car.heading; placeCarContact();
 
 let driveMode=false, carMode='idle';        // carMode: idle | manual | route
 const KEY={};
@@ -833,7 +851,7 @@ function updateCar(dt){
     travel=routeDriver.update(dt);for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=routeDriver.steering;
     if(routeDriver.done){carMode='parked';car.speed=0;introActive=false;}
     const y=heightAt(car.x,car.z);
-    car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;
+    car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;placeCarContact();
     if(rav4Rig)rav4Rig.update(carSteering,travel);
     else {const spin=travel/0.36;for(const w of wheels)w.rotation.x+=spin;}
   }
@@ -974,7 +992,7 @@ function configureQuality(){
 }
 try{const saved=JSON.parse(localStorage.getItem('montanaQuality'));if(saved&&['auto','0','1','2','3','4'].includes(saved.mode)&&[30,60].includes(saved.target)){$('qualityMode').value=saved.mode;$('targetFPS').value=String(saved.target);}}catch(e){}
 $('qualityMode').onchange=configureQuality;$('targetFPS').onchange=configureQuality;
-applyQuality(2);configureQuality();
+quality.level=startingLevel(renderer.getContext());applyQuality(quality.level);configureQuality();
 // Loading stalls and returning from a background tab must not lower quality.
 THREE.DefaultLoadingManager.onStart=()=>{qualityLoading=true;quality.reset();};
 THREE.DefaultLoadingManager.onLoad=()=>{qualityLoading=false;quality.reset();};

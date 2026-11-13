@@ -1,5 +1,8 @@
+// Shadows switch off only when asked for (mode 'off'). The lower quality levels keep a small cheap map instead of none:
+// three.js writes "the sun casts shadows" into every lit shader, so turning shadows off or on rebuilt them all, mid-drive.
 export function shadowSettings(level,mode='auto',limit=4096){
- if(mode==='off'||level<2)return {size:0,radius:0};
+ if(mode==='off')return {size:0,radius:0};
+ if(level<2)return {size:Math.min(limit,512),radius:40};
  const tier=mode==='auto'?level:Math.max(2,Math.min(4,Number(mode)||2));
  return {size:Math.min(limit,[0,0,1024,2048,4096][tier]),radius:[0,0,55,75,95][tier]};
 }

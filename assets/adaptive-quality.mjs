@@ -6,6 +6,13 @@ export const QUALITY_LEVELS = [
   {name:'High', distance:180, meshes:340, density:.85, pixelRatio:1.5},
   {name:'Ultra', distance:240, meshes:500, density:1, pixelRatio:2},
 ];
+// Where auto quality starts. A graphics chip built into the processor (Intel, AMD's laptop Radeon/Vega, or a software
+// renderer) starts on Low, and steps up if it keeps up; anything else starts on Medium. (Phones start on Medium: their chips
+// are built in too, but strong, and the renderer names them differently.)
+export function startingLevel(gl){
+  try{const ext=gl.getExtension('WEBGL_debug_renderer_info'),name=String(ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER));
+    return /Intel|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d+ Graphics|llvmpipe|SwiftShader|Microsoft Basic Render/i.test(name)?1:2;}catch(e){return 2;}
+}
 export class AdaptiveQuality {
   constructor(onChange){this.onChange=onChange;this.level=2;this.mode='auto';this.target=30;this.time=0;this.nextUpgrade=0;this.reset();}
   reset(warmup=5){this.warmup=warmup;this.samples=[];this.elapsed=0;this.slow=0;this.fast=0;}

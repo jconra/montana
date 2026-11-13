@@ -10,6 +10,6 @@ assert.ok(approachCoverage(0,1,20)<.1,'Long stalls cannot skip the handoff');
 assert.ok(approachCoverage(1,0,1/60)>.98,'Budget removal starts softly');
 console.log('Stable stagger distribution, smooth distance coverage and time-continuous fades passed');
 const {shadowSettings}=await import('../assets/tree-shadows.mjs');
-for(const level of [0,1])for(const mode of ['auto','2','3','4'])assert.equal(shadowSettings(level,mode).size,0);
+for(const level of [0,1])for(const mode of ['auto','2','3','4'])assert.equal(shadowSettings(level,mode).size,512);   // never off unless asked: switching rebuilds every shader
 assert.equal(shadowSettings(2).size,1024);assert.equal(shadowSettings(3).size,2048);assert.equal(shadowSettings(4).size,4096);
 assert.equal(shadowSettings(4,'off').size,0);assert.equal(shadowSettings(4,'auto',2048).size,2048);
