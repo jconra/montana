@@ -1,5 +1,6 @@
 import {correctedDriveway,GRAVEL_EXCLUSIONS,grassReclaim} from './driveway-refinements.mjs';
 import * as THREE from 'three';
+import {breather} from './breathe.mjs';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createRoute,groundZone,polygonDistance,POND_OUTLINE,CLEARING,CAMP_PROPS,smooth} from './property-layout.mjs';
 import {loadSagebrush} from './sagebrush.js';
@@ -162,6 +163,7 @@ export function preparePond(tiles,sample){
  }}return level;
 }
 export async function createPropertyNature({scene,heightAt,driveway,buildings,pondLevel,paintUniforms}){
+ const breathe=breather();
  const route=createRoute(driveway),R=rng(423031),o=new THREE.Object3D(),chunks=new Map(),props=[],wind={value:0},fadeDistance={value:90};let vex=1,quality=1,lastCam=new THREE.Vector3(1e8,0,0),radius=70;
  const geos={grass:grassGeometry(71),reeds:grassGeometry(75,true),white:flowerGeometry(81,false),yellow:flowerGeometry(85,true)};
  const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:1});
@@ -191,13 +193,14 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  add('grass',x,z,zone==='median'?.21+R()*.16:mown?.25+R()*.22:.6+R()*.65);
  if(zone==='meadow'&&!mown&&patch>.6&&R()<.045)add(R()<.75?'white':'yellow',x,z,.7+R()*.4);
  }
- for(let i=0;i<24000;i++){const p=route.at(R()*route.total,(R()<.5?-1:1)*(2.3+R()*19));candidate(p.x,p.z);}
- for(let i=0;i<24000;i++){const a=R()*Math.PI*2,r=Math.sqrt(R())*78;candidate(-8+Math.cos(a)*r,25+Math.sin(a)*r);}
+ for(let i=0;i<24000;i++){if(!(i&511))await breathe();const p=route.at(R()*route.total,(R()<.5?-1:1)*(2.3+R()*19));candidate(p.x,p.z);}
+ for(let i=0;i<24000;i++){if(!(i&511))await breathe();const a=R()*Math.PI*2,r=Math.sqrt(R())*78;candidate(-8+Math.cos(a)*r,25+Math.sin(a)*r);}
  for(let d=0;d<route.total-23;d+=.35){const p=route.at(d,(R()-.5)*.42);if(groundZone(p.x,p.z,route,buildings)==='median')add('grass',p.x,p.z,.18+R()*.16);}
  // The hillside reference has uneven thickets of open, woody sagebrush.
  // Keep gaps, the mown camp and the entire road clear; avoid coincident shrubs.
  const sageR=rng(701),occupied=new Map(),cell=3;
  for(let i=0;i<6000;i++){
+  if(!(i&255))await breathe();
   const p=route.at(sageR()*route.total,(sageR()<.5?-1:1)*(3.8+sageR()*33));
   const patch=.5+.25*Math.sin(p.x*.13+Math.sin(p.z*.07)*2)+.25*Math.cos(p.z*.12-p.x*.06);
   if(sageR()>.03+.88*smooth(.25,.7,patch)||groundZone(p.x,p.z,route,buildings)!=='meadow'||route.nearest(p.x,p.z).distance<3.5||Math.hypot(p.x-CLEARING.fire.x,p.z-CLEARING.fire.z)<17)continue;
@@ -218,6 +221,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
  for(const patch of TALL_GRASS_PATCHES){
   const xs=patch.outline.map(p=>p.x),zs=patch.outline.map(p=>p.z),xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs);
   for(let i=0;i<(xmax-xmin)*(zmax-zmin)*3;i++){
+   if(!(i&511))await breathe();
    const x=xmin+meadowR()*(xmax-xmin),z=zmin+meadowR()*(zmax-zmin),cover=tallGrassCoverage(x,z);
    if(meadowR()>cover||frontDoorGravel(x,z)>.2)continue;
    add('grass',x,z,1.15+meadowR()*.65,{tallPatch:true});
@@ -229,6 +233,7 @@ export async function createPropertyNature({scene,heightAt,driveway,buildings,po
   for(const im of chunk.meshes){im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();}
  }
  for(const chunk of chunks.values()){
+  await breathe();
   // Trim after generating the stable scatter: changing this footprint must not
   // renumber the sagebrush objects in existing exported landscape edits.
   if(chunk.kind==='grass'||chunk.kind==='white'||chunk.kind==='yellow'){

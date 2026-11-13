@@ -547,6 +547,14 @@ function drawNoise() {
 }
 
 let sheet=null;
+// The wood sheet takes a few hundred milliseconds to paint. prepareWood() paints it in a worker while the map loads, so the
+// page stays free; woodPixels() then hands back that copy (or paints it here, if no worker could run).
+export function prepareWood(){
+  if(sheet||typeof Worker==='undefined')return Promise.resolve();
+  return new Promise(done=>{let w;const fallback=()=>{w?.terminate();done();};
+    try{w=new Worker(new URL('./wood-worker.mjs',import.meta.url),{type:'module'});}catch(e){fallback();return;}
+    w.onmessage=e=>{if(!sheet&&e.data?.col)sheet=e.data;w.terminate();done();};w.onerror=fallback;});
+}
 export function woodPixels(){if(!sheet){const t0=performance.now(),W=drawWood('rustic');sheet={col:W.col,nrm:normalsFrom(W.H,WOOD.w,WOOD.h,6,false),ms:performance.now()-t0};}return sheet;}
 export function stonePixels(){const S=drawStone('fieldstone');return {col:S.col,nrm:normalsFrom(S.H,256,256,STONE_LOOKS.fieldstone.nrm,true)};}
 let cached=null;

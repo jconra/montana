@@ -149,7 +149,7 @@ export class Forest {
     // the average a shadowed wood comes to, so a wood is as dark past the edge as inside it. Range 0: off.
     const E = shadowEdge || {};
     this.edgeU = { shadowAt: E.at || { value: new THREE.Vector3() }, shadowRange: E.range || { value: 0 }, edgeFrom: E.from || { value: 0.55 }, edgeTo: E.to || { value: 0.97 }, edgeShade: E.shade || { value: 0.55 }, edgeJitter: E.jitter || { value: 0.12 } };   // (0.55: what five views of real-shadowed woods averaged, 0.34 to 0.74)
-    this.ready = false; this.baking = null;
+    this.ready = false; this.baking = null; this.bakeBudget = 10;   // ms of baking per frame (the loading screen tunes it to the frame rate)
     this.loaded = this.load();
   }
 
@@ -163,6 +163,7 @@ export class Forest {
       const box = new THREE.Box3().setFromObject(root), size = box.getSize(new THREE.Vector3());
       sp.unit = sp.height / size.y; sp.box0 = box.min.y; sp.boxH = size.y; sp.baseY = box.min.y + (sp.sink || 0) * size.y; sp.root = root;   // (sink: that share of its height under the ground)
       const shapeKey = sp.shape ? JSON.stringify(sp.shape) : '';          // (a species handed on to a new forest is already shaped)
+      await new Promise(r => setTimeout(r, 0));                          // a frame for the loading screen between species
       if (sp.shape && root.userData.shapedWith !== shapeKey) { sp.shapeInfo = shapeFoliage(root, sp.unit, sp.shape); root.userData.shapedWith = shapeKey; }
       root.traverse(o => { if (o.isMesh && !Array.isArray(o.material)) { o.material.side = THREE.DoubleSide; if (o.material.map) o.material.map.anisotropy = 4; if (o.material.transparent) { o.material.alphaTest = 0.5; o.material.transparent = false; } } });
       if (sp.coverage) root.traverse(o => { if (o.isMesh) for (const m of [].concat(o.material)) if (m.alphaTest > 0 && m.map) m.map = bleedLeafMap(m.map); });   // (before the meshes and the atlas copy it)
@@ -180,7 +181,7 @@ export class Forest {
   update(camera, target, at, dt) {
     if (this.baking) {
       const t0 = performance.now();
-      while (performance.now() - t0 < 10) { if (this.baking.next().done) { this.baking = null; this.buildDraws(); this.ready = true; break; } }
+      while (performance.now() - t0 < this.bakeBudget) { if (this.baking.next().done) { this.baking = null; this.buildDraws(); this.ready = true; break; } }
       if (!this.ready) return;
     }
     if (!this.ready) return;

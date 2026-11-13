@@ -40,7 +40,14 @@ export function correctedDriveway(points){
  const head=points.map(p=>({x:p.x,z:p.z+AERIAL_ROAD_SHIFT})).filter(p=>p.z<DRIVE_LINE[0].z-4);
  return [...head,...DRIVE_LINE];
 }
-function lineDistance(x,z,line){let best=Infinity;for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz)));best=Math.min(best,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));}return best;}
+// Distance to a polyline. Segments whose bounding box is already farther than the best so far are skipped (same answer, far less work).
+const SEGS=new WeakMap();
+function lineDistance(x,z,line){let segs=SEGS.get(line);
+ if(!segs){segs=[];for(let i=1;i<line.length;i++){const a=line[i-1],b=line[i],dx=b.x-a.x,dz=b.z-a.z;segs.push({ax:a.x,az:a.z,dx,dz,L:dx*dx+dz*dz,x0:Math.min(a.x,b.x),x1:Math.max(a.x,b.x),z0:Math.min(a.z,b.z),z1:Math.max(a.z,b.z)});}SEGS.set(line,segs);}
+ let best=Infinity;
+ for(const s of segs){const ox=x<s.x0?s.x0-x:x>s.x1?x-s.x1:0,oz=z<s.z0?s.z0-z:z>s.z1?z-s.z1:0;if(ox*ox+oz*oz>=best)continue;
+  const t=Math.max(0,Math.min(1,((x-s.ax)*s.dx+(z-s.az)*s.dz)/s.L)),qx=x-s.ax-s.dx*t,qz=z-s.az-s.dz*t;best=Math.min(best,qx*qx+qz*qz);}
+ return Math.sqrt(best);}
 export const driveLineDistance=(x,z)=>lineDistance(x,z,DRIVE_LINE);
 // 0..1: the short grass of the drive: the cut strip beside the tracks, and the strip between them (not on the apron or the camp arms)
 export function driveVerge(x,z){if(x<-5.5||x>136||z<-107)return 0;const d=lineDistance(x,z,DRIVE_LINE),e=TRACK_OFFSET+TRACK_WIDTH/2,m=TRACK_OFFSET-TRACK_WIDTH/2;return Math.max(smooth(e-.05,e+.08,d)*(1-smooth(e+VERGE-.1,e+VERGE+.12,d)),1-smooth(m-.08,m+.04,d));}

@@ -2,6 +2,7 @@
 // A tuft grows up out of the ground as the camera nears it (each at its own distance, so there is no visible ring) rather
 // than popping in. Chunks of instanced tufts, no per-frame CPU beyond switching chunks on and off. WebGL1 safe.
 import * as THREE from 'three';
+import {breather} from './breathe.mjs';
 import {polygonDistance} from './property-layout.mjs';
 import {roadCoverage,DRIVE_LINE,grassPriority,driveVerge,TRACK_OFFSET,TRACK_WIDTH,VERGE} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
@@ -28,6 +29,7 @@ async function zoneReader(){
  return (x,z)=>{const i=Math.floor((x+110)*2),j=Math.floor((z+100)*2);if(i<0||j<0||i>=512||j>=512)return [0,0];const k=(j*512+i)*4;return [d[k]/255,d[k+2]/255];};
 }
 export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=null}){
+ const breathe=breather();
  const zone=await zoneReader(),wind={value:0},far={value:80},R=(()=>{let s=20261101;return ()=>((s=Math.imul(s,1664525)+1013904223>>>0)/4294967296);})();
  const material=gradeLand(new THREE.MeshLambertMaterial({side:THREE.DoubleSide}));
  material.onBeforeCompile=sh=>{
@@ -67,7 +69,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
  const STEP=.42,E=150;
  const shortBoxes=SHORT_GRASS_PATCHES.map(o=>[Math.min(...o.map(p=>p.x))-1,Math.max(...o.map(p=>p.x))+1,Math.min(...o.map(p=>p.z))-1,Math.max(...o.map(p=>p.z))+1]);
  const nearShort=(x,z)=>shortBoxes.some(([a,b,c,d])=>x>a&&x<b&&z>c&&z<d);
- for(let gx=-E;gx<E;gx+=STEP)for(let gz=-E;gz<E;gz+=STEP){
+ for(let gx=-E;gx<E;gx+=STEP){await breathe();for(let gz=-E;gz<E;gz+=STEP){
   const x=gx+(R()-.5)*STEP*1.4-5,z=gz+(R()-.5)*STEP*1.4+10,centre=Math.hypot(x+5,z-12);if(centre>E)continue;
   // MOWN LAWN (the camp's mown opening and the strips he marked short): an even sward of short blades, a few centimetres tall,
   // where the ground texture alone read as paint (his picture 7 note). Evenly spread, so no patchy thinning here.
@@ -84,7 +86,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
   const dryBunch=(1-lawn)*(wet<.42?1:.15)*(patch>.6?1:.3)*(R()<.1?1:0);
   if(dryBunch)add(x,z,1.4+R()*.7,1+R()*.4,wet,.72+R()*.28);
   else add(x,z,size,lawn>.5?.34+R()*.18:tall,wet,lawn<.3&&R()<.05?.5:0);
- }
+ }}
  for(const [cx,cz,big] of STRAW_BUNCHES)for(let i=0;i<46;i++){const a=R()*6.283,r=Math.sqrt(R())*big*.55;add(cx+Math.cos(a)*r,cz+Math.sin(a)*r,1.7+R()*.6,1.7+R()*.7,.3,.8+R()*.2);}
  // Skirts: taller tufts round tree bases, along the drive and at the foundations.
  const skirt=(x,z)=>{if(!clear(x,z)||(x>-60&&x<34&&z>-25&&z<60&&campSurface(x,z).lawn>.3))return;const w=wetAt(x,z);const m=x>-60&&x<34&&z>-25&&z<60?campSurface(x,z).lawn:0;add(x,z,1+R()*.5,(1+R()*.7)*(1-m*.6),w,m<.2&&R()<.25?.55:0);};
@@ -92,7 +94,7 @@ export async function createMeadow({scene,heightAt,uniforms,prepareShadow,fill=n
  for(let q=1;q<DRIVE_LINE.length;q++){const a=DRIVE_LINE[q-1],b=DRIVE_LINE[q],len=Math.hypot(b.x-a.x,b.z-a.z);for(let d=0;d<len*5;d++){const t=R(),s=R()<.5?-1:1,o=TRACK_OFFSET+TRACK_WIDTH/2+VERGE+.15+R()*1.3,nx=-(b.z-a.z)/len,nz=(b.x-a.x)/len;skirt(a.x+(b.x-a.x)*t+nx*s*o,a.z+(b.z-a.z)*t+nz*s*o);}}
  for(const f of FOOTPRINTS.slice(0,4))for(let q=0;q<(f.hx+f.hz)*22;q++){const c=Math.cos(f.yaw),s=Math.sin(f.yaw),side=R(),e=R()*2-1,g=.15+R()*.7;let lx,lz;if(side<.5){lx=e*f.hx;lz=(R()<.5?-1:1)*(f.hz+g);}else{lx=(R()<.5?-1:1)*(f.hx+g);lz=e*f.hz;}skirt(f.x+lx*c+lz*s,f.z-lx*s+lz*c);}
  const chunks=[];let tufts=0;
- for(const c of cells.values()){c.rows.sort((a,b)=>a.rank-b.rank);const n=c.rows.length;tufts+=n;
+ for(const c of cells.values()){await breathe();c.rows.sort((a,b)=>a.rank-b.rank);const n=c.rows.length;tufts+=n;
   const g=new THREE.InstancedBufferGeometry();g.index=shape.index;g.setAttribute('position',shape.position);g.setAttribute('normal',shape.normal);g.setAttribute('aH',shape.aH);
   const iPos=new Float32Array(n*3),iTurn=new Float32Array(n*3),iTone=new Float32Array(n*3);
   c.rows.forEach((t,i)=>{iPos.set([t.x,heightAt(t.x,t.z),t.z],i*3);iTurn.set([t.turn,t.size,t.height],i*3);iTone.set([t.wet,t.straw,t.vary],i*3);});

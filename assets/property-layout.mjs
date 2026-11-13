@@ -25,15 +25,24 @@ export const CLEARING={fire:photoToWorld(796,454),picnic:photoToWorld(830,491),w
 export const CAMP_PROPS={fire:{x:-19,z:39.25},picnic:{x:-16.1,z:36.56}};
 export const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 export const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
+// Signed distance to an outline (positive inside). Called hundreds of thousands of times while the scene builds, so each
+// outline keeps its edges with their bounding boxes, and an edge whose box is already farther than the best distance is
+// skipped: the same answer, without the square roots.
+const EDGES=new WeakMap();
+function edgesOf(points){let e=EDGES.get(points);if(e)return e;e=[];
+  for(let i=0,j=points.length-1;i<points.length;j=i++){const a=points[j],b=points[i],dx=b.x-a.x,dz=b.z-a.z;
+    e.push({ax:a.x,az:a.z,bz:b.z,dx,dz,L:dx*dx+dz*dz,x0:Math.min(a.x,b.x),x1:Math.max(a.x,b.x),z0:Math.min(a.z,b.z),z1:Math.max(a.z,b.z)});}
+  EDGES.set(points,e);return e;}
 export function polygonDistance(x,z,points=POND_OUTLINE){
-  let inside=false,distance=Infinity;
-  for(let i=0,j=points.length-1;i<points.length;j=i++){
-    const a=points[j],b=points[i],dx=b.x-a.x,dz=b.z-a.z;
-    const L=dx*dx+dz*dz,t=L?clamp(((x-a.x)*dx+(z-a.z)*dz)/L):0;   // (a repeated point is a zero-length edge, not a NaN)
-    distance=Math.min(distance,Math.hypot(x-a.x-dx*t,z-a.z-dz*t));
-    if((a.z>z)!==(b.z>z)&&x<(b.x-a.x)*(z-a.z)/(b.z-a.z)+a.x)inside=!inside;
+  let inside=false,best=Infinity;
+  for(const e of edgesOf(points)){
+    if((e.az>z)!==(e.bz>z)&&x<e.dx*(z-e.az)/(e.bz-e.az)+e.ax)inside=!inside;
+    const ox=x<e.x0?e.x0-x:x>e.x1?x-e.x1:0,oz=z<e.z0?e.z0-z:z>e.z1?z-e.z1:0;
+    if(ox*ox+oz*oz>=best)continue;
+    const t=e.L?clamp(((x-e.ax)*e.dx+(z-e.az)*e.dz)/e.L):0,qx=x-e.ax-e.dx*t,qz=z-e.az-e.dz*t;   // (a repeated point is a zero-length edge, not a NaN)
+    best=Math.min(best,qx*qx+qz*qz);
   }
-  return inside?distance:-distance;
+  const distance=Math.sqrt(best);return inside?distance:-distance;
 }
 export function createRoute(points){
   let total=0;const segments=points.slice(1).map((b,i)=>{const a=points[i],length=Math.hypot(b.x-a.x,b.z-a.z),s={a,b,length,start:total};total+=length;return s;});

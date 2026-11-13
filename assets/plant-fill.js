@@ -4,6 +4,7 @@
 // loose drifts; real-looking cattails on the pond's edge and sparse thistles on the lush borders. None of it stands above the
 // knee except cattails and thistles. Chunks of instanced plants that grow up as the camera nears. WebGL1 safe.
 import * as THREE from 'three';
+import {breather} from './breathe.mjs';
 import {polygonDistance} from './property-layout.mjs';
 import {roadCoverage,grassPriority,driveLineDistance,driveVerge,TRACK_OFFSET,TRACK_WIDTH} from './driveway-measured.mjs';
 import {campSurface} from './camp-approach.mjs';
@@ -45,6 +46,7 @@ export async function loadPlantFillMap(){
  return {data:d,at};
 }
 export async function createPlantFill({scene,heightAt,fill}){
+ const breathe=breather();
  const {data,at}=fill,wind={value:0},far={value:58};let seed=20261102;const R=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/4294967296);
  const models=await (await fetch(new URL('./models/fill-plants.json',import.meta.url))).json();
  const material=gradeLand(new THREE.MeshLambertMaterial({side:THREE.DoubleSide,vertexColors:true}));material.name='plant-fill';
@@ -71,7 +73,7 @@ export async function createPlantFill({scene,heightAt,fill}){
  const add=(kind,x,z,size,height,col)=>{if(kind==='lush'||kind==='dry'||kind==='shrublet'){const keep=.5+.5*grassPriority(x,z);if(R()>keep)return;size*=1+(1-keep)*.4;}const k=kind+':'+Math.floor(x/CHUNK)+':'+Math.floor(z/CHUNK);let c=cells.get(k);if(!c)cells.set(k,c={kind,x:(Math.floor(x/CHUNK)+.5)*CHUNK,z:(Math.floor(z/CHUNK)+.5)*CHUNK,rows:[]});c.rows.push({x,z,size,height,col,turn:R()*6.283,rank:R(),vary:R()});count[kind]=(count[kind]||0)+1;};
  const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
  const DEEP=[.12,.2,.06],LIME=[.2,.3,.09],OLIVE=[.19,.24,.09],BRILLIANT=[.2,.38,.06],EMERALD=[.09,.24,.06],YELLOWGREEN=[.27,.33,.07],STRAW=[.42,.34,.16],TAN=[.3,.24,.11],PALE=[.25,.3,.12],SILVER=[.3,.33,.24];
- for(let i=0;i<data.h;i++)for(let j=0;j<data.w;j++){const T=tallGrassCoverage(data.x0+j+.5,data.z0+i+.5),cover=Math.max(T,data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5));if(cover<.3)continue;
+ for(let i=0;i<data.h;i++){await breathe();for(let j=0;j<data.w;j++){const T=tallGrassCoverage(data.x0+j+.5,data.z0+i+.5),cover=Math.max(T,data.cover&&fill.at('cover',data.x0+j+.5,data.z0+i+.5));if(cover<.3)continue;
   // where he marked long lush grass, it is long lush grass whatever the frames' map read
   const X=data.x0+j,Z=data.z0+i,lush=Math.max(T,at('lush',X+.5,Z+.5)),dry=at('dry',X+.5,Z+.5)*(1-T),bare=at('bare',X+.5,Z+.5)*(1-T),live=cover*(1-bare)*(1-bare);
   const patch=vnoise(X*.11+7,Z*.11),fine=vnoise(X*.45,Z*.45);
@@ -83,12 +85,12 @@ export async function createPlantFill({scene,heightAt,fill}){
   const grassy=(lush+dry*.6)*live,drift=vnoise(X*.07+31,Z*.07-9)*.7+vnoise(X*.3,Z*.3)*.3,w=at('white',X+.5,Z+.5);
   roll(grassy*Math.max(0,(drift-.5)*3)*(1.5+Math.min(w,1)*3),(x,z)=>(x>-60&&x<34&&z>-25&&z<60&&campSurface(x,z).lawn>.3)||add('white',x,z,.9+R()*.5,1,[.95,.95,.85]));
   roll(grassy*Math.min(at('yellow',X+.5,Z+.5),1)*.35,(x,z)=>add('yellow',x,z,.9+R()*.4,1,[.95,.72,.12]));
- }
+ }}
  for(const [px,pz,r] of data.yellowPatches)for(let q=r*r*7;q>0;q--){const a=R()*6.283,d=Math.sqrt(R())*r,x=px+Math.cos(a)*d,z=pz+Math.sin(a)*d;if(clear(x,z))add('yellow',x,z,.9+R()*.5,1,[.95,.72,.12]);}
  for(const [x,z,h] of data.cattails){const v=.9+R()*.25;add('cattail',x,z,h*1.15,1,[v,v,v]);}
  for(const [x,z,h] of data.thistles)if(clear(x,z)){const v=.9+R()*.2;add('thistle',x,z,h,1,[v,v,v]);}
  const chunks=[];let tris=0;
- for(const c of cells.values()){const sh=shapes[c.kind],n=c.rows.length;c.rows.sort((a,b)=>a.rank-b.rank);tris+=n*sh.index.length/3;
+ for(const c of cells.values()){await breathe();const sh=shapes[c.kind],n=c.rows.length;c.rows.sort((a,b)=>a.rank-b.rank);tris+=n*sh.index.length/3;
   const g=new THREE.InstancedBufferGeometry();g.setIndex(new THREE.BufferAttribute(sh.index,1));g.setAttribute('position',new THREE.BufferAttribute(sh.position,3));g.setAttribute('normal',new THREE.BufferAttribute(sh.normal,3));g.setAttribute('color',new THREE.BufferAttribute(sh.color,3));g.setAttribute('aH',new THREE.BufferAttribute(sh.aH,1));
   // (arrays hold every plant so a higher quality setting only widens the count)
   const iPos=new Float32Array(n*3),iTurn=new Float32Array(n*4),iCol=new Float32Array(n*3);
