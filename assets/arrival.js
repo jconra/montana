@@ -23,7 +23,7 @@ function blob() {                                    // one soft shadow under ea
 }
 
 export function createArrival({ scene, heightAt, renderer, camera }) {
-  let lib = null, loading = null, folk = [], started = false;
+  let lib = null, loading = null, folk = [], started = false, ground = heightAt, inside = [], onOut = null, doorOut = DOOR, doorIn = null;
   const shadowMat = blob(), shadowGeo = new THREE.PlaneGeometry(0.8, 0.8).rotateX(-Math.PI / 2);
   const col = (s) => new THREE.Color(s);
 
@@ -69,7 +69,8 @@ export function createArrival({ scene, heightAt, renderer, camera }) {
       const [along, side] = o.f.seat, jit = (i - 1.5) * 0.35;
       const door = { x: car.x + fx * along + rx * side * 0.95, z: car.z + fz * along + rz * side * 0.95 };
       const out = { x: door.x + rx * side * 0.7, z: door.z + rz * side * 0.7 };
-      o.path = [door, out, { x: APRON.x, z: APRON.z + jit }, { x: WALK.x, z: WALK.z + jit * 0.4 }, DOOR];
+      // through the door and on to a spot of their own in the great room (when the house gave us its rooms)
+      o.path = [door, out, { x: APRON.x, z: APRON.z + jit }, { x: WALK.x, z: WALK.z + jit * 0.4 }, doorOut, ...(doorIn && inside.length ? [doorIn, inside[i % inside.length]] : [])];
       o.leg = 0; o.t = -0.5 * i; o.state = 'out';
       const pos = o.p.root.position; pos.set(door.x, heightAt(door.x, door.z), door.z);
       o.p.root.rotation.y = Math.atan2(out.x - door.x, out.z - door.z);
@@ -80,7 +81,8 @@ export function createArrival({ scene, heightAt, renderer, camera }) {
   const SPEED = { walk: 1.25, run: 2.6 };
   function update(dt) {
     for (const o of folk) {
-      if (o.state === 'wait' || o.state === 'inside') continue;
+      if (o.state === 'wait' || o.state === 'player') continue;
+      if (o.state === 'inside') { o.p.update(dt); continue; }   // standing about in the house
       o.t += dt; if (o.t < 0) continue;                      // the doors open one after another
       const { p } = o, pos = p.root.position;
       if (!p.root.visible) { p.root.visible = o.sh.visible = true; }
@@ -91,23 +93,31 @@ export function createArrival({ scene, heightAt, renderer, camera }) {
         p.update(dt); continue;
       }
       const target = o.path[o.leg + 1];
-      if (!target) { o.state = 'inside'; p.root.visible = o.sh.visible = false; continue; }   // through the door
+      if (!target) { o.state = 'inside'; p.play('Idle', { fade: .4 }); if (!inside.length) p.root.visible = o.sh.visible = false; continue; }   // arrived (no rooms: gone in at the door)
       const run = o.f.run && o.leg >= 1 && o.leg < 3, speed = o.leg === 0 ? 0.7 : run ? SPEED.run : SPEED.walk;
       const clip = run ? 'Run' : 'Walk';
       if (p.curName !== clip || o.state === 'out') { p.play(clip, { speed: speed / STRIDE[p.kind.body][clip] }); o.state = 'go'; }
       const dx = target.x - pos.x, dz = target.z - pos.z, d = Math.hypot(dx, dz), step = speed * dt;
       if (d <= step) {
         pos.x = target.x; pos.z = target.z; o.leg++;
+        if (o.leg === 1 && o.f.role === 'dad' && onOut) onOut(o);   // the driver is out of the car
         if (o.f.role === 'dad' && o.leg === 3 && !o.waved) { o.waved = true; o.state = 'wave'; o.t = 0; p.play('Wave', { fade: 0.25 }); }
       } else {
         pos.x += dx / d * step; pos.z += dz / d * step;
         const want = Math.atan2(dx, dz); let turn = want - p.root.rotation.y;
         turn = Math.atan2(Math.sin(turn), Math.cos(turn)); p.root.rotation.y += turn * Math.min(1, dt * 8);
       }
-      pos.y = heightAt(pos.x, pos.z);
+      pos.y = ground(pos.x, pos.z);
       o.sh.position.set(pos.x, pos.y + 0.04, pos.z);
       p.update(dt);
     }
   }
-  return { prepare, start, update, get folk() { return folk; } };
+  return {
+    prepare, start, update, get folk() { return folk; },
+    get driver() { return folk.find((o) => o.f.role === 'dad'); },
+    get started() { return started; },
+    // ground: what to stand on (house floors inside); rooms: spots inside the house, the first just in from the door
+    setGround(fn) { ground = fn; }, setInside(spots) { inside = spots; }, onDriverOut(fn) { onOut = fn; },
+    setDoor(out, inn) { doorOut = out; doorIn = inn; },   // the real doorway: a step outside it and a step in
+  };
 }

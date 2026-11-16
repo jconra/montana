@@ -46,7 +46,7 @@ export function createVisitorUI({controls,photoMatch,getToolDock,freeCamera,foll
   photosBtn.setAttribute('aria-pressed','false');
   const bar=el('div',{id:'vBar'},camBtn,photosBtn);
   let following=true;
-  function setFollowing(on){following=on;camBtn.textContent=on?'Free Camera':'Back to Car';camBtn.setAttribute('aria-pressed','false');}
+  function setFollowing(on,who='car'){following=on;camBtn.textContent=on?'Free Camera':who==='person'?'Back to Dad':'Back to Car';camBtn.setAttribute('aria-pressed','false');}
   camBtn.onclick=()=>{closeCompare();if(following)freeCamera();else followCar();};
 
   // ---- photos ----

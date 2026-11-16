@@ -144,6 +144,7 @@ import {createToolDock} from './assets/tool-dock.js';
 import {createVisitorUI} from './assets/visitor-ui.js';
 import {createCampfire} from './assets/campfire.js';
 import {createArrival} from './assets/arrival.js';
+import {createWalking} from './assets/player.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
@@ -295,13 +296,27 @@ function box(p,w,h,d,x,y,z,mat){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h
 // into the geometry (flattened) so optimizeGroup can still merge it and the placement scale slider works.
 const FT=0.3048;
 function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
-  const out=new THREE.Group();
-  src.traverse(o=>{ if(o.isMesh && o.geometry){ const g2=o.geometry.clone(); g2.applyMatrix4(o.matrixWorld);
-    const mat=Array.isArray(o.material)?o.material[0]:o.material;   // two-tone walls carry a material array; collapse to the exterior one for the distant terrain view
-    out.add(new THREE.Mesh(g2,mat)); } });
+  const out=new THREE.Group(),doors=[],inDoor=o=>{for(let a=o;a;a=a.parent)if(a.userData.door)return true;return false;};
+  // Doors stay their own hinged groups (outside the merged walls) so they can swing: each leaf's meshes keep their place
+  // relative to its hinge, and the hinge carries the leaf's world position and turn.
+  src.traverse(o=>{if(!o.userData.door)return;const hinge=new THREE.Group(),pos=new THREE.Vector3(),q=new THREE.Quaternion(),sc=new THREE.Vector3();
+    o.rotation.y=o.userData.door.closed;o.updateMatrixWorld(true);o.matrixWorld.decompose(pos,q,sc);hinge.position.copy(pos);hinge.quaternion.copy(q);
+    const inv=new THREE.Matrix4().compose(new THREE.Vector3(),new THREE.Quaternion(),sc);
+    o.traverse(m=>{if(!m.isMesh)return;const g2=m.geometry.clone();g2.applyMatrix4(new THREE.Matrix4().copy(o.matrixWorld).invert().multiply(m.matrixWorld));g2.applyMatrix4(inv);
+      hinge.add(new THREE.Mesh(g2,Array.isArray(m.material)?m.material[0]:m.material));});
+    hinge.name='door';hinge.userData.door={...o.userData.door,closedYaw:hinge.rotation.y};doors.push(hinge);});
+  src.traverse(o=>{ if(o.isMesh && o.geometry && !inDoor(o)){ const g2=o.geometry.clone(); g2.applyMatrix4(o.matrixWorld);
+    // two-tone walls carry a material per face (siding outside, the room's own inside): split them by face so the rooms
+    // keep their inside faces now that people walk in (they used to be collapsed to the outside material)
+    if(Array.isArray(o.material)&&g2.index&&g2.groups.length){for(const gr of g2.groups){const m=o.material[gr.materialIndex];if(!m)continue;
+      const sub=g2.clone();sub.setIndex(Array.from(g2.index.array.slice(gr.start,gr.start+gr.count)));sub.clearGroups();out.add(new THREE.Mesh(sub,m));}}
+    else out.add(new THREE.Mesh(g2,Array.isArray(o.material)?o.material[0]:o.material)); } });
   // centre on the footprint (X/Z) so it lands where the old origin-centred model did; keep the base on the ground (Y)
   const bb=new THREE.Box3().setFromObject(out),cx=src.userData.origin?src.userData.origin[0]*FT:(bb.min.x+bb.max.x)/2,cz=src.userData.origin?src.userData.origin[1]*FT:(bb.min.z+bb.max.z)/2;
   out.children.forEach(m=>m.geometry.translate(-cx,0,-cz));
+  for(const d of doors){d.position.x-=cx;d.position.z-=cz;out.add(d);}
+  // the walls for walking, in the same metres as the geometry (see house-model wallSeg)
+  out.userData.walls=(src.userData.walls||[]).map(w=>({x0:w.x0*FT-cx,z0:w.z0*FT-cz,x1:w.x1*FT-cx,z1:w.z1*FT-cz,y0:w.y0*FT,h:w.h*FT,gaps:w.gaps.map(([a,b])=>[a*FT,b*FT])}));
   return out; }
 // The house's ground-floor outline in its own metres (bakedFt centres it on the design origin), for the foundation and the ground cut.
 function houseOutline(spec){const o=spec.origin||[0,0];return spec.floors[0].outline.map(([x,z])=>new THREE.Vector3((x-o[0])*FT,0,(z-o[1])*FT));}
@@ -486,7 +501,7 @@ let LOD_DIST=95;        // trees within this many m of the camera may be meshes
 let MAX_DETAIL=60;      // hard cap on mesh trees (perf); the circle shrinks to hold this many
 let treeSpecies=null,forest=null,treeBudget=null,neighboursAt=()=>9,shrubForest=null,shrubBudget=null;
 // Read-only handle for the test rigs (set here, after everything it reads is declared): the camera, ground height and the records actually drawn, so a rig can say what stands under a spot in a frame.
-window.montanaDebug={cam,controls,renderer,get car(){return car.group;},heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
+window.montanaDebug={cam,controls,renderer,get car(){return car.group;},get walking(){return walking;},get arrival(){return arrival;},heightAt:(x,z)=>heightAt(x,z),get records(){return landscapeRecords;},get trees(){return trees;},get forest(){return forest;},get shrubs(){return shrubForest;}};
 const WEBGL2=renderer.capabilities.isWebGL2;
 function treeKindOf(id,x,z,h,authored=false){const k=treeKind({id,x,z,h,neighbours:neighboursAt(x,z),authored});return k==='juniper'&&!authored?juniperVariety(id,h):k;}
 function treeTint(kind,id,tint,tone){
@@ -778,6 +793,7 @@ addEventListener('keydown',e=>{
   const k=e.key.toLowerCase(); KEY[k]=true;
   if(e.code==='Space')KEY.space=true;
   if(e.code==='Space')e.preventDefault();
+  if(followCar&&k.startsWith('arrow'))e.preventDefault();   // arrows steer, not scroll
 });
 addEventListener('keyup',e=>{KEY[e.key.toLowerCase()]=false;if(e.code==='Space')KEY.space=false;});
 const clearCameraKeys=()=>{for(const key of Object.keys(KEY))KEY[key]=false;};
@@ -813,11 +829,11 @@ function chaseCam(blend,lookBlend=blend){
   cam.position.lerp(_des,blend);controls.target.lerp(_look,lookBlend);cam.lookAt(controls.target);
 }
 // Once someone swipes or zooms, the camera keeps the angle and distance they chose and just travels along with the car.
-let followCar=false,userOrbit=false,glide=null;
+let followCar=false,userOrbit=false,glide=null,followWho='car',stopT=0;   // followWho: 'car' or 'person' (someone out of it)
 controls.addEventListener('start',()=>{if(followCar)userOrbit=true;glide=null;});
 function carryCam(){const y=heightAt(car.x,car.z);_look.set(car.x,y+1.3,car.z);_des.subVectors(_look,controls.target);controls.target.add(_des);cam.position.add(_des);}
 // The camera lets go of the car; the car carries on with its drive.
-function releaseCamera(){followCar=false;userOrbit=false;controls.enabled=true;}
+function releaseCamera(){followCar=false;userOrbit=false;controls.enabled=true;setNear?.(false);}
 
 // ---- drive + intro cinematic ----
 let introT=0, introActive=false; const introDur=4.5;
@@ -846,18 +862,31 @@ function introRoute(){let best={d:4,s:0},s=0;const S=[0];
 function playIntro(){ if(routePts.length<2){info.innerHTML='add at least 2 waypoints first';return;}
   if(!beginDrive('route',introRoute()))return;const y=heightAt(car.x,car.z);cam.position.set(car.x+35,y+55,car.z+35);introActive=true;introT=0; }
 
+const PARK={x:-22.9,z:-6.4};          // where the drive ends by the garage
 function updateCar(dt){
   if(!driveMode) return;
-  let travel=0;
-  if(carMode==='route'){                                     // at the end of the route the car parks
+  let travel=0;const inp=walking.input();
+  // the visitor takes the wheel: any drive key or the thumb stick, while the camera rides with the car (before anyone gets out)
+  if(followCar&&followWho==='car'&&(carMode==='route'||carMode==='parked')&&inp.any&&!arrival.started){carMode='manual';routeDriver=null;introActive=false;}
+  if(carMode==='manual'){
+    car.speed+=inp.y*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
+    carSteering+=(-inp.x*.48-carSteering)*dampFactor(5,dt);
+    car.heading+=carSteering/.48*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
+    travel=car.speed*dt;car.x+=Math.sin(car.heading)*travel;car.z+=Math.cos(car.heading)*travel;
+    // stopped near the house: everyone gets out
+    stopT=Math.abs(car.speed)<.3&&!inp.any?stopT+dt:0;
+    if(stopT>1.2&&Math.hypot(car.x-PARK.x,car.z-PARK.z)<30){carMode='parked';car.speed=0;arrival.start(car);}
+  } else if(carMode==='route'){                              // at the end of the route the car parks
     travel=routeDriver.update(dt);for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=routeDriver.steering;
     if(routeDriver.done){carMode='parked';car.speed=0;introActive=false;arrival.start(car);}
+  }
+  if(carMode==='route'||carMode==='manual'){
     const y=heightAt(car.x,car.z);
     car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;placeCarContact();
     if(rav4Rig)rav4Rig.update(carSteering,travel);
     else {const spin=travel/0.36;for(const w of wheels)w.rotation.x+=spin;}
   }
-  if(!followCar)return;
+  if(!followCar||followWho!=='car')return;
   if(userOrbit){carryCam();controls.update();return;}
   if(introActive){introT+=dt;chaseCam(dampFactor(1.2+3.8*Math.min(1,introT/introDur),dt),dampFactor(7,dt));if(introT>=introDur)introActive=false;}
   else chaseCam(dampFactor(5,dt),dampFactor(7,dt));
@@ -874,7 +903,23 @@ function updateGlide(dt){if(!glide)return;glide.t=Math.min(1,glide.t+dt/glide.du
   const lift=Math.sin(Math.PI*e)*Math.min(40,glide.p0.distanceTo(glide.p1)*.25);cam.position.y+=lift;   // an arc, not a slide through the trees
   if(glide.t>=1)glide=null;}
 // The visitor bar shows whether the camera rides with the car.
-let onCameraModeHook=null;function onCameraMode(){onCameraModeHook?.(followCar);}
+let onCameraModeHook=null;function onCameraMode(){onCameraModeHook?.(followCar,followWho);}
+// Riding along with a person: behind them at head height, swipes orbit round them, and a wall never comes between (the
+// camera pulls in toward their head); indoors it stays under the ceiling.
+const _head=new THREE.Vector3();
+function followPerson(dt){
+  const o=walking.person||arrival.driver;if(!o)return;const p=o.p.root.position;_head.set(p.x,p.y+1.45,p.z);
+  if(userOrbit){_des.subVectors(_head,controls.target);controls.target.add(_des);cam.position.add(_des);controls.update();}
+  else{const h=o.p.root.rotation.y;_des.set(p.x-Math.sin(h)*4.2,p.y+2.1,p.z-Math.cos(h)*4.2);cam.position.lerp(_des,dampFactor(3,dt));controls.target.lerp(_head,dampFactor(6,dt));}
+  const t=walking.clear(_head.x,_head.z,cam.position.x,cam.position.z,cam.position.y);
+  if(t<1){const k=Math.max(.12,t*.85);cam.position.x=_head.x+(cam.position.x-_head.x)*k;cam.position.z=_head.z+(cam.position.z-_head.z)*k;}
+  const inside=walking.indoors(p.x,p.z);if(inside)cam.position.y=Math.min(cam.position.y,p.y+2.3);
+  setNear(inside||t<1);cam.lookAt(controls.target);
+}
+// Up close (indoors, or a wall just behind the camera) the camera sees from 12 cm instead of 1.5 m, with a shorter reach
+// so depth stays precise; out on the land it goes back to the long view.
+let closeView=false;
+function setNear(on){if(on===closeView)return;closeView=on;cam.near=on?.12:1.5;cam.far=on?4000:120000;cam.updateProjectionMatrix();}
 
 // ---- UI wiring ----------------------------------------------------------
 const $=id=>document.getElementById(id);
@@ -892,9 +937,9 @@ $('rintro').onclick=playIntro;
 $('rcopy').onclick=()=>{const t=routePts.map(p=>({E:+p.x.toFixed(1),N:+(-p.z).toFixed(1)})); $('rdump').value=JSON.stringify(t); try{navigator.clipboard.writeText($('rdump').value).catch(()=>{});}catch(e){}};
 const photoMatch=createPhotoMatch({camera:cam,controls,renderer,stopDrive(){if(landscape?.active)landscape.setActive(false);releaseCamera();onCameraMode();},onLens(fov){$('fov').value=fov;$('fovv').textContent=fov.toFixed(1)+'°';}});
 // Back behind the car, wherever it is (driving or parked).
-function rideAlong(){if(!driveMode){driveMode=true;carMode='parked';}followCar=true;userOrbit=false;glide=null;introActive=false;controls.enabled=true;onCameraMode();}
+function rideAlong(){if(followWho==='car'&&!driveMode){driveMode=true;carMode='parked';}followCar=true;userOrbit=false;glide=null;introActive=false;controls.enabled=true;onCameraMode();}
 const visitorUI=createVisitorUI({controls,photoMatch,getToolDock:()=>toolDock,freeCamera,followCar:rideAlong});
-onCameraModeHook=on=>visitorUI.setFollowing(on);
+onCameraModeHook=(on,who)=>{visitorUI.setFollowing(on,who);walking.showStick(on);};
 // The readouts (place, frame rate, messages) are off unless asked for; the choice stays in this browser.
 {const k='montanaShowStats',apply=on=>document.body.classList.toggle('show-stats',on);try{$('showStats').checked=localStorage.getItem(k)==='1';}catch(e){}
  apply($('showStats').checked);$('showStats').onchange=()=>{apply($('showStats').checked);try{localStorage.setItem(k,$('showStats').checked?'1':'0');}catch(e){}};}
@@ -914,6 +959,9 @@ LOAD.at(.32,'Filling the pond');await tick();
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
 const campfire=createCampfire({scene,camera:cam,heightAt,at:CAMP_PROPS.fire});   // a fire burning in the fire pit
 const arrival=createArrival({scene,heightAt,renderer,camera:cam});              // the family, out of the parked car
+const walking=createWalking({heightAt,keys:KEY,camera:cam,controls});            // walls, doors, and the person the visitor steers
+// when the driver steps out and the camera was riding with the car, it stays with the driver
+arrival.onDriverOut(()=>{if(followCar&&followWho==='car'){followWho='person';userOrbit=false;onCameraMode();}});
 const plantFillMap=await loadPlantFillMap();
 LOAD.at(.38,'Growing the meadow');await tick();
 const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial,fill:plantFillMap});
@@ -1161,9 +1209,26 @@ async function uploadInSlices(from,to){
   }
   renderer.shadowMap.needsUpdate=true;shadowStamp=-Infinity;   // the real shadow map, drawn whole on the first frame
 }
+// The buildings stand where the editor put them now: their walls, doors and floors for walking, and the family's way in
+// (a step outside the entry door, a step in, then spots of their own in the great room).
+function setupWalking(){
+  const B=walking.survey(placed),house=placed.find(r=>r.type==='house'&&!r.deleted);if(!house)return;
+  arrival.setGround(walking.floorAt);walking.watch(arrival.folk);
+  const entry=B.doors.reduce((a,d)=>!a||Math.hypot(d.mid.x+1.2,d.mid.z+1.75)<Math.hypot(a.mid.x+1.2,a.mid.z+1.75)?d:a,null);
+  if(entry&&Math.hypot(entry.mid.x+1.2,entry.mid.z+1.75)<4){
+    // the doorway's way in: from the door's middle toward the house's middle, square to the wall it is in
+    const w=B.walls.reduce((a,w)=>{const d=segDist(entry.mid,w);return !a||d<a.d?{w,d}:a;},null).w;
+    let nx=-(w.bz-w.az)/w.len,nz=(w.bx-w.ax)/w.len;if(nx*(house.x-entry.mid.x)+nz*(house.z-entry.mid.z)<0){nx=-nx;nz=-nz;}
+    arrival.setDoor({x:entry.mid.x-nx*.8,z:entry.mid.z-nz*.8},{x:entry.mid.x+nx*1.6,z:entry.mid.z+nz*1.6});
+  }
+  const ft=(x,z)=>new THREE.Vector3(x*FT,0,z*FT).applyMatrix4(house.group.matrixWorld);
+  arrival.setInside([[-16,6],[-12,3.5],[-19,8.5],[-13.5,9]].map(([x,z])=>{const v=ft(x,z);return {x:v.x,z:v.z};}));
+}
+function segDist(p,w){const dx=w.bx-w.ax,dz=w.bz-w.az,t=Math.max(0,Math.min(1,((p.x-w.ax)*dx+(p.z-w.az)*dz)/(w.len*w.len)));return Math.hypot(p.x-w.ax-dx*t,p.z-w.az-dz*t);}
 (async function reveal(){
   const t0=performance.now(),until=(ok,ms)=>new Promise(r=>{(function f(){if(ok()||performance.now()-t0>ms)r();else setTimeout(f,50);})();});
   await landscapeReady;await rav4Loaded;
+  setupWalking();
   await until(()=>(!forest||forest.ready)&&(!shrubForest||shrubForest.ready),120000);
   if(AUTO_INTRO){playIntro();placeCar();cam.lookAt(controls.target);holdCar=true;}
   warming=true;loadParts.warm=.15;loadAt('Lighting the fire');
@@ -1181,6 +1246,9 @@ async function uploadInSlices(from,to){
   if(loading){bakeWhileLoading(dt,elapsed);return;}
   if(!warming)updateQuality(elapsed,dt);
   if(!holdCar)updateCar(Math.min(.1,elapsed)); if(!followCar){ updateGlide(dt); if(!glide&&controls.enabled)panCam(dt); controls.update(); }
+  // riding with the driver: the first key or stick push hands them over to the visitor
+  if(followCar&&followWho==='person'){const d=arrival.driver;if(!walking.person&&d&&d.state!=='wait'&&walking.input().any)walking.take(d);followPerson(dt);}
+  walking.update(dt,followCar&&followWho==='person');
   photoMatch.applyRoll();
   propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);campfire.update(cam);arrival.update(dt);
   landscapeLayer?.update(cam);

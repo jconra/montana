@@ -186,6 +186,8 @@ export function buildHouse(THREE, spec, opts){
       for(const c of splits)fb(fw*0.55, hh, c, cy); };                 // mullions between the panes
     const os=(ops||[]).map(o=>{ const off=Math.max(0,Math.min(len-o.w,o.off));
       return {...o,a:-len/2+off, b:-len/2+off+o.w, y0:Math.max(0,o.y0), y1:Math.min(h,o.y1)}; }).filter(o=>o.y1>o.y0).sort((p,q)=>p.a-q.a);
+    // every wall drawn, for walking: its ends, height and the gaps left by doors (distances along it from x0,z0)
+    (g.userData.walls||(g.userData.walls=[])).push({x0,z0,x1,z1,y0:baseY,h,gaps:os.filter(o=>o.type==='door'||o.type==='garage').map(o=>[o.a+len/2,o.b+len/2])});
     let cur=-len/2-ext;
     for(const o of os){
       seg(cur,o.a,0,h, wm); seg(o.a,o.b,0,o.y0, wm); seg(o.a,o.b,o.y1,h, wm);
@@ -216,6 +218,8 @@ export function buildHouse(THREE, spec, opts){
           if(o.arch){const R=gw/2,cy=-lh/2+gy0+gh,mk=(g,m,z)=>{const q=new THREE.Mesh(g,m);q.position.set(lw/2,cy,z);q.rotation.y=z<0?Math.PI:0;leaf.add(q);};   // round top over the panes
             for(const z of [.105,-.105]){mk(new THREE.CircleGeometry(R,20,0,Math.PI),glassMat,z);mk(new THREE.RingGeometry(R-.02,R+.13,20,1,0,Math.PI),mull,z*1.2);mk(new THREE.RingGeometry(R*.34,R*.34+.09,12,1,0,Math.PI),mull,z*1.2);}}
         }
+        // a door that can swing: the leaf is a group on its hinge; the page keeps it out of the merged walls (see bakedFt)
+        leaf.userData.door={closed:0,open:-1.6,startOpen:!o.closed};leaf.name='door-leaf';
         leaf.rotation.y=o.closed?0:-1.9; wg.add(leaf);
       } else {
         if(spec.windowStreaks!==false&&o.y0>1){                 // faint run marks below the sill
