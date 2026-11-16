@@ -142,6 +142,8 @@ import {makeCloudSky} from './assets/sky/cloudSky.js';
 import {Sunbeams} from './assets/sky/sunbeams.js';
 import {createToolDock} from './assets/tool-dock.js';
 import {createVisitorUI} from './assets/visitor-ui.js';
+import {createCampfire} from './assets/campfire.js';
+import {createArrival} from './assets/arrival.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
@@ -849,7 +851,7 @@ function updateCar(dt){
   let travel=0;
   if(carMode==='route'){                                     // at the end of the route the car parks
     travel=routeDriver.update(dt);for(const key of ['x','z','heading','speed'])car[key]=routeDriver[key];carSteering=routeDriver.steering;
-    if(routeDriver.done){carMode='parked';car.speed=0;introActive=false;}
+    if(routeDriver.done){carMode='parked';car.speed=0;introActive=false;arrival.start(car);}
     const y=heightAt(car.x,car.z);
     car.group.position.set(car.x,y,car.z); car.group.rotation.y=car.heading;placeCarContact();
     if(rav4Rig)rav4Rig.update(carSteering,travel);
@@ -910,6 +912,8 @@ $('hud').innerHTML=`<b>Paradise Valley, MT</b><br>wide ${(2*cHalf).toFixed(0)} m
 
 LOAD.at(.32,'Filling the pond');await tick();
 propertyNature=await createPropertyNature({scene,heightAt,driveway:DRIVEWAY,buildings:placed,pondLevel,paintUniforms:groundDetail.paint.uniforms});
+const campfire=createCampfire({scene,camera:cam,heightAt,at:CAMP_PROPS.fire});   // a fire burning in the fire pit
+const arrival=createArrival({scene,heightAt,renderer,camera:cam});              // the family, out of the parked car
 const plantFillMap=await loadPlantFillMap();
 LOAD.at(.38,'Growing the meadow');await tick();
 const meadow=await createMeadow({scene,heightAt,uniforms:groundDetail.uniforms,prepareShadow:prepareShadowMaterial,fill:plantFillMap});
@@ -1170,6 +1174,7 @@ async function uploadInSlices(from,to){
   await settled();
   loadParts.warm=1;loadAt();warming=false;quality.reset();
   await LOAD.done();holdCar=false;quality.reset();
+  setTimeout(()=>arrival.prepare(),1500);            // the family loads in the background while the car drives in
 })();
 (function loop(){requestAnimationFrame(loop);
   const now=performance.now(), elapsed=(now-lastT)/1000, dt=Math.min(0.05,elapsed); lastT=now;
@@ -1177,7 +1182,7 @@ async function uploadInSlices(from,to){
   if(!warming)updateQuality(elapsed,dt);
   if(!holdCar)updateCar(Math.min(.1,elapsed)); if(!followCar){ updateGlide(dt); if(!glide&&controls.enabled)panCam(dt); controls.update(); }
   photoMatch.applyRoll();
-  propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);
+  propertyNature.update(now/1000,cam);meadow.update(now/1000,cam);plantFill.update(now/1000,cam);campfire.update(cam);arrival.update(dt);
   landscapeLayer?.update(cam);
   // Keep the ground cut on the house as it stands (the editor can move it).
   {const h=placed.find(r=>r.type==='house'&&!r.deleted&&r.group.userData.outline);if(h){h.group.updateMatrixWorld();const m=h.group.matrixWorld.elements,key=m.join(',');
