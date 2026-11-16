@@ -198,14 +198,14 @@
       "photo": "cabin-southwest",
       "filename": "montanaFacingCabinLookingSouthWest.jpg",
       "position": [
-        -15.1458,
+        -11.9032,
         131.2061,
-        26.5343
+        18.3026
       ],
       "target": [
-        -39.802,
-        120.9455,
-        40.2015
+        -34.0082,
+        116.2061,
+        33.2148
       ],
       "fov": 40.6,
       "aspect": 1.7777777777777777,
