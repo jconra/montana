@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interior Lab · Montana</title>
+<style>
+:root{--bg:#15171a;--panel:#1f2328ee;--line:#3a4048;--text:#e8e6e1;--dim:#9aa1a8;--accent:#f0a33a;--pin:#ffd84a;--model:#3fe0ff;--ok:#7bd88f;--bad:#ff6b5e}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.35 system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0}
+#view{position:absolute;overflow:hidden;background:#0d0e10;touch-action:none}
+#view>*{position:absolute;inset:0;width:100%;height:100%}
+#photo{object-fit:fill;pointer-events:none;user-select:none}
+#c{display:block}
+#marks{pointer-events:none}
+#status{position:fixed;left:12px;bottom:10px;background:#000a;padding:6px 10px;border-radius:6px;max-width:70vw;pointer-events:none;font-size:13px}
+.win{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px #0008;display:flex;flex-direction:column;min-width:200px;z-index:10}
+.win.hidden{display:none}
+.win>header{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);cursor:move;user-select:none;font-weight:600;letter-spacing:.02em}
+.win>header span{flex:1}
+.win>header button{background:none;border:0;color:var(--dim);font-size:16px;cursor:pointer;padding:0 4px}
+.win>header button:hover{color:var(--text)}
+.win>.body{padding:8px;overflow:hidden;display:flex;flex-direction:column;gap:6px;flex:1}
+button,select,input{font:inherit;color:var(--text);background:#2b3037;border:1px solid var(--line);border-radius:5px;padding:4px 8px}
+button{cursor:pointer}button:hover{border-color:#5a626c}button.on{background:var(--accent);color:#1b1206;border-color:var(--accent)}
+input[type=number],input[type=text]{width:100%;min-width:0}
+input[type=range]{width:100%;padding:0}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center}
+.grid4{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:4px 6px;align-items:center}
+.dim{color:var(--dim)}small{color:var(--dim)}
+.thumbs{display:flex;flex-wrap:wrap;gap:4px}
+.thumbs button{padding:0;width:62px;height:62px;position:relative;overflow:hidden;border-width:2px}
+.thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs button.on{border-color:var(--accent);background:none}
+.thumbs .badge{position:absolute;right:2px;bottom:2px;background:#000c;border-radius:3px;font-size:10px;padding:0 3px;color:var(--ok)}
+.pins{display:flex;flex-wrap:wrap;gap:4px}
+.pins span{background:#2b3037;border:1px solid var(--line);border-radius:4px;padding:1px 4px;font-size:12px;white-space:nowrap}
+.pins span b{color:var(--pin)}.pins span button{border:0;background:none;padding:0 2px;color:var(--dim)}
+#menu .tools button{flex:1}
+kbd{background:#2b3037;border:1px solid var(--line);border-radius:3px;padding:0 4px;font-size:11px}
+.help p{margin:0 0 6px}
+canvas.plan{background:#111316;border-radius:6px;flex:1;width:100%;min-height:0;touch-action:none}
+</style>
+<script type="importmap">{"imports":{"three":"../../vendor/three/three.module.js","three/addons/":"../../vendor/three/addons/"}}</script>
+</head><body>
+<div id="stage"><div id="view"><img id="photo" alt=""><canvas id="c"></canvas><canvas id="marks"></canvas></div></div>
+<div id="status">Loading the house…</div>
+<script type="module" src="./lab.js"></script>
+</body></html>

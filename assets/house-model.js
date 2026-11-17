@@ -155,8 +155,12 @@ export function buildHouse(THREE, spec, opts){
   const quad=(a,b,c,d,mat)=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([...a,...b,...c,...a,...c,...d],3));geo.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,0,1,1,1,0,0,1,1,1,0],2));geo.computeVertexNormals();g.add(new THREE.Mesh(geo,mat));};
   const P=(p,y)=>[p[0],y,p[1]];
   // One definition of a gable piece: base is the height of the eave edge, rise the climb from there to the ridge.
+  // A gable's ridge sits rise above its base. Normally it is centred and the slope runs out to the eave's edge at the base
+  // height; ridgeOff moves the ridge across the span (toward -z / -x when negative) and slope sets the pitch of both sides
+  // itself, so one side comes down lower than the other (the house: ridge north of centre, the south side longer and lower).
   const roofMetrics=rp=>{let along=rp.w>=rp.d;if(rp.flipRidge)along=!along;const span=along?rp.d:rp.w,eave=rp.overhang??2,rise=rp.rise??span/2*(rp.pitch??.5),run=span/2+eave;
-    return {along,span,eave,rise,run,slope:rise/run,height:(x,z)=>(rp.base||0)+rise*(1-Math.abs(along?z-rp.z:x-rp.x)/run)};};
+    const gable=(rp.style||'gable')==='gable',m=gable&&rp.slope!=null?rp.slope:rise/run,off=gable?rp.ridgeOff||0:0,top=(rp.base||0)+rise;
+    return {along,span,eave,rise,run,slope:m,off,top,height:(x,z)=>top-m*Math.abs((along?z-rp.z:x-rp.x)-off)};};
 
   // ---- a wall between two points, openings punched out (off = metres from start point) ----
   function wallSeg(x0,z0,x1,z1, baseY,h, ops, wallColor, surf, inColor, outFace, butt){
@@ -178,21 +182,36 @@ export function buildHouse(THREE, spec, opts){
       // Keep horizontal siding courses aligned across window fragments and floors.
       for(const face of [0,1,4,5])for(let i=0;i<4;i++){const k=face*4+i;geo.attributes.uv.setY(k,geo.attributes.uv.getY(k)+baseY+y0);}
       const m=new THREE.Mesh(geo,mat); m.position.set((a+b)/2,(y0+y1)/2,0); wg.add(m); };
-    const frame=(a,b,y0,y1,splits,tm=trimMat,ofw)=>{ const fw=ofw??FRAME_W, d=t+Math.min(.3,fw*.8), fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
+    const frame=(a,b,y0,y1,splits,tm=trimMat,ofw,inn)=>{ const fw=ofw??FRAME_W, d=t+Math.min(.3,fw*.8), fo=0.06; a+=fo; b-=fo; y0+=fo; y1-=fo;   // lap the frame fo onto the opening so its inner edges aren't coplanar with the wall reveal (no z-fight)
       const cx=(a+b)/2, cy=(y0+y1)/2, w=b-a, hh=y1-y0;   // trim frame + centre mullion, proud of the wall
       const fb=(w2,h2,x,yy)=>{ const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),tm); mf.position.set(x,yy,0); wg.add(mf); };
       fb(fw, hh+2*fw, a-fw/2, cy); fb(fw, hh+2*fw, b+fw/2, cy);        // left + right jambs
       fb(w, fw, cx, y1+fw/2); fb(w, fw, cx, y0-fw/2);                  // head + sill
-      for(const c of splits)fb(fw*0.55, hh, c, cy); };                 // mullions between the panes
+      for(const c of splits)fb(fw*0.55, hh, c, cy);                    // mullions between the panes
+      if(inn){ const zi=inn.s*(d/2+.03), pb=(w2,h2,x,yy)=>{ const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,.06),inn.m); mf.position.set(x,yy,zi); wg.add(mf); };   // the same frame in pine on the room's side
+        pb(fw+.08, hh+2*fw+.08, a-fw/2, cy); pb(fw+.08, hh+2*fw+.08, b+fw/2, cy); pb(w, fw+.08, cx, y1+fw/2); pb(w, fw+.08, cx, y0-fw/2); for(const c of splits)pb(fw*0.55+.04, hh, c, cy); } };
     const os=(ops||[]).map(o=>{ const off=Math.max(0,Math.min(len-o.w,o.off));
       return {...o,a:-len/2+off, b:-len/2+off+o.w, y0:Math.max(0,o.y0), y1:Math.min(h,o.y1)}; }).filter(o=>o.y1>o.y0).sort((p,q)=>p.a-q.a);
     // every wall drawn, for walking: its ends, height and the gaps left by doors (distances along it from x0,z0)
-    (g.userData.walls||(g.userData.walls=[])).push({x0,z0,x1,z1,y0:baseY,h,gaps:os.filter(o=>o.type==='door'||o.type==='garage').map(o=>[o.a+len/2,o.b+len/2])});
+    (g.userData.walls||(g.userData.walls=[])).push({x0,z0,x1,z1,y0:baseY,h,gaps:os.filter(o=>o.type==='door'||o.type==='garage'||o.type==='arch'||o.type==='open').map(o=>[o.a+len/2,o.b+len/2])});
+    // an archway: an open doorway with a round top (y1 is its crown), cased in pine on both faces, the curve lined in pine too
+    for(const o of os){ if(o.type!=='arch') continue;
+      const c=o.b-o.a, cx=(o.a+o.b)/2, rise=Math.min(c/2, o.rise??c*.22), ys=o.y1-rise, R=(c*c/4+rise*rise)/(2*rise), cy=o.y1-R;
+      const al=Math.atan2(ys-cy, o.b-cx), N=24, arc=[]; for(let i=0;i<=N;i++){const th=Math.PI-al+(2*al-Math.PI)*i/N; arc.push([cx+R*Math.cos(th), cy+R*Math.sin(th)]);}
+      const fill=new THREE.Shape(); fill.moveTo(o.a,ys); for(const [x,y] of arc) fill.lineTo(x,y); fill.lineTo(o.b,o.y1); fill.lineTo(o.a,o.y1); fill.closePath();
+      const fg=new THREE.ExtrudeGeometry(fill,{depth:t,bevelEnabled:false,curveSegments:1}); fg.translate(0,0,-t/2); wg.add(new THREE.Mesh(fg,inM??outM));
+      const pine=archPine(), cw=o.casingW??.35, d=t+.14, jamb=(x)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(cw,ys-o.y0,d),pine); m.position.set(x,(o.y0+ys)/2,0); wg.add(m);};
+      jamb(o.a-cw/2+.03); jamb(o.b+cw/2-.03);
+      const band=new THREE.Shape(), r0=R-.03, r1=R+cw-.03; band.moveTo(cx+r1*Math.cos(Math.PI-al),cy+r1*Math.sin(Math.PI-al));
+      for(let i=0;i<=N;i++){const th=Math.PI-al+(2*al-Math.PI)*i/N; band.lineTo(cx+r1*Math.cos(th),cy+r1*Math.sin(th));}
+      for(let i=N;i>=0;i--){const th=Math.PI-al+(2*al-Math.PI)*i/N; band.lineTo(cx+r0*Math.cos(th),cy+r0*Math.sin(th));}
+      band.closePath(); const bg=new THREE.ExtrudeGeometry(band,{depth:d,bevelEnabled:false,curveSegments:1}); bg.translate(0,0,-d/2); wg.add(new THREE.Mesh(bg,pine)); }
     let cur=-len/2-ext;
     for(const o of os){
       seg(cur,o.a,0,h, wm); seg(o.a,o.b,0,o.y0, wm); seg(o.a,o.b,o.y1,h, wm);
-      if(o.casing!=null){                                       // flat board surround, proud of the siding on both faces
-        const cw=o.casingW??.45,cm=swatchMat(o.casing,defTrim),d=t+.14,top=o.y1+cw,bot=o.type==='window'?o.y0-cw:o.y0;
+      const inside=surf&&surf.kind==='wall';                    // a wall between rooms: its doors and windows are cased in pine
+      if(o.casing!=null||(inside&&(o.type==='door'||o.type==='open'))){   // flat board surround, proud of the wall on both faces
+        const cw=o.casingW??(o.casing!=null?.45:.3),cm=o.casing!=null?swatchMat(o.casing,defTrim):archPine(),d=t+.14,top=o.y1+cw,bot=o.type==='window'?o.y0-cw:o.y0;
         const cb=(w2,h2,x,yy)=>{const mf=new THREE.Mesh(new THREE.BoxGeometry(w2,h2,d),cm);mf.position.set(x,yy,0);wg.add(mf);};
         const lap=.03;cb(cw,top-bot,o.a-cw/2+lap,(top+bot)/2);cb(cw,top-bot,o.b+cw/2-lap,(top+bot)/2);cb(o.b-o.a,cw,(o.a+o.b)/2,o.y1+cw/2-lap);if(o.type==='window')cb(o.b-o.a,cw,(o.a+o.b)/2,o.y0-cw/2+lap);   // lapped onto the opening so no face lies flush with the wall's cut end
       }
@@ -204,9 +223,10 @@ export function buildHouse(THREE, spec, opts){
           m.position.set((o.a+o.b)/2,o.y0+(r+.5)*hh,0);wg.add(m);
           for(let c=0;c<cols;c++){const pn=new THREE.Mesh(new THREE.BoxGeometry(cw-.46,hh-.5,.26),raised);pn.position.set(o.a+(c+.5)*cw,o.y0+(r+.5)*hh,0);wg.add(pn);}
         }
+      } else if(o.type==='arch'||o.type==='open'){                             // an open archway: built after this loop (see above), nothing in it
       } else if(o.type==='door'){                             // optional closed leaf for exterior reference views
         const leaf=new THREE.Group(); leaf.position.set(o.a,(o.y0+o.y1)/2,0);
-        const l=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a,o.y1-o.y0,0.15),o.mat!=null?swatchMat(o.mat,defTrim):doorMat); l.position.x=(o.b-o.a)/2; leaf.add(l);
+        const l=new THREE.Mesh(new THREE.BoxGeometry(o.b-o.a,o.y1-o.y0,0.15),o.mat!=null?swatchMat(o.mat,defTrim):(surf&&surf.kind==='wall'?pineDoor():doorMat)); l.position.x=(o.b-o.a)/2; leaf.add(l);
         if(o.closed&&o.lites){                                // glazed upper part with a muntin grid, proud of the leaf on both faces
           const [cols,rws]=o.lites,lw=o.b-o.a,lh=o.y1-o.y0,gx=.2,gy0=lh*(o.liteFrom??.48),gw=lw-2*gx,gh=lh-gy0-gx-(o.arch?gw/2:0);
           const glass=new THREE.Mesh(new THREE.BoxGeometry(gw,gh,.2),glassMat);glass.position.set(lw/2,-lh/2+gy0+gh/2,0);leaf.add(glass);
@@ -225,7 +245,7 @@ export function buildHouse(THREE, spec, opts){
         if(spec.windowStreaks!==false&&o.y0>1){                 // faint run marks below the sill
           const sh=Math.min(1.7,o.y0-.05),sillDrop=o.casing!=null?(o.casingW??.45):FRAME_W;
           const quad=new THREE.PlaneGeometry(o.b-o.a+FRAME_W,sh);
-          for(const zz of [t/2+.03,-t/2-.03]){const q=new THREE.Mesh(quad,streakMat());q.position.set((o.a+o.b)/2,o.y0-sillDrop-sh/2,zz);wg.add(q);}
+          for(const zz of inside?[]:inM?[outFace===4?t/2+.03:-t/2-.03]:[t/2+.03,-t/2-.03]){const q=new THREE.Mesh(quad,streakMat());q.position.set((o.a+o.b)/2,o.y0-sillDrop-sh/2,zz);wg.add(q);}
         }
         if(o.curtain){const side=outFace===5?1:-1,cw=(o.b-o.a)*(o.curtainW??.3),cm=solid(o.curtain);   // two curtains pulled back behind the glass
           for(const cx of [o.a+cw/2+.05,o.b-cw/2-.05]){const c=new THREE.Mesh(new THREE.PlaneGeometry(cw,o.y1-o.y0-.1),cm);c.position.set(cx,(o.y0+o.y1)/2,.1*side);wg.add(c);}}
@@ -235,7 +255,7 @@ export function buildHouse(THREE, spec, opts){
         if(winFrames){ const mw=FRAME_W*0.55, W=o.b-o.a;
           // split lists the pane widths as fractions; the default is two equal panes (a sliding window)
           const fr=o.split||[.5,.5];let at=0;const cuts=fr.slice(0,-1).map(f=>o.a+W*(at+=f));
-          frame(o.a,o.b,o.y0,o.y1,cuts,o.trim!=null?swatchMat(o.trim,defTrim):trimMat,o.frameW);
+          frame(o.a,o.b,o.y0,o.y1,cuts,o.trim!=null?swatchMat(o.trim,defTrim):(inside?archPine():trimMat),o.frameW,(!inside&&inM)?{m:archPine(),s:outFace===4?-1:1}:null);
           [o.a,...cuts].forEach((c,i,l)=>{const end=i+1<l.length?l[i+1]:o.b;pane(c+(i?mw/2+gi:gi),end-(i+1<l.length?mw/2+gi:gi));}); }
         else pane(o.a+gi, o.b-gi);                              // frameless: one inset pane
       }
@@ -245,6 +265,13 @@ export function buildHouse(THREE, spec, opts){
   }
 
   // ---- polygon floor slab / flat roof deck, with rectangular stairwell holes ----
+  // inside surfaces: the room's colour, never the outdoor grime and streaks
+  const _inner=new Map();const innerMat=(idx,both=false)=>{const k=idx+'|'+both;if(!_inner.has(k)){const m=swatchMat(idx,defInner,'world');const mm=both?m.clone():m;if(both)mm.side=THREE.DoubleSide;mm.userData.wxDone=true;_inner.set(k,mm);}return _inner.get(k);};
+  // ceilings face down, away from the sky: a little of their own light keeps them reading white
+  let _pine=null;const archPine=()=>{if(!_pine){_pine=new THREE.MeshStandardMaterial({color:new THREE.Color('#b07a3e'),roughness:.7});_pine.userData.wxDone=true;}return _pine;};   // natural pine trim, as in the photos
+  let _pdoor=null;const pineDoor=()=>{if(!_pdoor){_pdoor=new THREE.MeshStandardMaterial({color:new THREE.Color('#a8733a'),roughness:.75});_pdoor.userData.wxDone=true;}return _pdoor;};   // knotty pine doors
+  let _slope=null;const slopeCeil=()=>{if(!spec.ceilingSlope)return ceilingMat();if(!_slope){const cc=new THREE.Color(spec.ceilingSlope);_slope=new THREE.MeshStandardMaterial({color:cc,emissive:cc,emissiveIntensity:.3,roughness:.8,side:THREE.DoubleSide});_slope.userData.wxDone=true;_slope.userData.noShadow=true;}return _slope;};
+  let _ceil=null;const ceilingMat=()=>{if(!_ceil){const cc=new THREE.Color(spec.ceiling||'#f1eee6');_ceil=new THREE.MeshStandardMaterial({color:cc,emissive:cc,emissiveIntensity:.42,roughness:.95,side:THREE.DoubleSide});_ceil.userData.wxDone=true;_ceil.userData.noShadow=true;}return _ceil;};
   function slabPoly(outline, y, holes, mat, thick, surf){
     thick=thick||0.6;
     const sh=new THREE.Shape(); outline.forEach((p,i)=> i? sh.lineTo(p[0],-p[1]) : sh.moveTo(p[0],-p[1]));
@@ -271,11 +298,12 @@ export function buildHouse(THREE, spec, opts){
     const dH=Math.max(.5,w.dormerHeight??Math.min(floorH,6)),eave=baseY+dH,peak=eave+Math.max(.1,w.dormerRise??2.5);
     const FL=[x0,z0], FR=[x1,z1], BL=[x0+ix*depth,z0+iz*depth], BR=[x1+ix*depth,z1+iz*depth], midF=[mx,mz];
     const wm=M(color);
-    wallSeg(x0,z0,x1,z1, baseY, dH, ops, color, surf);          // front (with window)
-    wallSeg(FL[0],FL[1],BL[0],BL[1], baseY, dH, [], color, null);
-    wallSeg(FR[0],FR[1],BR[0],BR[1], baseY, dH, [], color, null);
+    // which broad face of a wall a->b looks outward (its local +z is (-dz,dx)): the other face is inside the room
+    const outOf=(a,b,o)=>((a[1]-b[1])*o[0]+(b[0]-a[0])*o[1])>0?4:5, inside=innerMat(null);
+    wallSeg(x0,z0,x1,z1, baseY, dH, ops, color, surf, inside, outOf([x0,z0],[x1,z1],[nx,nz]));          // front (with window)
     const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute([...P(FL,eave),...P(FR,eave),...P(midF,peak)],3));
     fg.setAttribute('uv',new THREE.Float32BufferAttribute([0,eave,L,eave,L/2,peak],2));fg.computeVertexNormals();g.add(new THREE.Mesh(fg,wm));
+    {const lg=fg.clone();lg.translate(ix*(WALL_T/2+.04),0,iz*(WALL_T/2+.04));g.add(new THREE.Mesh(lg,innerMat(null,true)));}   // its inside face: the room's white, not the siding
     // A wall dormer joins the main roof along its two valleys, not along a
     // rectangular patch laid on top of an uncut roof.
     const roofIndex=w.roofPiece??0, main=spec.roofPieces?.[roofIndex];
@@ -287,6 +315,20 @@ export function buildHouse(THREE, spec, opts){
     if(main&&(main.style||'gable')==='gable'){
       const metrics=roofMetrics(main);
       mainHeight=p=>metrics.height(p[0],p[1]);
+    }
+    // The dormer's side walls stand only where its roof rises above the main roof: below that the room runs on under the
+    // main roof's slope, open, as in the real house (full-height side walls stood in the middle of the rooms).
+    for(const [A,B,inward] of [[FL,BL,[ux,uz]],[FR,BR,[-ux,-uz]]]){
+      const dx=B[0]-A[0], dz=B[1]-A[1], len=Math.hypot(dx,dz), N=24, low=[];
+      for(let i=0;i<=N;i++){ const t=i/N, p=[A[0]+dx*t, A[1]+dz*t]; low.push(Math.min(eave, Math.max(baseY, mainHeight?mainHeight(p)-.3:baseY))); }
+      if(low.every(y=>y>=eave-.02)) continue;                  // wholly under the main roof: no wall at all
+      const sh=new THREE.Shape(); sh.moveTo(-len/2,eave); sh.lineTo(len/2,eave);
+      for(let i=N;i>=0;i--) sh.lineTo(-len/2+len*i/N, Math.min(low[i], eave-.01));
+      sh.closePath();
+      const geo=new THREE.ExtrudeGeometry(sh,{depth:WALL_T,bevelEnabled:false}); geo.translate(0,0,-WALL_T/2);
+      const m=new THREE.Mesh(geo,[wm,innerMat(null)]); m.position.set((A[0]+B[0])/2,0,(A[1]+B[1])/2); m.rotation.y=-Math.atan2(dz,dx); g.add(m);   // siding on its faces; its edges (the bottom one shows from the room) in the room's white
+      const side=Math.sign((-dz)*inward[0]+dx*inward[1])||1;   // which face looks into the dormer: the room's own colour there
+      const lm=new THREE.Mesh(new THREE.ShapeGeometry(sh),innerMat(null,true)); lm.position.z=side*(WALL_T/2+.02); m.add(lm);
     }
     for(const side of [-1,1]){
       const a=side<0?-(L/2+WALL_T/2):0,b=side<0?0:L/2+WALL_T/2;
@@ -300,11 +342,21 @@ export function buildHouse(THREE, spec, opts){
           const slant=Math.hypot(1,(peak-eave)/(L/2));
           const geo=roofPanelGeometry(THREE,poly,[],ceiling,p=>[p[0]*ix+p[1]*iz,(p[0]*ux+p[1]*uz)*slant]);
           const m=new THREE.Mesh(geo,swatchMat(w.roofMat??main?.mat,defRoof,'roof'));m.userData.surf=surf;g.add(m);
+          if(spec.ceiling){                                         // its ceiling inside: from the wall line in, under the steel
+            let cp=[plan(side<0?-L/2:0,0),plan(side<0?0:L/2,0),plan(side<0?0:L/2,depth),plan(side<0?-L/2:0,depth)];
+            if(mainHeight)cp=clipRoofPolygon(cp,p=>ceiling(p)-mainHeight(p)+.05);   // carried a little past the valley, under the main roof: the main roof's dark cut edge never shows between the two ceilings
+            if(cp.length>=3)g.add(new THREE.Mesh(roofPanelGeometry(THREE,cp,[],p=>ceiling(p)-.3,p=>[0,0],.03),slopeCeil()));
+            // along the valleys, where this ceiling meets the main one, the main roof's cut edge would show dark: a white strip over it
+            if(mainHeight&&cp.length>=3)for(let k=0;k<cp.length;k++){const A=cp[k],B=cp[(k+1)%cp.length];
+              if(Math.abs(ceiling(A)-mainHeight(A))>.08||Math.abs(ceiling(B)-mainHeight(B))>.08)continue;
+              const pos=[...P(A,ceiling(A)-.36),...P(B,ceiling(B)-.36),...P(B,mainHeight(B)+.12),...P(A,ceiling(A)-.36),...P(B,mainHeight(B)+.12),...P(A,mainHeight(A)+.12)];
+              const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));sg.computeVertexNormals();g.add(new THREE.Mesh(sg,slopeCeil()));}
+          }
           if(w.fasciaMat!=null){                                  // dark rake and eave boards under the steel
             const fm=swatchMat(w.fasciaMat,defTrim),edge=side*(L/2+dov),board=(a2,a3)=>{const A=new THREE.Vector3(...a2),B=new THREE.Vector3(...a3),V=B.clone().sub(A),n=new THREE.Mesh(new THREE.BoxGeometry(.14,V.length(),.5),fm),h=V.clone().cross(new THREE.Vector3(0,-1,0)).normalize();
               n.position.copy(A).add(B).multiplyScalar(.5);n.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(h,V.clone().normalize(),h.clone().cross(V).normalize()));g.add(n);};
             const front=plan(edge,-dov),top=plan(0,-dov),at=(p,dy=-.25)=>[p[0],ceiling(p)+dy,p[1]];board(at(front),at(top));
-            let reach=-dov;for(let k=0;k<40&&(!mainHeight||ceiling(plan(edge,reach+.25))>mainHeight(plan(edge,reach+.25)));k++)reach+=.25;board(at(front),at(plan(edge,Math.max(reach,-dov+.3))));
+            let reach=-dov;for(let k=0;k<40&&(!mainHeight||ceiling(plan(edge,reach+.25))>mainHeight(plan(edge,reach+.25)));k++)reach+=.25;board(at(front),at(plan(edge,Math.max(Math.min(reach,-.05),-dov+.3))));   // the eave board stops at the outside wall: never into the room
           }
         }
       }
@@ -313,13 +365,27 @@ export function buildHouse(THREE, spec, opts){
 
   // gable-fill above a wall segment: box top at y0, top edge follows the roof underside heights `tops`
   // (array of {t,y}, t in 0..1 along a->b, sorted) — so a wall crossing the ridge peaks in the middle.
-  function infillWall(a,b, y0, tops, mat){
+  // an inside wall on the top floor rises from its top to the ceiling under the roof, following the slope
+  function toCeiling(w, top, floorY){
+    const under=(x,z)=>{let best=null;for(const rp of spec.roofPieces||[]){if((rp.style||'gable')!=='gable')continue;
+      if(x<rp.x-rp.w/2||x>rp.x+rp.w/2||z<rp.z-rp.d/2||z>rp.z+rp.d/2)continue;const hgt=roofMetrics(rp).height(x,z)-.34;if(best==null||hgt>best)best=hgt;}return best;};
+    const N=16, tops=[]; for(let i=0;i<=N;i++){const t=i/N, y=under(w.x0+(w.x1-w.x0)*t, w.z0+(w.z1-w.z0)*t); tops.push({t, y:y==null?top:y});}
+    if(tops.every(q=>q.y<=top+.03)) return;
+    // upper panes: {off, w, y1a, y1b} = along the wall from its start, and the pane's top at its two ends (above the floor)
+    const len=Math.hypot(w.x1-w.x0,w.z1-w.z0), holes=(w.upper||[]).map(u=>{const a=-len/2+u.off, b=a+u.w; return [[a,top+.14],[b,top+.14],[b,floorY+u.y1b],[a,floorY+u.y1a]];}).filter(q=>q[2][1]>top+.3||q[3][1]>top+.3);
+    infillWall([w.x0,w.z0],[w.x1,w.z1], top, tops.map(q=>({t:q.t,y:Math.max(q.y,top+.01)})), innerMat(w.mat,true), 0, holes);
+  }
+  function infillWall(a,b, y0, tops, mat, inSide=0, holes=[]){
     const dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz); if(len<0.05) return;
     const sh=new THREE.Shape(); sh.moveTo(-len/2,y0); sh.lineTo(len/2,y0);       // bottom edge
     for(let i=tops.length-1;i>=0;i--) sh.lineTo(-len/2+tops[i].t*len, Math.max(tops[i].y, y0+0.01));   // top edge, right->left
     sh.closePath();
+    for(const q of holes){ const hp=new THREE.Path(); q.forEach(([x,y],i)=>i?hp.lineTo(x,y):hp.moveTo(x,y)); hp.closePath(); sh.holes.push(hp); }
     const geo=new THREE.ExtrudeGeometry(sh,{depth:WALL_T,bevelEnabled:false}); geo.translate(0,0,-WALL_T/2);
     const m=new THREE.Mesh(geo,mat); m.position.set((a[0]+b[0])/2,0,(a[1]+b[1])/2); m.rotation.y=-Math.atan2(dz,dx); g.add(m);
+    for(const q of holes){ const gs=new THREE.Shape(); q.forEach(([x,y],i)=>i?gs.lineTo(x,y):gs.moveTo(x,y)); gs.closePath(); m.add(new THREE.Mesh(new THREE.ShapeGeometry(gs),glassMat)); }   // glass in the upper panes
+    if(inSide){const lm=new THREE.Mesh(new THREE.ShapeGeometry(sh),innerMat(null,true));lm.position.z=inSide*(WALL_T/2+.02);m.add(lm);}   // the room's own colour inside
+    return m;
   }
 
   function roof(outline, topY, rs, sm){                        // sm = {pi} identifies which roof piece, for painting
@@ -337,12 +403,22 @@ export function buildHouse(THREE, spec, opts){
     let along=w>=d; if(rs.flipRidge) along=!along;              // ridge runs along the longer side by default; flipRidge turns it 90°
     const len=along?w:d, span=along?d:w;
     const rise=rs.rise??(span/2)*pitch, sln=Math.hypot(span/2+eave,rise), ang=Math.atan2(rise,span/2+eave);
+    // a gable's two sides: where the ridge is across the span, the slope, and where each side's eave ends (s = -1 or +1)
+    const isG=style==='gable', off=isG?rs.ridgeOff||0:0, mS=isG&&rs.slope!=null?rs.slope:rise/(span/2+eave), top=h+rise;
+    const edge=s=>s<0?-(span/2+(isG?rs.overhangs?.[0]??eave:eave)):span/2+(isG?rs.overhangs?.[1]??eave:eave), Hc=pz=>top-mS*Math.abs(pz-off);
     const sub=new THREE.Group(); sub.rotation.y=along?0:Math.PI/2; rg.add(sub);
     // one roof panel spanning eave -> ridge. s=+1 is the +z side, -1 the -z side.
     // ext extends the panel a touch PAST the ridge so the two sides cross and meet cleanly (no gap / no notch).
     const toLocal=p=>along?[p[0]-x,p[1]-z]:[-(p[1]-z),p[0]-x];
     const toWorld=p=>along?[p[0]+x,p[1]+z]:[p[1]+x,z-p[0]];
     const manual=(rs.holes||[]).map(roofOpeningPolygon).map(poly=>poly.map(toLocal));
+    // an end of the ridge that runs into a taller part of the house (a bay roof against the wall above it) stops at that
+    // wall: no overhang, gable or rake board there, so nothing pokes through into the rooms
+    const inPoly=(p,P)=>{let r=false;for(let i=0,j=P.length-1;i<P.length;j=i++)if((P[i][1]>p[1])!==(P[j][1]>p[1])&&p[0]<(P[j][0]-P[i][0])*(p[1]-P[i][1])/(P[j][1]-P[i][1])+P[i][0])r=!r;return r;};
+    const abuts=sx=>{ const pin=toWorld([sx*(len/2+.5),0]), pout=toWorld([sx*(len/2-.5),0]);   // just past the ridge's end, and just short of it
+      const tall=Math.max(...F.map((f,fi)=>f.outline&&inPoly(pin,f.outline)?baseYs[fi]+(f.h||10):-1e9));   // how high the house stands there (all its floors)
+      return tall>h+1&&F.some((f,fi)=>f.outline&&baseYs[fi]<h+.5&&inPoly(pin,f.outline)&&!inPoly(pout,f.outline)); };
+    const rakeA=style==='gable'&&abuts(-1)?0:rake, rakeB=style==='gable'&&abuts(1)?0:rake;
     function panel(poly,height,uv,thickness=.4,mat=rmat){
       const cuts=manual.slice();
       for(const cut of dormerCuts){
@@ -355,11 +431,11 @@ export function buildHouse(THREE, spec, opts){
       const m=new THREE.Mesh(roofPanelGeometry(THREE,poly,cuts,height,uv,thickness),mat);m.userData.roofPanel=true;sub.add(m);
     }
     const slope=s=>{
-      const a=-len/2-rake,b=len/2+rake,z0=s<0?-(span/2+eave):0,z1=s<0?0:span/2+eave;
-      panel([[a,z0],[b,z0],[b,z1],[a,z1]],p=>h+rise*(1-s*p[1]/(span/2+eave)),p=>[p[0],p[1]*sln/(span/2+eave)]);
+      const a=-len/2-rakeA,b=len/2+rakeB,z0=s<0?edge(-1):off,z1=s<0?off:edge(1);
+      panel([[a,z0],[b,z0],[b,z1],[a,z1]],p=>Hc(p[1]),p=>[p[0],p[1]*Math.hypot(1,mS)]);
     };
-    const gableEnd=(sx)=>{const eH=rise*eave/(span/2+eave); const shp=new THREE.Shape();   // top follows the roof rake (slope over span/2+eave) so it meets the roof with no gap
-      shp.moveTo(-span/2,0); shp.lineTo(span/2,0); shp.lineTo(span/2,eH); shp.lineTo(0,rise); shp.lineTo(-span/2,eH); shp.closePath();  // paintable via roof.gableMat
+    const gableEnd=(sx)=>{const shp=new THREE.Shape();   // top follows the roof rake so it meets the roof with no gap (the shape's x runs toward -z once it is turned)
+      shp.moveTo(-span/2,0); shp.lineTo(span/2,0); shp.lineTo(span/2,Hc(-span/2)-h); shp.lineTo(-off,rise); shp.lineTo(-span/2,Hc(span/2)-h); shp.closePath();  // paintable via roof.gableMat
       const m=new THREE.Mesh(new THREE.ExtrudeGeometry(shp,{depth:0.5,bevelEnabled:false}),swatchMat(rs.gableMat,defWall,"world"));m.rotation.y=Math.PI/2;m.position.set(sx*len/2,h,-0.25);m.userData.surf={kind:'gable',pi};sub.add(m);};
     if(style==='shed'){
       const rise2=span*pitch*0.6, ang2=Math.atan2(rise2,span+eave), sll=Math.hypot(span+eave,rise2);
@@ -369,17 +445,21 @@ export function buildHouse(THREE, spec, opts){
       return;
     }
     slope(1,0); slope(-1,0);                                   // panels now meet exactly along the ridge line
+    // the ceiling under the steel, inside the walls only (the eaves keep their dark soffits): a thin white panel just under
+    // the roof's own underside, with the same dormer and skylight openings
+    if(spec.ceiling&&style==='gable')for(const s of [-1,1]){const z0=s<0?-span/2:off,z1=s<0?off:span/2;
+      panel([[-len/2,z0],[len/2,z0],[len/2,z1],[-len/2,z1]],p=>Hc(p[1])-.32,p=>[p[0],p[1]],.03,slopeCeil());}
     if(rs.soffitMat!=null&&style==='gable'){                    // dark boards just under the steel, so eaves read as deep shade
-      const sm=solid(PAL[rs.soffitMat]||defTrim);for(const s of [-1,1]){const z0=s<0?-(span/2+eave):0,z1=s<0?0:span/2+eave;
-        panel([[-len/2-rake,z0],[len/2+rake,z0],[len/2+rake,z1],[-len/2-rake,z1]],p=>h+rise*(1-s*p[1]/(span/2+eave))-.02,p=>[p[0],p[1]],.02,sm);}}
-    if(style!=='hip')panel([[-len/2-rake,-.275],[len/2+rake,-.275],[len/2+rake,.275],[-len/2-rake,.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
+      const sm=solid(PAL[rs.soffitMat]||defTrim);for(const s of [-1,1]){const z0=s<0?edge(-1):off,z1=s<0?off:edge(1);
+        panel([[-len/2-rakeA,z0],[len/2+rakeB,z0],[len/2+rakeB,z1],[-len/2-rakeA,z1]],p=>Hc(p[1])-.02,p=>[p[0],p[1]],.02,sm);}}
+    if(style!=='hip')panel([[-len/2-(style==='gable'?rakeA:rake),off-.275],[len/2+(style==='gable'?rakeB:rake),off-.275],[len/2+(style==='gable'?rakeB:rake),off+.275],[-len/2-(style==='gable'?rakeA:rake),off+.275]],()=>h+rise-.03,p=>[p[0],p[1]],.2);   // ridge cap hides the seam between panels
     if(rs.fasciaMat!=null&&style==='gable'){                    // eave boards and rake boards, set just under the steel
-      const fm=swatchMat(rs.fasciaMat,defTrim),fh=rs.fasciaH??.55,fz=span/2+eave,L=len+2*rake,slopeLen=Math.hypot(fz,rise),tilt=Math.atan2(rise,fz);
+      const fm=swatchMat(rs.fasciaMat,defTrim),fh=rs.fasciaH??.55;
       for(const s of [-1,1]){                                   // the eave board stops at each dormer that breaks through this eave
-        const gaps=dormerCuts.filter(c=>c.roofIndex===pi).map(c=>c.poly.map(toLocal)).filter(q=>q.some(p=>s*p[1]>=fz-.01)).map(q=>[Math.min(...q.map(p=>p[0])),Math.max(...q.map(p=>p[0]))]).sort((u,v)=>u[0]-v[0]);
-        let x0=-L/2;const piece=(a,b)=>{if(b-a<.05)return;const e=new THREE.Mesh(new THREE.BoxGeometry(b-a,fh,.12),fm);e.position.set((a+b)/2,h-.18-fh/2+.2,s*fz);sub.add(e);};
-        for(const [ga,gb] of gaps){piece(x0,Math.min(ga,L/2));x0=Math.max(x0,gb);}piece(x0,L/2);}
-      for(const sx of [-1,1])for(const s of [-1,1]){const r=new THREE.Mesh(new THREE.BoxGeometry(.12,fh,slopeLen),fm);r.position.set(sx*(len/2+rake),h+rise/2-fh/2+.02,s*fz/2);r.rotation.x=s*tilt;sub.add(r);}
+        const gaps=dormerCuts.filter(c=>c.roofIndex===pi).map(c=>c.poly.map(toLocal)).filter(q=>q.some(p=>s*p[1]>=s*edge(s)-.01)).map(q=>[Math.min(...q.map(p=>p[0])),Math.max(...q.map(p=>p[0]))]).sort((u,v)=>u[0]-v[0]);
+        let x0=-len/2-rakeA;const piece=(a,b)=>{if(b-a<.05)return;const e=new THREE.Mesh(new THREE.BoxGeometry(b-a,fh,.12),fm);e.position.set((a+b)/2,Hc(edge(s))-.18-fh/2+.2,edge(s));sub.add(e);};
+        for(const [ga,gb] of gaps){piece(x0,Math.min(ga,len/2+rakeB));x0=Math.max(x0,gb);}piece(x0,len/2+rakeB);}
+      for(const sx of [-1,1])for(const s of [-1,1]){if(!(sx<0?rakeA:rakeB)&&abuts(sx))continue;const dz=Math.abs(edge(s)-off),dy=top-Hc(edge(s)),r=new THREE.Mesh(new THREE.BoxGeometry(.12,fh,Math.hypot(dz,dy)),fm);r.position.set(sx*(len/2+(sx<0?rakeA:rakeB)),top-dy/2-fh/2+.02,(edge(s)+off)/2);r.rotation.x=s*Math.atan2(dy,dz);sub.add(r);}
     }
     if(style==='hip'){
       const rl=Math.max(0.01,len-span), y0=h, y1=h+rise, Lx=len/2+eave, W=span/2+eave, R=rl/2;
@@ -388,14 +468,34 @@ export function buildHouse(THREE, spec, opts){
       tri(0,3,4); tri(1,4,2); tri(0,4,5); tri(0,5,1); tri(3,2,5); tri(3,5,4);
       const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(V,3)); geo.computeVertexNormals();
       sub.add(new THREE.Mesh(geo,rmat));
-    } else { if(!rs.noGable){ gableEnd(-1); gableEnd(1); } }   // noGable: a wall-raising piece closes its ends with infill instead
+    } else { if(!rs.noGable){ if(!(style==='gable'&&abuts(-1)))gableEnd(-1); if(!(style==='gable'&&abuts(1)))gableEnd(1); } }   // noGable: a wall-raising piece closes its ends with infill instead
   }
 
   function stairs(st, baseY, h){
     const run=st.run||10, w=st.w||3, n=Math.max(3,Math.round(h/0.65)), rise=h/n, tread=run/n;
-    const dirs={N:[0,1],S:[0,-1],E:[1,0],W:[-1,0]}, [ux,uz]=dirs[st.dir||'N'];
+    const dirs={N:[0,1],S:[0,-1],E:[1,0],W:[-1,0]}, [ux,uz]=dirs[st.dir||'N'], px=-uz, pz=ux;   // (px,pz): across the stairs
+    baseY+=0.6;                                                 // they stand on the floor's top and reach the next floor's top
+    const sm=st.color?solid(st.color):trimMat; if(st.color) sm.userData.wxDone=true;
     for(let i=0;i<n;i++){ const t=tread*(i+0.5)-run/2, cx=st.x+ux*t, cz=st.z+uz*t, sh=rise*(i+1);
-      box(ux?tread:w, sh, ux?w:tread, cx, baseY+sh/2, cz, trimMat); }
+      box(ux?tread:w, sh, ux?w:tread, cx, baseY+sh/2, cz, sm);
+      if(st.skin){ const k=st.skin*(w/2+.03); box(ux?tread:.06, sh, ux?.06:tread, cx+px*k, baseY+sh/2, cz+pz*k, innerMat(null)); } }   // the wall under the open side, in the room's white
+    if(st.rail){                                               // the open side: a baluster on every tread, a stringer board and a handrail (pine)
+      const {side=1,from=0,to=1,h:rh=3}=st.rail, pine=archPine(), k=side*(w/2+.08), i0=Math.round(from*n), i1=Math.round(to*n);
+      for(let i=i0;i<i1;i++){ const t=tread*(i+0.5)-run/2; box(.13, rh, .13, st.x+ux*t+px*k, baseY+rise*(i+1)+rh/2, st.z+uz*t+pz*k, pine); }
+      const a=tread*i0-run/2, b=tread*i1-run/2, dy=rise*(i1-i0), L=Math.hypot(b-a,dy), mid=(a+b)/2, ym=baseY+rise*(i0+i1)/2;
+      const grp=new THREE.Group(); grp.position.set(st.x+ux*mid+px*k, ym, st.z+uz*mid+pz*k); grp.rotation.y=-Math.atan2(uz,ux); g.add(grp);
+      const bar=(hh,dd,yy)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(L,hh,dd),pine); m.rotation.z=Math.atan2(dy,b-a); m.position.y=yy; grp.add(m);};
+      bar(.16,.3,rh+rise/2+.05); bar(.9,.14,rise/2-.2);       // handrail; stringer along the treads' noses
+    }
+  }
+  // a railing (balusters between a bottom and a top rail) or, rail:'cap', a short solid wall with a pine cap
+  function railing(w, y, surf){
+    const dx=w.x1-w.x0, dz=w.z1-w.z0, len=Math.hypot(dx,dz); if(len<.05) return; const h=w.h??3.2, pine=archPine();
+    const wg=new THREE.Group(); wg.position.set((w.x0+w.x1)/2, y, (w.z0+w.z1)/2); wg.rotation.y=-Math.atan2(dz,dx); if(surf) wg.userData.surf=surf; g.add(wg);
+    const bx=(sx,sy,sz,qx,qy,m)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m); b.position.set(qx,qy,0); wg.add(b);};
+    if(w.rail==='cap'){ bx(len+.4,h-.12,.4,0,(h-.12)/2,innerMat(null)); bx(len+.5,.14,.62,0,h-.05,pine); }
+    else { bx(len,.14,.3,0,h-.07,pine); bx(len,.12,.2,0,.3,pine); const n=Math.max(2,Math.round(len/.42)); for(let i=0;i<=n;i++) bx(.13,h-.4,.13,-len/2+len*i/n,(h-.1)/2+.1,pine); }
+    (g.userData.walls||(g.userData.walls=[])).push({x0:w.x0,z0:w.z0,x1:w.x1,z1:w.z1,y0:y,h,gaps:[]});
   }
 
   // ---- assemble ----
@@ -403,7 +503,9 @@ export function buildHouse(THREE, spec, opts){
   const baseYs=[]; let acc=0; F.forEach(f=>{baseYs.push(acc); acc+=(f.h||10);});
   const holes=F.map(()=>[]);
   (spec.stairs||[]).forEach(st=>{ const fi=st.floor||0; if(fi+1<F.length){
-    const horiz=(st.dir==='E'||st.dir==='W'); holes[fi+1].push({x:st.x,z:st.z,w:horiz?(st.run||10):(st.w||3),d:horiz?(st.w||3):(st.run||10)}); }});
+    // the opening in the floor above: the whole run, or (st.well = 0..1) only from that far along it, where headroom is needed
+    const horiz=(st.dir==='E'||st.dir==='W'), run=st.run||10, cut=(st.well||0)*run, d0={N:[0,1],S:[0,-1],E:[1,0],W:[-1,0]}[st.dir||'N'];
+    holes[fi+1].push({x:st.x+d0[0]*cut/2,z:st.z+d0[1]*cut/2,w:horiz?run-cut:(st.w||3),d:horiz?(st.w||3):run-cut}); }});
 
   F.forEach((f,fi)=>{
     if(opts.upto!=null && fi>opts.upto) return;                    // level view: only build floors up to the selected one
@@ -411,12 +513,13 @@ export function buildHouse(THREE, spec, opts){
     const cen=centroid(o);
     const slabHoles=[...holes[fi], ...(f.voids||[]).map(v=>({poly:v}))];   // stairwells + open-to-below cutouts
     slabPoly(o, y, slabHoles, swatchMat(f.floorMat, defTrim, 'world'), 0.6, {kind:'floor',floor:fi});   // paintable floor (wood, etc.)
+    if(fi>0&&spec.ceiling) slabPoly(o, y-0.03, slabHoles, ceilingMat(), 0.02);   // the room below sees a white ceiling, not the floor's boards
     // which side is "outside" is set by the polygon winding — robust for concave shapes (a centroid test flips on a bay neck)
     let area2=0; for(let e=0;e<o.length;e++){ const a=o[e],b=o[(e+1)%o.length]; area2+=a[0]*b[1]-b[0]*a[1]; }
     const outFace = area2>0 ? 5 : 4;                                  // CCW -> exterior is local -z (face 5); CW -> +z (face 4)
     for(let e=0;e<o.length;e++){ const a=o[e], b=o[(e+1)%o.length];
       const ops=(f.openings||[]).filter(x=>x.on==='outline'&&x.edge===e);
-      wallSeg(a[0],a[1],b[0],b[1], y,h, ops, swatchMat(m[e],defWall,'world'), {kind:'outline',floor:fi,edge:e}, swatchMat(mi[e],defInner,'world'), outFace, true); }   // butt=true: stop short for corner pieces
+      wallSeg(a[0],a[1],b[0],b[1], y,h, ops, swatchMat(m[e],defWall,'world'), {kind:'outline',floor:fi,edge:e}, innerMat(mi[e]), outFace, true); }   // butt=true: stop short for corner pieces
     for(let e=0;e<o.length;e++){ const v=o[e], p=o[(e-1+o.length)%o.length], n=o[(e+1)%o.length];   // corner piece filling each vertex
       const t1=Math.atan2(v[1]-p[1],v[0]-p[0]), t2=Math.atan2(n[1]-v[1],n[0]-v[0]);
       const turn=Math.abs(((t2-t1)*180/Math.PI+540)%360-180);        // 0 = straight, 90 = right angle
@@ -430,7 +533,9 @@ export function buildHouse(THREE, spec, opts){
       const ops=(f.openings||[]).filter(x=>x.on==='wall'&&x.wi===wi);
       const surf={kind:'wall',floor:fi,wi};
       if(isTop && w.dormer) dormer(w, y, h, ops, swatchMat(w.mat,defWall,'world'), surf, o);   // dormer is now an opt-in per-wall flag
-      else wallSeg(w.x0,w.z0,w.x1,w.z1, y,h, ops, swatchMat(w.mat,defInner,'world'), surf, swatchMat(w.matIn,defInner,'world'), 4, true);   // butt=true: stop short so a T-junction ends at the other wall's face, not through it
+      else if(w.rail) railing(w, y+.6, surf);
+      else wallSeg(w.x0,w.z0,w.x1,w.z1, y+.6,(w.h??h)-.6, ops, innerMat(w.mat), surf, innerMat(w.matIn), 4, true);   // inside walls stand ON the floor (0.6 thick), so their corners at the floor are real points   // butt=true: stop short so a T-junction ends at the other wall's face, not through it
+      if(isTop && !w.rail && !w.dormer && w.h==null) toCeiling(w, y+h, y+.6);   // under the sloped roof the wall carries on up to the ceiling
     });
     // posts only where two partitions share an endpoint (an interior corner). A T-junction into a wall's SIDE meets its face flush from the butt above, so it needs none.
     const near=(a,b)=>Math.abs(a[0]-b[0])<0.06 && Math.abs(a[1]-b[1])<0.06;
@@ -447,11 +552,11 @@ export function buildHouse(THREE, spec, opts){
       skyCuts[d.onRoof].push(mt.along?{x:d.x,z:d.z,w:d.w,d:d.d*c}:{x:d.x,z:d.z,w:d.w*c,d:d.d});});
     const okPiece=rp=> rp.w>0.5&&rp.d>0.5&&isFinite(rp.x)&&isFinite(rp.z)&&isFinite(rp.base||0)&&isFinite(rp.pitch??0.5);
     (spec.roofPieces||[]).forEach((rp,pi)=>{ if(okPiece(rp))   // every roof (incl. the main house) is one of these
-      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls,holes:[...(rp.holes||[]),...skyCuts[pi]],overhang:rp.overhang,rake:rp.rake,rise:rp.rise,fasciaMat:rp.fasciaMat,fasciaH:rp.fasciaH,soffitMat:rp.soffitMat}, {pi}); });
+      roof(rectOutline(rp.x,rp.z,rp.w,rp.d), rp.base||0, {style:rp.style||'gable',pitch:rp.pitch??0.5,mat:rp.mat,gableMat:rp.gableMat,flipRidge:rp.flipRidge,noGable:rp.raiseWalls||rp.openGable,holes:[...(rp.holes||[]),...skyCuts[pi]],overhang:rp.overhang,overhangs:rp.overhangs,ridgeOff:rp.ridgeOff,slope:rp.slope,rake:rp.rake,rise:rp.rise,fasciaMat:rp.fasciaMat,fasciaH:rp.fasciaH,soffitMat:rp.soffitMat}, {pi}); });
     // raise the walls sitting under a roof piece up into its underside (opt-in, gable pieces)
     (spec.roofPieces||[]).forEach(rp=>{ if(!rp.raiseWalls||!okPiece(rp)||(rp.style||'gable')!=='gable') return;
-      const rw=rp.w, rd=rp.d, {along,span,rise,run}=roofMetrics(rp), base=rp.base||0;
-      const rHt=(x,z)=> base + rise*Math.max(0, 1-(along?Math.abs(z-rp.z):Math.abs(x-rp.x))/run);   // roof underside height — run includes the eave overhang so the wall slope matches the roof exactly
+      const rw=rp.w, rd=rp.d, RM=roofMetrics(rp), {along}=RM, base=rp.base||0;
+      const rHt=(x,z)=> RM.height(x,z);   // roof underside height — run includes the eave overhang so the wall slope matches the roof exactly
       const inFoot=(x,z)=> x>=rp.x-rw/2-0.6 && x<=rp.x+rw/2+0.6 && z>=rp.z-rd/2-0.6 && z<=rp.z+rd/2+0.6;
       F.forEach((f,fi)=>{ const ftop=baseYs[fi]+(f.h||10); if(Math.abs(ftop-base)>1.5) return;   // walls whose top meets this eave
         const o=f.outline, mm=f.mats||{};
@@ -459,22 +564,42 @@ export function buildHouse(THREE, spec, opts){
           if(!inFoot((a[0]+b[0])/2,(a[1]+b[1])/2)) continue;
           const ts=[0,1];                                          // sample the roof underside at the ends AND where the ridge crosses (so a gable-end wall peaks in the middle)
           const denom = along ? (b[1]-a[1]) : (b[0]-a[0]);
-          if(Math.abs(denom)>1e-6){ const cr=(along?(rp.z-a[1]):(rp.x-a[0]))/denom; if(cr>0.02 && cr<0.98) ts.push(cr); }
+          if(Math.abs(denom)>1e-6){ const cr=(along?(rp.z+RM.off-a[1]):(rp.x+RM.off-a[0]))/denom; if(cr>0.02 && cr<0.98) ts.push(cr); }
           ts.sort((p,q)=>p-q);
           const tops=ts.map(t=>({t, y: rHt(a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t)}));
           if(tops.every(tp=>tp.y<=ftop+0.03)) continue;            // whole edge at/below wall top (eave) -> no fill
-          infillWall(a,b, ftop, tops, swatchMat(mm[e],defWall,'world')); } }); }); }
+          let ar=0;for(let k=0;k<o.length;k++){const p=o[k],q=o[(k+1)%o.length];ar+=p[0]*q[1]-q[0]*p[1];}
+          const EL=Math.hypot(b[0]-a[0],b[1]-a[1]), inS=ar>0?1:-1, archs=(f.openings||[]).filter(x=>x.on==='outline'&&x.edge===e&&x.archTop).map(x=>{
+            const x0=-EL/2+x.off, x1=x0+x.w; return {x, x0, x1, cx:(x0+x1)/2, r:x.w/2, ys:baseYs[fi]+(x.archTop.spring??(f.h||10)+.9)}; });
+          const ups=archs.map(({x0,x1,cx,r,ys})=>{ const pts=[[x0,ftop+.14],[x1,ftop+.14],[x1,ys]];
+            for(let i=1;i<28;i++){const th=Math.PI*i/28; pts.push([cx+r*Math.cos(th), ys+r*Math.sin(th)]);} pts.push([x0,ys]); return pts; });
+          const im=infillWall(a,b, ftop, tops, swatchMat(mm[e],defWall,'world'), inS, ups);
+          // the round pane's frame: one band outside in the window's own trim, one inside in pine, each lapping the opening a
+          // little (as a sash does) so the cut through the wall never shows as a second arch behind the glass
+          if(im) for(const {x,cx,r,ys} of archs){ const cw=x.casingW??.42;
+            const band=(ri,ro,depth,mat,z)=>{ const bs=new THREE.Shape(), N=28; bs.moveTo(cx+ro,ftop); bs.lineTo(cx+ro,ys);
+              for(let i=1;i<=N;i++){const th=Math.PI*i/N; bs.lineTo(cx+ro*Math.cos(th), ys+ro*Math.sin(th));} bs.lineTo(cx-ro,ftop); bs.lineTo(cx-ri,ftop); bs.lineTo(cx-ri,ys);
+              for(let i=N-1;i>=0;i--){const th=Math.PI*i/N; bs.lineTo(cx+ri*Math.cos(th), ys+ri*Math.sin(th));} bs.lineTo(cx+ri,ftop); bs.closePath();
+              const bm=new THREE.Mesh(new THREE.ExtrudeGeometry(bs,{depth,bevelEnabled:false,curveSegments:1}),mat); bm.position.z=z; im.add(bm); };
+            band(r-.14, r+cw-.03, .1, x.casing!=null?swatchMat(x.casing,defTrim):trimMat, inS>0?-(WALL_T/2+.1):WALL_T/2);
+            band(r-.05, r+cw-.03, .08, archPine(), inS>0?WALL_T/2+.02:-(WALL_T/2+.1)); } } }); }); }
   (spec.stairs||[]).forEach(st=>{ const fi=st.floor||0; if(F[fi]) stairs(st, baseYs[fi], F[fi].h||3); });
+  // the floors and stairs for walking (design units; the page's bake turns them into metres): each floor's height, outline
+  // and the holes in it (stairwells, open-to-below), and each stair's run from bottom to top
+  g.userData.levels=F.map((f,fi)=>({y:baseYs[fi]+0.6,outline:f.outline,holes:[...holes[fi].map(r=>[[r.x-r.w/2,r.z-r.d/2],[r.x+r.w/2,r.z-r.d/2],[r.x+r.w/2,r.z+r.d/2],[r.x-r.w/2,r.z+r.d/2]]),...(f.voids||[])]}));
+  g.userData.stairs=(spec.stairs||[]).filter(st=>F[st.floor||0]).map(st=>{const dirs={N:[0,1],S:[0,-1],E:[1,0],W:[-1,0]},[ux,uz]=dirs[st.dir||'N'],run=st.run||10,fi=st.floor||0;
+    return {x0:st.x-ux*run/2,z0:st.z-uz*run/2,x1:st.x+ux*run/2,z1:st.z+uz*run/2,w:st.w||3,y0:baseYs[fi]+.6,y1:baseYs[fi]+(F[fi].h||3)+.6};});
 
   // Parametric exterior details stay in the JSON and in the designer, rather
   // than being scene-only decorations which vanish on the next export.
   (spec.details||[]).forEach((d,di)=>{
     if(opts.upto!=null&&d.floor!=null&&d.floor>opts.upto)return;
     if(opts.noRoof&&(d.type==='skylight'||d.type==='chimney'))return;
+    if(d.hidden)return;                                         // kept in the list (so the others keep their numbers) but not built
     const dg=new THREE.Group();dg.position.set(d.x||0,d.y||0,d.z||0);dg.rotation.set(...(d.rotation||[0,0,0]).map(v=>v*Math.PI/180));
     // A roof-mounted detail follows its roof piece, so resizing the roof cannot bury it.
     const seat=d.onRoof!=null&&spec.roofPieces?.[d.onRoof];let sg=1,seatAlong=true;
-    if(seat){const mt=roofMetrics(seat),t=Math.atan(mt.slope);seatAlong=mt.along;sg=Math.sign((mt.along?d.z-seat.z:d.x-seat.x)||1);
+    if(seat){const mt=roofMetrics(seat),t=Math.atan(mt.slope);seatAlong=mt.along;sg=Math.sign(((mt.along?d.z-seat.z:d.x-seat.x)-mt.off)||1);
       dg.position.y=mt.height(d.x,d.z)+(d.lift??0);
       if(d.type==='chimney')dg.position.y+=(d.h||1)/2-.3;
       if(d.type==='skylight'){dg.position.y+=.2/Math.cos(t)+(d.h||.25)/2;if(mt.along)dg.rotation.x=sg*t;else dg.rotation.z=-sg*t;}}dg.userData.surf={kind:'detail',di};g.add(dg);

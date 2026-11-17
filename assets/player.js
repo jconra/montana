@@ -30,9 +30,15 @@ export function surveyBuildings(placed) {
       const box = new THREE.Box3().setFromObject(o), mid = box.getCenter(new THREE.Vector3());
       doors.push({ group: o, base: o.quaternion.clone(), angle: 0, target: 0, open: d.open, mid, timer: 0 });
     } });
-    if (g.userData.outline) {                                // where the house's ground floor is (the terrain is cut inside it)
+    const W = ([x, z]) => { const q = v.set(x, 0, z).applyMatrix4(g.matrixWorld);return { x: q.x, z: q.z }; };
+    if (g.userData.levels) {                                 // a built house: every floor, with its holes, and its stairs
+      const levels = g.userData.levels.map((l) => ({ y: g.position.y + l.y * s + .05, poly: l.outline.map(W), holes: l.holes.map((h) => h.map(W)) }));
+      const stairs = (g.userData.stairs || []).map((t) => { const a = W([t.x0, t.z0]), b = W([t.x1, t.z1]), len = Math.hypot(b.x - a.x, b.z - a.z);
+        return { a, ux: (b.x - a.x) / len, uz: (b.z - a.z) / len, len, w: t.w * s, y0: g.position.y + t.y0 * s + .05, y1: g.position.y + t.y1 * s + .05 }; });
+      floors.push({ poly: levels[0].poly, y: levels[0].y, levels, stairs });
+    } else if (g.userData.outline) {                         // where the house's ground floor is (the terrain is cut inside it)
       const poly = g.userData.outline.map((p) => p.clone().applyMatrix4(g.matrixWorld));
-      floors.push({ poly, y: g.position.y + 0.05 });
+      floors.push({ poly, y: g.position.y + 0.05, levels: null, stairs: [] });
     }
   }
   return { walls, doors, floors };
@@ -62,6 +68,10 @@ function joystick() {
 
 export function createWalking({ heightAt, keys, camera, controls }) {
   let B = { walls: [], doors: [], floors: [] };
+  // obstacles outside (trees, rocks, props) as circles in a grid of 4 m cells
+  const CELL = 4, grid = new Map(), key = (i, j) => i + ',' + j;
+  function setObstacles(list) { grid.clear();for (const o of list) { const i = Math.floor(o.x / CELL), j = Math.floor(o.z / CELL);(grid.get(key(i, j)) || grid.set(key(i, j), []).get(key(i, j))).push(o); } }
+  function nearObstacles(x, z, f) { const i = Math.floor(x / CELL), j = Math.floor(z / CELL);for (let a = i - 1;a <= i + 1;a++) for (let b = j - 1;b <= j + 1;b++) for (const o of grid.get(key(a, b)) || []) f(o); }
   const stick = joystick(), touch = matchMedia('(pointer:coarse)').matches;
   let person = null;                                     // the one the visitor steers (a family member from arrival.js)
   const others = [];                                     // everyone else who opens doors by walking up to them
@@ -71,13 +81,14 @@ export function createWalking({ heightAt, keys, camera, controls }) {
   const indoors = (x, z) => B.floors.some((f) => inPoly(x, z, f.poly));
 
   // push a position out of any wall it is too close to, unless it is in a door gap
-  function collide(p, y) {
+  function collide(p, y, r = R) {
+    nearObstacles(p.x, p.z, (o) => { const ox = p.x - o.x, oz = p.z - o.z, d = Math.hypot(ox, oz), m = o.r + r;if (d < m && d > 1e-6) { p.x = o.x + ox / d * m;p.z = o.z + oz / d * m; } });
     for (let it = 0;it < 2;it++) for (const w of B.walls) {
       if (w.y1 < y + .3 || w.y0 > y + 1.6) continue;
       const dx = w.bx - w.ax, dz = w.bz - w.az, t = Math.max(0, Math.min(1, ((p.x - w.ax) * dx + (p.z - w.az) * dz) / (w.len * w.len)));
       const along = t * w.len;if (w.gaps.some(([a, b]) => along > a + R * .6 && along < b - R * .6)) continue;
       const cx = w.ax + dx * t, cz = w.az + dz * t, ox = p.x - cx, oz = p.z - cz, d = Math.hypot(ox, oz);
-      if (d < R && d > 1e-6) { p.x = cx + ox / d * R;p.z = cz + oz / d * R; }
+      if (d < r && d > 1e-6) { p.x = cx + ox / d * r;p.z = cz + oz / d * r; }
     }
   }
 
@@ -93,6 +104,33 @@ export function createWalking({ heightAt, keys, camera, controls }) {
     return best;
   }
 
+  // STAIRS AND FLOORS: a walker carries the level they are on. On a stair they rise with it (and are on the upper floor
+  // past half way); off it, on an upper floor they cannot step out over a stairwell, the open-to-below or past the walls.
+  function onStair(x, z) {
+    for (const f of B.floors) for (const t of f.stairs || []) {
+      const dx = x - t.a.x, dz = z - t.a.z, u = (dx * t.ux + dz * t.uz) / t.len, v = -dx * t.uz + dz * t.ux;
+      if (u >= 0 && u <= 1 && Math.abs(v) <= t.w / 2) return { t, u, f };
+    }
+    return null;
+  }
+  function stand(o, px, pz) {
+    const pos = o.p.root.position;o.level = o.level || 0;
+    const st = onStair(pos.x, pos.z);
+    if (st) {
+      const y = st.t.y0 + st.u * (st.t.y1 - st.t.y0);
+      // stepping onto a stair from the side, far from the floor it is at, is not allowed
+      if (Math.abs(y - pos.y) > .5 && !onStair(px, pz)) { pos.x = px;pos.z = pz; } else { pos.y = y;o.level = st.u > .5 ? 1 : 0; }
+      collide(pos, pos.y);return;
+    }
+    const house = B.floors.find((f) => f.levels && inPoly(pos.x, pos.z, f.poly));
+    if (o.level > 0) {
+      const f = B.floors.find((q) => q.levels && q.levels[o.level]);const L = f?.levels[o.level];
+      if (!L || !inPoly(pos.x, pos.z, L.poly) || L.holes.some((h) => inPoly(pos.x, pos.z, h))) { pos.x = px;pos.z = pz; }   // no stepping into thin air
+      pos.y = L ? L.y : pos.y;collide(pos, pos.y);return;
+    }
+    pos.y = house ? house.levels[0].y : floorAt(pos.x, pos.z);collide(pos, pos.y);pos.y = house ? house.levels[0].y : floorAt(pos.x, pos.z);
+  }
+
   const fwd = new THREE.Vector3(), right = new THREE.Vector3();
   function input() {
     const k = keys, x = (k.d || k.arrowright ? 1 : 0) - (k.a || k.arrowleft ? 1 : 0) + stick.out.x;
@@ -103,7 +141,7 @@ export function createWalking({ heightAt, keys, camera, controls }) {
   // the steered person: camera-relative walking, turning toward the way they go, Walk / Run / Idle
   function steer(dt) {
     if (!person) return;
-    const { p } = person, pos = p.root.position, inp = input();
+    const { p } = person, pos = p.root.position, inp = input(), prevX = pos.x, prevZ = pos.z;
     camera.getWorldDirection(fwd);fwd.y = 0;fwd.normalize();right.crossVectors(fwd, camera.up).normalize();
     let mx = fwd.x * inp.y + right.x * inp.x, mz = fwd.z * inp.y + right.z * inp.x;const m = Math.min(1, Math.hypot(mx, mz));
     if (m > .05) {
@@ -113,7 +151,7 @@ export function createWalking({ heightAt, keys, camera, controls }) {
       const want = Math.atan2(mx, mz);let turn = want - p.root.rotation.y;turn = Math.atan2(Math.sin(turn), Math.cos(turn));p.root.rotation.y += turn * Math.min(1, dt * 10);
       pos.x += mx * speed * dt;pos.z += mz * speed * dt;
     } else p.play('Idle', { fade: .25 });
-    pos.y = floorAt(pos.x, pos.z);collide(pos, pos.y);pos.y = floorAt(pos.x, pos.z);
+    stand(person, prevX, prevZ);
     person.sh.position.set(pos.x, pos.y + .04, pos.z);
     p.update(dt);
   }
@@ -132,8 +170,19 @@ export function createWalking({ heightAt, keys, camera, controls }) {
     }
   }
 
+  // the car: two circles along it (front and back axles), pushed out of trees, rocks and walls; a knock stops it
+  function collideCar(car) {
+    const fx = Math.sin(car.heading), fz = Math.cos(car.heading);let hit = false;
+    for (const k of [1.25, -1.25]) {
+      const c = { x: car.x + fx * k, z: car.z + fz * k }, x0 = c.x, z0 = c.z;
+      collide(c, heightAt(c.x, c.z), 1.0);
+      if (c.x !== x0 || c.z !== z0) { car.x += c.x - x0;car.z += c.z - z0;hit = true; }
+    }
+    if (hit) car.speed *= -.15;
+    return hit;
+  }
   return {
-    stick, touch,
+    stick, touch, setObstacles, collideCar,
     survey(placed) { B = surveyBuildings(placed); return B; },
     get buildings() { return B; },
     floorAt, indoors, clear, input,

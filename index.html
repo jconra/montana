@@ -145,6 +145,7 @@ import {createVisitorUI} from './assets/visitor-ui.js';
 import {createCampfire} from './assets/campfire.js';
 import {createArrival} from './assets/arrival.js';
 import {createWalking} from './assets/player.js';
+import {buildInterior} from './assets/interior.js';
 import { createSceneTransform } from './assets/scene-transform.js';
 import { createLandscapeEditor } from './assets/landscape-editor.js?v=terrain-20261011';
 import { createLandscapeObjects } from './assets/landscape-objects.js';
@@ -162,6 +163,7 @@ LOAD.at(.04,'Reading the map');
 
 const M = await (await fetch('./assets/manifest.json')).json();
 let houseSchema=null; try{ houseSchema=await (await fetch('./assets/montana-home.json')).json(); }catch(e){}   // redesigned house
+let interiorData=null; try{ interiorData=await (await fetch('./assets/montana-interior.json')).json(); }catch(e){}   // the furniture (labs/interior edits it)
 let garageSchema=null;try{garageSchema=await (await fetch('./assets/montana-garage.json')).json();}catch(e){}
 let shedSchema=null;try{shedSchema=await (await fetch('./assets/montana-shed.json')).json();}catch(e){}
 const gmin = M.globalMin, relief = M.globalMax - M.globalMin;
@@ -308,8 +310,8 @@ function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
   src.traverse(o=>{ if(o.isMesh && o.geometry && !inDoor(o)){ const g2=o.geometry.clone(); g2.applyMatrix4(o.matrixWorld);
     // two-tone walls carry a material per face (siding outside, the room's own inside): split them by face so the rooms
     // keep their inside faces now that people walk in (they used to be collapsed to the outside material)
-    if(Array.isArray(o.material)&&g2.index&&g2.groups.length){for(const gr of g2.groups){const m=o.material[gr.materialIndex];if(!m)continue;
-      const sub=g2.clone();sub.setIndex(Array.from(g2.index.array.slice(gr.start,gr.start+gr.count)));sub.clearGroups();out.add(new THREE.Mesh(sub,m));}}
+    if(Array.isArray(o.material)&&g2.groups.length){for(const gr of g2.groups){const m=o.material[gr.materialIndex];if(!m)continue;   // (extruded shapes carry no index: their groups count plain vertices)
+      const sub=g2.clone();sub.setIndex(g2.index?Array.from(g2.index.array.slice(gr.start,gr.start+gr.count)):Array.from({length:gr.count},(_,i)=>gr.start+i));sub.clearGroups();out.add(new THREE.Mesh(sub,m));}}
     else out.add(new THREE.Mesh(g2,Array.isArray(o.material)?o.material[0]:o.material)); } });
   // centre on the footprint (X/Z) so it lands where the old origin-centred model did; keep the base on the ground (Y)
   const bb=new THREE.Box3().setFromObject(out),cx=src.userData.origin?src.userData.origin[0]*FT:(bb.min.x+bb.max.x)/2,cz=src.userData.origin?src.userData.origin[1]*FT:(bb.min.z+bb.max.z)/2;
@@ -317,6 +319,9 @@ function bakedFt(src){ src.scale.setScalar(FT); src.updateMatrixWorld(true);
   for(const d of doors){d.position.x-=cx;d.position.z-=cz;out.add(d);}
   // the walls for walking, in the same metres as the geometry (see house-model wallSeg)
   out.userData.walls=(src.userData.walls||[]).map(w=>({x0:w.x0*FT-cx,z0:w.z0*FT-cz,x1:w.x1*FT-cx,z1:w.z1*FT-cz,y0:w.y0*FT,h:w.h*FT,gaps:w.gaps.map(([a,b])=>[a*FT,b*FT])}));
+  const P=([x,z])=>[x*FT-cx,z*FT-cz];
+  out.userData.levels=(src.userData.levels||[]).map(l=>({y:l.y*FT,outline:l.outline.map(P),holes:l.holes.map(h=>h.map(P))}));
+  out.userData.stairs=(src.userData.stairs||[]).map(t=>({x0:t.x0*FT-cx,z0:t.z0*FT-cz,x1:t.x1*FT-cx,z1:t.z1*FT-cz,w:t.w*FT,y0:t.y0*FT,y1:t.y1*FT}));
   return out; }
 // The house's ground-floor outline in its own metres (bakedFt centres it on the design origin), for the foundation and the ground cut.
 function houseOutline(spec){const o=spec.origin||[0,0];return spec.floors[0].outline.map(([x,z])=>new THREE.Vector3((x-o[0])*FT,0,(z-o[1])*FT));}
@@ -328,10 +333,12 @@ function withSkirt(g,spec){const P=houseOutline(spec);let area=0;for(let i=0;i<P
     pos.push(a.x+nx,-1.6,a.z+nz, b.x+nx,-1.6,b.z+nz, b.x+nx,.08,b.z+nz, a.x+nx,.08,a.z+nz);idx.push(k,k+1,k+2,k,k+2,k+3);}
   const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();
   g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x6b6862,roughness:.95,side:THREE.DoubleSide})));g.userData.outline=P;return g;}
+// The furniture inside (assets/interior.js, from Jacob's markup and photos), in the house's own frame; solid pieces join its walls.
+function furnish(g){if(!interiorData)return;try{const inner=buildInterior(FT,interiorData);g.add(inner.group);(g.userData.walls||(g.userData.walls=[])).push(...inner.walls);}catch(e){console.warn('Furniture could not build:',e);}}
 function makeHouse(){
   const saved=localStorage.getItem('montanaHouse');                  // live design from the Home Designer (same-origin)
-  if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length) return bakedFt(h); }catch(e){} }
-  if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length) return withSkirt(bakedFt(h),houseSchema); }catch(e){} }   // committed montana-home.json
+  if(saved){ try{ const h=buildHouse(THREE, JSON.parse(saved)); if(h.children.length){const g=bakedFt(h);furnish(g);return g;} }catch(e){} }
+  if(houseSchema){ try{ const h=buildHouse(THREE, houseSchema); if(h.children.length){const g=withSkirt(bakedFt(h),houseSchema);furnish(g);return g;} }catch(e){console.warn('House could not build:',e);} }   // committed montana-home.json
   console.warn('House design could not load');return new THREE.Group();
 }
 
@@ -454,6 +461,8 @@ function makeCabin(){
   for(const x of [-11,-8])T([x,DECK-.3,WF+.2],[x,-.2,WF+.2-TR*N],.6,rim);
   // shutters and rails end here; wall lamps
   B(.5,.9,.3,5.8,DECK+6.1,zW+.1,dark);B(.5,.9,.3,X0+1.2,11.5,DF-.3,dark);
+  // for walking: the body and porch are solid (raised on its deck; the inside comes with the interiors)
+  {const P=[[-HW,-WF-.5],[HW,-WF-.5],[HW,DF],[-HW,DF]].map(([x,z])=>[x*F,z*F]);g.userData.walls=P.map((a,k)=>{const b=P[(k+1)%4];return {x0:a[0],z0:a[1],x1:b[0],z1:b[1],y0:0,h:RIDGE*F,gaps:[]};});}
   return g;
 }
 
@@ -872,7 +881,7 @@ function updateCar(dt){
     car.speed+=inp.y*22*dt; car.speed*=(1-1.3*dt); car.speed=Math.max(-7,Math.min(18,car.speed));
     carSteering+=(-inp.x*.48-carSteering)*dampFactor(5,dt);
     car.heading+=carSteering/.48*1.3*dt*Math.max(-1,Math.min(1,car.speed/2));
-    travel=car.speed*dt;car.x+=Math.sin(car.heading)*travel;car.z+=Math.cos(car.heading)*travel;
+    travel=car.speed*dt;car.x+=Math.sin(car.heading)*travel;car.z+=Math.cos(car.heading)*travel;walking.collideCar(car);
     // stopped near the house: everyone gets out
     stopT=Math.abs(car.speed)<.3&&!inp.any?stopT+dt:0;
     if(stopT>1.2&&Math.hypot(car.x-PARK.x,car.z-PARK.z)<30){carMode='parked';car.speed=0;arrival.start(car);}
@@ -1127,7 +1136,7 @@ const landscapeReady=(async()=>{
   const bridge={heightAt,
     apply(records,authored){
       if(!detached){for(const entry of groundMeshes){scene.remove(entry.im);entry.im.dispose();}groundMeshes=[];propertyNature.detachSage();propertyNature.detachProps();detached=true;landscapeLayer=createLandscapeObjects(scene,catalog,heightAt);}
-      landscapeRecords=records;landscapeAuthored=authored;landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);drawTrees();buildShrubs();
+      landscapeRecords=records;landscapeAuthored=authored;walking.setObstacles(obstaclesFrom(records,catalog));landscapeLayer.rebuild(records,authored);landscapeLayer.setQuality(qualityLevel,QUALITY_LEVELS[qualityLevel].density);landscapeLayer.update(cam);drawTrees();buildShrubs();
     },
     hide(id){
       if(landscapeHidden===id)return;const old=landscapeHidden;landscapeHidden=id;landscapeLayer?.setHidden(id);
@@ -1222,7 +1231,29 @@ function setupWalking(){
     arrival.setDoor({x:entry.mid.x-nx*.8,z:entry.mid.z-nz*.8},{x:entry.mid.x+nx*1.6,z:entry.mid.z+nz*1.6});
   }
   const ft=(x,z)=>new THREE.Vector3(x*FT,0,z*FT).applyMatrix4(house.group.matrixWorld);
-  arrival.setInside([[-16,6],[-12,3.5],[-19,8.5],[-13.5,9]].map(([x,z])=>{const v=ft(x,z);return {x:v.x,z:v.z};}));
+  arrival.setInside([[-16,6],[-11,5],[-18.5,7.6],[-12.5,8.6]].map(([x,z])=>{const v=ft(x,z);return {x:v.x,z:v.z};}));
+}
+// What stands in the way outside, from the placed objects: a tree by its trunk (you walk under its branches), a juniper by
+// most of its crown (they are bushy to the ground), a rock or prop by its own model's footprint unless it is low enough to
+// step over. Sage and grass stay walk-through. Circles, in metres.
+const _bb=new Map();
+function footprint(entry){let r=_bb.get(entry);if(r!==undefined)return r;r={r:0,h:0};
+  for(const part of entry?.parts||[]){const g=part.geometry;if(!g)continue;g.computeBoundingBox?.();const b=g.boundingBox;if(b){r.r=Math.max(r.r,Math.abs(b.min.x),Math.abs(b.max.x),Math.abs(b.min.z),Math.abs(b.max.z));r.h=Math.max(r.h,b.max.y);}}
+  _bb.set(entry,r);return r;}
+function obstaclesFrom(records,catalog){
+  const out=[];
+  for(const r of records){const a=r.asset||'',s=r.scale||[1,1,1];
+    if(/sage|grass|flower|fill|cattail|thistle/.test(a))continue;
+    let rad=0;
+    if(a.startsWith('tree/juniper'))rad=s[0]/1.3*.36;
+    else if(a.startsWith('tree/'))rad=Math.min(.6,.18+.012*s[1]);
+    else if(a.startsWith('bush/'))rad=Math.max(s[0],s[2])*.3;
+    else if(a==='prop/entry-arch'){const yaw=(r.rotation||[0,0,0])[1],c=Math.cos(yaw),sn=Math.sin(yaw);   // two posts 5.8 m apart: drive between them
+      for(const k of [-2.9,2.9])out.push({x:r.x+c*k,z:r.z-sn*k,r:.3});continue;}
+    else{const f=footprint(catalog.get(a));if(f.h*s[1]<.45)continue;rad=f.r*Math.max(s[0],s[2])*.8;   // low things (log edging, flat stones) are stepped over
+      if(rad>2.6&&!a.startsWith('rock/'))continue;}                                              // big open frames (arches, swings) are not one solid lump
+    if(rad>.12)out.push({x:r.x,z:r.z,r:rad});}
+  return out;
 }
 function segDist(p,w){const dx=w.bx-w.ax,dz=w.bz-w.az,t=Math.max(0,Math.min(1,((p.x-w.ax)*dx+(p.z-w.az)*dz)/(w.len*w.len)));return Math.hypot(p.x-w.ax-dx*t,p.z-w.az-dz*t);}
 (async function reveal(){

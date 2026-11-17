@@ -64,75 +64,103 @@
         {
           "x0": -24,
           "z0": -0.3,
-          "x1": -8,
+          "x1": -12,
           "z1": -0.3,
           "dormer": false
         },
         {
-          "x0": -8,
+          "x0": -12,
           "z0": -0.3,
-          "x1": -8,
-          "z1": -12
+          "x1": -12,
+          "z1": -12,
+          "dormer": false
+        },
+        {
+          "x0": -24,
+          "z0": 1.3,
+          "x1": -24,
+          "z1": 11.3,
+          "dormer": false
+        },
+        {
+          "x0": -32.2,
+          "z0": 3.65,
+          "x1": -27.2,
+          "z1": 3.65,
+          "dormer": false
+        },
+        {
+          "x0": -27.2,
+          "z0": 1.3,
+          "x1": -27.2,
+          "z1": 3.65,
+          "dormer": false
+        },
+        {
+          "x0": -1.5,
+          "z0": -8.5,
+          "x1": 4.75,
+          "z1": -8.5,
+          "dormer": false
+        },
+        {
+          "x0": 4.75,
+          "z0": -8.5,
+          "x1": 8,
+          "z1": -8.5,
+          "dormer": false
         },
         {
           "x0": 8,
-          "z0": -12,
+          "z0": 0.9,
           "x1": 8,
-          "z1": 0
+          "z1": -12,
+          "dormer": false
         },
         {
-          "x0": 16,
-          "z0": 0,
-          "x1": 16,
-          "z1": -12
-        },
-        {
-          "x0": 16,
-          "z0": 0,
+          "x0": 8,
+          "z0": 0.9,
           "x1": 24,
-          "z1": 0
+          "z1": 0.9,
+          "dormer": false
         },
         {
-          "x0": 16,
-          "z0": -1.5,
-          "x1": 8,
-          "z1": -1.5
+          "x0": 8,
+          "z0": -2.1,
+          "x1": 18.2,
+          "z1": -2.1,
+          "dormer": false
         },
         {
-          "x0": 13,
-          "z0": -1.5,
-          "x1": 13,
-          "z1": 0
+          "x0": 14.6,
+          "z0": -2.1,
+          "x1": 14.6,
+          "z1": 0.9,
+          "dormer": false
+        },
+        {
+          "x0": 18.2,
+          "z0": -5,
+          "x1": 18.2,
+          "z1": 0.9,
+          "dormer": false
+        },
+        {
+          "x0": 18.2,
+          "z0": -12,
+          "x1": 18.2,
+          "z1": -5,
+          "dormer": false
+        },
+        {
+          "x0": 18.2,
+          "z0": -5,
+          "x1": 24,
+          "z1": -5,
+          "dormer": false
         }
       ],
       "openings": [
-        {
-          "on": "wall",
-          "off": 4,
-          "w": 3,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "wi": 1
-        },
-        {
-          "on": "wall",
-          "off": 6.56,
-          "w": 3,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "wi": 2
-        },
-        {
-          "on": "wall",
-          "off": 2.74,
-          "w": 3,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "wi": 4
-        },
         {
           "on": "outline",
           "edge": 8,
@@ -283,7 +311,7 @@
         {
           "on": "outline",
           "edge": 1,
-          "off": 14.1,
+          "off": 13.3,
           "w": 3,
           "y0": 0,
           "y1": 7,
@@ -310,6 +338,100 @@
           "type": "window",
           "casing": 24,
           "casingW": 0.42
+        },
+        {
+          "on": "outline",
+          "edge": 13,
+          "off": 7.4,
+          "w": 3.2,
+          "y0": 3.1,
+          "y1": 6.6,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 1,
+          "off": 8.6,
+          "w": 2.7,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 2,
+          "off": 2.5,
+          "w": 4.0,
+          "y0": 0,
+          "y1": 7.6,
+          "type": "arch",
+          "rise": 1.3
+        },
+        {
+          "on": "wall",
+          "wi": 3,
+          "off": 0.5,
+          "w": 4,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
+        },
+        {
+          "on": "wall",
+          "wi": 6,
+          "off": 0.35,
+          "w": 2.5,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
+        },
+        {
+          "on": "wall",
+          "wi": 7,
+          "off": 6.4,
+          "w": 2.6,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 8,
+          "off": 1.0,
+          "w": 5.4,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
+        },
+        {
+          "on": "wall",
+          "wi": 8,
+          "off": 6.8,
+          "w": 3.2,
+          "y0": 0,
+          "y1": 6.4,
+          "type": "open"
+        },
+        {
+          "on": "wall",
+          "wi": 8,
+          "off": 10.6,
+          "w": 2.7,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 12,
+          "off": 3.5,
+          "w": 2.6,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
         }
       ],
       "mats": {
@@ -364,22 +486,131 @@
       "h": 6.5,
       "walls": [
         {
-          "x0": -8,
-          "z0": 1.297,
-          "x1": -24,
-          "z1": 1.297
+          "x0": -24,
+          "z0": -8.8,
+          "x1": -10.3,
+          "z1": -8.8,
+          "dormer": false
         },
         {
-          "x0": -8,
-          "z0": 1.297,
-          "x1": -8,
-          "z1": -12
+          "x0": -10.3,
+          "z0": -12,
+          "x1": -10.3,
+          "z1": 0.5,
+          "dormer": false
+        },
+        {
+          "x0": -24,
+          "z0": 0.5,
+          "x1": -10.3,
+          "z1": 0.5,
+          "dormer": false
+        },
+        {
+          "x0": -10.3,
+          "z0": 0.5,
+          "x1": 8,
+          "z1": 0.5,
+          "dormer": false,
+          "rail": true,
+          "h": 3.3
+        },
+        {
+          "x0": -6.5,
+          "z0": -8.5,
+          "x1": 4.75,
+          "z1": -8.5,
+          "dormer": false,
+          "rail": "cap",
+          "h": 3.3
+        },
+        {
+          "x0": -6.5,
+          "z0": -8.5,
+          "x1": -6.5,
+          "z1": -12,
+          "dormer": false,
+          "rail": "cap",
+          "h": 3.3
         },
         {
           "x0": 8,
           "z0": 12,
           "x1": 8,
-          "z1": -12
+          "z1": -12,
+          "dormer": false,
+          "upper": [
+            {
+              "off": 8.3,
+              "w": 2.2,
+              "y1a": 10.0,
+              "y1b": 11.25
+            },
+            {
+              "off": 5.9,
+              "w": 2.2,
+              "y1a": 8.7,
+              "y1b": 9.9
+            },
+            {
+              "off": 3.5,
+              "w": 2.2,
+              "y1a": 7.35,
+              "y1b": 8.55
+            }
+          ]
+        },
+        {
+          "x0": 8,
+          "z0": -3.1,
+          "x1": 12.3,
+          "z1": -3.1,
+          "dormer": false,
+          "h": 8
+        },
+        {
+          "x0": 12.3,
+          "z0": -3.1,
+          "x1": 14.6,
+          "z1": -5.4,
+          "dormer": false,
+          "h": 8
+        },
+        {
+          "x0": 14.6,
+          "z0": -5.4,
+          "x1": 14.6,
+          "z1": -12,
+          "dormer": false,
+          "h": 8
+        },
+        {
+          "x0": 8,
+          "z0": 10,
+          "x1": 12.5,
+          "z1": 10,
+          "dormer": false
+        },
+        {
+          "x0": 12.5,
+          "z0": 10,
+          "x1": 12.5,
+          "z1": 12,
+          "dormer": false
+        },
+        {
+          "x0": 19.5,
+          "z0": 10,
+          "x1": 24,
+          "z1": 10,
+          "dormer": false
+        },
+        {
+          "x0": 19.5,
+          "z0": 10,
+          "x1": 19.5,
+          "z1": 12,
+          "dormer": false
         },
         {
           "x0": -19.25,
@@ -414,30 +645,12 @@
       ],
       "openings": [
         {
-          "on": "wall",
-          "off": 3.6,
-          "w": 3,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "wi": 1
-        },
-        {
-          "on": "wall",
-          "off": 13.74,
-          "w": 3,
-          "y0": 0,
-          "y1": 7,
-          "type": "door",
-          "wi": 2
-        },
-        {
           "on": "outline",
           "edge": 1,
           "off": 3.95,
           "w": 4.5,
-          "y0": 2.8,
-          "y1": 6.1,
+          "y0": 3.3,
+          "y1": 6.3,
           "type": "window",
           "casing": 24,
           "casingW": 0.42
@@ -447,41 +660,22 @@
           "edge": 1,
           "off": 9,
           "w": 6,
-          "y0": 2.1,
-          "y1": 6.1,
+          "y0": 3.3,
+          "y1": 6.5,
           "type": "window",
           "casing": 24,
-          "casingW": 0.42
+          "casingW": 0.42,
+          "archTop": {
+            "spring": 7.3
+          }
         },
         {
           "on": "outline",
           "edge": 1,
           "off": 15.55,
           "w": 4.5,
-          "y0": 2.8,
-          "y1": 6.1,
-          "type": "window",
-          "casing": 24,
-          "casingW": 0.42
-        },
-        {
-          "on": "wall",
-          "wi": 3,
-          "off": 1.45,
-          "w": 3.6,
-          "y0": 0.9,
-          "y1": 3.6,
-          "type": "window",
-          "casing": 24,
-          "casingW": 0.42
-        },
-        {
-          "on": "wall",
-          "wi": 4,
-          "off": 1.45,
-          "w": 3.6,
-          "y0": 0.9,
-          "y1": 3.6,
+          "y0": 3.3,
+          "y1": 6.3,
           "type": "window",
           "casing": 24,
           "casingW": 0.42
@@ -537,6 +731,121 @@
           "type": "window",
           "casing": 24,
           "casingW": 0.3
+        },
+        {
+          "on": "wall",
+          "wi": 14,
+          "off": 1.45,
+          "w": 3.6,
+          "y0": 0.9,
+          "y1": 3.6,
+          "type": "window",
+          "casing": 24,
+          "casingW": 0.42
+        },
+        {
+          "on": "wall",
+          "wi": 15,
+          "off": 1.45,
+          "w": 3.6,
+          "y0": 0.9,
+          "y1": 3.6,
+          "type": "window",
+          "casing": 24,
+          "casingW": 0.42
+        },
+        {
+          "on": "wall",
+          "wi": 0,
+          "off": 2.7,
+          "w": 2.8,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
+        },
+        {
+          "on": "wall",
+          "wi": 1,
+          "off": 9.3,
+          "w": 2.8,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 2,
+          "off": 7.0,
+          "w": 3.0,
+          "y0": 2.6,
+          "y1": 5.6,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 6,
+          "off": 11.9,
+          "w": 2.8,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 6,
+          "off": 8.3,
+          "w": 2.2,
+          "y0": 3.6,
+          "y1": 5.9,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 6,
+          "off": 5.9,
+          "w": 2.2,
+          "y0": 3.6,
+          "y1": 5.9,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 6,
+          "off": 3.5,
+          "w": 2.2,
+          "y0": 3.6,
+          "y1": 5.9,
+          "type": "window"
+        },
+        {
+          "on": "wall",
+          "wi": 8,
+          "off": 0.35,
+          "w": 2.5,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door"
+        },
+        {
+          "on": "wall",
+          "wi": 10,
+          "off": 0.6,
+          "w": 3.3,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
+        },
+        {
+          "on": "wall",
+          "wi": 12,
+          "off": 0.6,
+          "w": 3.3,
+          "y0": 0,
+          "y1": 6.8,
+          "type": "door",
+          "closed": true
         }
       ],
       "mats": {
@@ -552,7 +861,7 @@
         [
           [
             -24,
-            1.297
+            0.5
           ],
           [
             -24,
@@ -564,7 +873,7 @@
           ],
           [
             8,
-            1.297
+            0.5
           ]
         ]
       ],
@@ -583,12 +892,18 @@
       "pitch": 0.7,
       "mat": 4,
       "flipRidge": false,
-      "raiseWalls": false,
+      "raiseWalls": true,
       "gableMat": 3,
       "overhang": 4,
       "rake": 1.5,
       "fasciaMat": 11,
-      "soffitMat": 11
+      "soffitMat": 11,
+      "slope": 0.56,
+      "ridgeOff": -1.56,
+      "overhangs": [
+        1.8,
+        2.5
+      ]
     },
     {
       "x": 0,
@@ -623,30 +938,41 @@
       "soffitMat": 11
     },
     {
-      "x": 27,
-      "z": 1.1,
-      "w": 6,
-      "d": 8.1,
-      "base": 7,
+      "x": 27.2,
+      "z": 1.6,
+      "w": 6.4,
+      "d": 7.4,
+      "base": 8.3,
       "style": "gable",
-      "pitch": 0.52,
       "mat": 4,
       "gableMat": 3,
-      "flipRidge": false,
+      "flipRidge": true,
       "raiseWalls": false,
       "fasciaMat": 11,
       "soffitMat": 11,
-      "rake": 0.3
+      "rake": 0.3,
+      "rise": 2.7,
+      "overhang": 1.4,
+      "openGable": true
     }
   ],
   "stairs": [
     {
-      "x": -3,
-      "z": -9.5,
-      "w": 5,
-      "run": 15.5,
+      "x": -1.625,
+      "z": -10.25,
+      "w": 3.5,
+      "run": 12.75,
       "dir": "E",
-      "floor": 0
+      "floor": 0,
+      "color": "#aaa294",
+      "skin": 1,
+      "rail": {
+        "side": 1,
+        "from": 0,
+        "to": 0.5,
+        "h": 3
+      },
+      "well": 0.118
     }
   ],
   "palette": [
@@ -741,11 +1067,11 @@
     {
       "type": "chimney",
       "name": "Stove pipe",
-      "x": -21.5,
-      "y": 21.3,
-      "z": 8.5,
+      "x": -21.65,
+      "y": 20.8,
+      "z": 10.25,
       "w": 0.95,
-      "h": 6,
+      "h": 8,
       "d": 0.95,
       "mat": 9,
       "floor": 1,
@@ -767,7 +1093,9 @@
         0
       ],
       "mat": 1,
-      "floor": 1
+      "floor": 1,
+      "hidden": true,
+      "note": "replaced by the real arched pane (the east window's archTop)"
     },
     {
       "type": "box",
@@ -784,11 +1112,11 @@
     {
       "type": "box",
       "name": "East entry roof support north",
-      "x": 28.5,
-      "y": 3.35,
+      "x": 29.8,
+      "y": 3.7,
       "z": -1.3,
       "w": 0.62,
-      "h": 7.7,
+      "h": 8.4,
       "d": 0.62,
       "mat": 24,
       "floor": 0
@@ -796,11 +1124,11 @@
     {
       "type": "box",
       "name": "East entry roof support south",
-      "x": 28.5,
-      "y": 3.35,
+      "x": 29.8,
+      "y": 3.7,
       "z": 4.5,
       "w": 0.62,
-      "h": 7.7,
+      "h": 8.4,
       "d": 0.62,
       "mat": 24,
       "floor": 0
@@ -808,12 +1136,12 @@
     {
       "type": "box",
       "name": "East entry roof front beam",
-      "x": 28.5,
-      "y": 7.0,
+      "x": 29.8,
+      "y": 8.1,
       "z": 1.6,
       "w": 0.48,
-      "h": 0.4,
-      "d": 6.6,
+      "h": 0.45,
+      "d": 7.0,
       "mat": 24,
       "floor": 0
     },
@@ -2322,6 +2650,60 @@
       "d": 0.5,
       "mat": 14,
       "floor": 0
+    },
+    {
+      "type": "box",
+      "name": "East porch king post",
+      "x": 29.8,
+      "y": 9.55,
+      "z": 1.6,
+      "w": 0.42,
+      "h": 2.5,
+      "d": 0.42,
+      "mat": 24,
+      "floor": 0
+    },
+    {
+      "type": "beam",
+      "name": "East porch truss strut north",
+      "x": 29.8,
+      "y": 0,
+      "z": 0,
+      "from": [
+        29.8,
+        8.35,
+        -0.9
+      ],
+      "to": [
+        29.8,
+        10.0,
+        1.45
+      ],
+      "w": 0.34,
+      "d": 0.34,
+      "mat": 24,
+      "floor": 0
+    },
+    {
+      "type": "beam",
+      "name": "East porch truss strut south",
+      "x": 29.8,
+      "y": 0,
+      "z": 0,
+      "from": [
+        29.8,
+        8.35,
+        4.1
+      ],
+      "to": [
+        29.8,
+        10.0,
+        1.75
+      ],
+      "w": 0.34,
+      "d": 0.34,
+      "mat": 24,
+      "floor": 0
     }
   ],
   "origin": [
@@ -2332,5 +2714,7 @@
   "glassAlpha": 0.5,
   "noWeather": [
     11
-  ]
+  ],
+  "ceiling": "#f1eee6",
+  "ceilingSlope": "#b27a45"
 }

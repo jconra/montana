@@ -1,0 +1,402 @@
+[
+ {
+  "id": "20120704_132202",
+  "label": "Great room through the arched doorway",
+  "file": "20120704_132202.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-04 13:22",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_140922",
+  "label": "Great room from the dining side",
+  "file": "20120704_140922.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-04 14:09",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_141013",
+  "label": "Kitchen and dining",
+  "file": "20120704_141013.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-04 14:10",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_141121",
+  "label": "Main bedroom, arched window",
+  "file": "20120704_141121.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-04 14:11",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_141311",
+  "label": "Main bedroom, TV and doors",
+  "file": "20120704_141311.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-04 14:13",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_141418",
+  "label": "Loft futon",
+  "file": "20120704_141418.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-04 14:14",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120704_141433",
+  "label": "Loft railing and stairs",
+  "file": "20120704_141433.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-04 14:14",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162525",
+  "label": "Bedroom, half-round window",
+  "file": "20120707_162525.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:25",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162559",
+  "label": "Loft futon and quilt",
+  "file": "20120707_162559.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:25",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162812",
+  "label": "Loft toward a bedroom",
+  "file": "20120707_162812.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:28",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162853",
+  "label": "Bunk room",
+  "file": "20120707_162853.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-07 16:28",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162924",
+  "label": "Kitchen counters",
+  "file": "20120707_162924.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:29",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_162937",
+  "label": "Great room toward the stairs",
+  "file": "20120707_162937.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:29",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_163009",
+  "label": "Sectional and stairs",
+  "file": "20120707_163009.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:30",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_163036",
+  "label": "Down the great room",
+  "file": "20120707_163036.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-07 16:30",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_163805",
+  "label": "Sectional and coffee table",
+  "file": "20120707_163805.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:38",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_163828",
+  "label": "Bathroom sinks",
+  "file": "20120707_163828.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-07 16:38",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 63.5,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_163923",
+  "label": "Kitchen island and fridge",
+  "file": "20120707_163923.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-07 16:39",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120707_193221",
+  "label": "Great room from the loft",
+  "file": "20120707_193221.jpg",
+  "width": 1067,
+  "height": 1600,
+  "taken": "2012-07-07 19:32",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 43.0,
+  "vfov": 29.04,
+  "lens": {
+   "focalUsed": 44.0,
+   "ptlens": [
+    -0.0145311,
+    0.0519614,
+    -0.0575535
+   ],
+   "straightened": true
+  }
+ },
+ {
+  "id": "20120708_112205",
+  "label": "Bedroom, green quilt",
+  "file": "20120708_112205.jpg",
+  "width": 1600,
+  "height": 1067,
+  "taken": "2012-07-08 11:22",
+  "camera": "Canon EOS DIGITAL REBEL XTi",
+  "focal": 18.0,
+  "vfov": 44.83,
+  "lens": {
+   "focalUsed": 18.0,
+   "ptlens": [
+    0.0160236,
+    -0.047854,
+    0.0030549
+   ],
+   "straightened": true
+  }
+ }
+]
